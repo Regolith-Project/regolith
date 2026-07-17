@@ -55,6 +55,53 @@ High-level mission execution:
 - Mode transitions (manual → assisted → autonomous)
 - Telemetry and status reporting
 
+## Repository Structure
+
+Regolith follows the same two-tier layout as upstream Autoware:
+
+- **`regolith`** (this repo) is the meta-repo. It holds no package source of its
+  own — only `regolith.repos` (pins the packages repo), top-level docs, and the
+  demo/launch scripts under `scripts/`. Run `scripts/setup.sh` to pull in
+  `regolith.universe` and build.
+- **[`regolith.universe`](https://github.com/Regolith-Project/regolith.universe)**
+  is a genuine GitHub fork of
+  [`autoware.universe`](https://github.com/autowarefoundation/autoware_universe),
+  preserving fork relationship and history. Car-specific packages (lane/HD-map
+  planning, traffic-light logic, NDT map localisation, etc.) are excluded from
+  the build via `COLCON_IGNORE`; reusable packages (common utilities, Autoware
+  message definitions, `ekf_localizer`, trajectory/control components) are kept.
+  New planetary packages live under `planetary/` in that repo, namespaced
+  `regolith_*`.
+
+## Hello-World PoC Scope
+
+The sections above describe Regolith's long-term architectural vision. The
+first working demo (an NLnet NGI Zero Commons Fund milestone) deliberately
+narrows this to prove the pipeline end-to-end before broadening it:
+
+- **Localisation** fuses wheel odometry + IMU only — no visual odometry yet.
+  Bounded drift over a short traverse is acceptable and is visualized
+  (estimated vs. ground-truth pose), not hidden.
+- **The costmap comes from the generated terrain heightmap** (the world is
+  known a priori), not from onboard perception. Sensor-derived costmaps are
+  the explicit next milestone after this PoC — the rover still genuinely
+  plans and navigates, it just starts from a map instead of building one.
+- Lunar gravity (1.62 m/s²) is modeled; wheel friction/damping is tuned for
+  controllability rather than strict physical accuracy.
+
+Out of scope for this milestone: visual odometry/SLAM, sensor-derived
+costmaps, additional rover models, ML terrain classification, adaptive speed
+governors, FDIR beyond stop-and-replan, real hardware.
+
+### Autoware Component Reuse Log
+
+Every reuse-vs-replace decision made while building the PoC is logged here as
+it happens, with a one-line rationale.
+
+| Autoware component | Decision | Rationale |
+|---|---|---|
+| _(populated milestone by milestone — see PROGRESS.md for narrative detail)_ | | |
+
 ## Simulation Environment
 
 Gazebo-based planetary analogue worlds with:

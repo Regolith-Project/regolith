@@ -1,0 +1,5 @@
+repositories:
+  src/regolith.universe:
+    type: git
+    url: https://github.com/Regolith-Project/regolith.universe.git
+    version: main

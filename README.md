@@ -86,18 +86,19 @@ See the [Roadmap](#roadmap) below for details.
 > Coming soon — the first simulation release is targeted for mid-2026. When ready:
 >
 > ```bash
-> # Clone
+> # Clone the meta-repo
 > git clone https://github.com/Regolith-Project/regolith.git
 > cd regolith
 >
-> # Build (ROS 2 Humble/Jazzy)
-> colcon build --symlink-install
+> # Pull in regolith.universe (packages) and build
+> ./scripts/setup.sh
 >
 > # Launch simulation
-> ros2 launch regolith_bringup simulation.launch.py
+> source install/setup.bash
+> ros2 launch regolith_bringup hello_moon.launch.py
 > ```
 >
-> This will spawn a rover in a planetary-analogue Gazebo world and begin autonomous waypoint navigation.
+> This will spawn a rover in a planetary-analogue Gazebo world and begin autonomous waypoint navigation. See [`docs/architecture.md`](docs/architecture.md) for how this repo relates to `regolith.universe`.
 
 ## Roadmap
 

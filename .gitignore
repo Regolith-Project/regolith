@@ -1,0 +1,10 @@
+# colcon workspace (populated via scripts/setup.sh, not committed)
+/src/
+/build/
+/install/
+/log/
+
+# local tooling / internal execution brief, not part of the published project
+# (PROGRESS.md and ARCHITECTURE.md are tracked deliverables, not excluded)
+.claude/
+PLAN.md
