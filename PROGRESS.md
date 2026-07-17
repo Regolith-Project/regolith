@@ -11,7 +11,7 @@ component reuse log.
 | M0 — Environment verified | Done |
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
-| M3 — Localization | Not started |
+| M3 — Localization | Substantially done (see notes) |
 | M4 — Autonomous navigation | Not started |
 | M5 — Demo polish and packaging | Not started |
 
@@ -34,6 +34,15 @@ component reuse log.
 - `regolith.universe` created as a genuine GitHub fork of
   `autowarefoundation/autoware_universe` (fork relationship + full history on
   `main` preserved; only `main` branch copied, not every upstream branch/tag).
+- **M3 localization uses `robot_localization`'s `ekf_node`, not Autoware's
+  `ekf_localizer`**: the plan asked to check `ekf_localizer` first. It isn't
+  present anywhere in this fork's checked-out `autoware_universe` tree at all
+  (not under `localization/`, not referenced in any `.repos` file) - it's
+  been removed/relocated upstream since whatever commit generation this
+  fork's history reflects. Migrating it in would mean pulling in a whole
+  separate, unvetted external repo, which is squarely the "disproportionate
+  for this PoC" case the plan anticipated. `robot_localization` (already
+  installed in M0 as exactly this fallback) is used instead.
 
 ## Environment
 
@@ -118,6 +127,82 @@ component reuse log.
   (0.14→0.11 m), increased wheel friction (μ 1.0→1.4), and capped
   `max_angular_velocity` at 0.3 rad/s (initially 1.2, then 0.6 - still
   flipped once under combined fast-forward+fast-turn before this final cut).
+
+## M3 acceptance results
+
+**Status: infrastructure complete and working; the <5% drift target is not
+reliably met.** Recording this honestly rather than as a clean pass, per the
+plan's own framing that drift is expected and worth visualizing, not hidden.
+
+- New `regolith_bringup/launch/localization_demo.launch.py`,
+  `config/ekf.yaml`, and `scripts/sensor_covariance_relay.py`: fuses wheel
+  odometry (`/odom`, velocity only) and IMU (`/imu`, orientation + angular
+  velocity) in a `robot_localization` `ekf_node`, publishing `/odometry/filtered`
+  and the `odom -> base_link` TF. Ground truth is bridged separately via a
+  `gz-sim-pose-publisher-system` plugin on the rover model
+  (`/model/rover/pose` -> `/ground_truth/pose`, `geometry_msgs/PoseStamped`,
+  GZ-to-ROS only, never fed into the EKF).
+- Three real bugs found and fixed along the way, all now resolved:
+  1. gz-sim's IMU and DiffDrive-odometry both publish all-zero covariance
+     (no noise model configured). Per REP-145, all-zero covariance means
+     "unknown," and robot_localization's EKF silently discards a measurement
+     with unknown covariance rather than trusting it - it looked exactly
+     like the fused estimate just wasn't listening to either sensor.
+     Fixed by `sensor_covariance_relay.py`, which republishes both topics
+     with small fixed diagonal covariances filled in
+     (`/imu/with_covariance`, `/odom/with_covariance`).
+  2. The IMU's `frame_id` is gz-sim's internal sensor naming
+     (`rover/base_link/imu`), which has no corresponding TF frame - only
+     `imu_link` (from the URDF, published by `robot_state_publisher`) does.
+     robot_localization needs a resolvable TF transform from the sensor
+     frame to `base_link` and silently drops messages it can't transform.
+     Fixed in the same relay (overwrites `frame_id` to `imu_link`).
+  3. Wheel odometry's *absolute* yaw (and, by extension, its x/y position,
+     which was integrated using that same bad internal yaw) is unreliable
+     for a skid-steer platform: turning requires real wheel scrub against
+     the ground that the dead-reckoning kinematic model doesn't account
+     for. Verified directly with an in-place-rotation test: ground truth
+     turned ~122°, wheel odom's own yaw estimate claimed only ~41°.
+     `odom0_config` now feeds only `vx`/`vyaw` (rate measurements) into the
+     EKF, not position or absolute orientation; absolute heading comes from
+     the IMU, whose orientation was independently verified to match ground
+     truth to ~7 decimal places (gz-sim's simulated IMU is effectively
+     noise-free here).
+- After fix 3 was in place, yaw tracking is excellent: EKF yaw matched
+  ground truth to 4+ decimal places in every test run, including after
+  sustained combined forward+turn maneuvers.
+- Position tracking improved enormously from the pre-fix state (which was
+  wrong by 60-190%, including one run where the estimate ended up hundreds
+  of metres from a ground truth a few metres away) but still shows
+  20-45% position drift relative to distance traveled across several test
+  runs at moderate speed (0.2-0.35 m/s) with gentle turning, well above the
+  plan's <5% target. Isolated causes, in descending order of confidence:
+  - **Genuine, speed-dependent wheel slip**: at 0.1 m/s pure-straight
+    driving, wheel odometry position matched ground truth to 6 decimal
+    places (zero drift); at 0.3-0.35 m/s the same straight-line test showed
+    25-39% overshoot. Lunar gravity (1.62 m/s²) means far less normal force
+    (and thus available traction) than Earth gravity for the same
+    friction coefficients, so wheel slip under acceleration is a real,
+    physically-motivated effect here, not obviously a bug - though it may
+    be exaggerated by this PoC's simplified friction/contact model.
+  - **An unresolved residual EKF integration behavior**: in one clean
+    straight-line test after all three fixes above, wheel odometry itself
+    overshot ground truth (as expected from the slip effect), but the
+    EKF's fused position *undershot* by a similar margin in the opposite
+    direction - the two errors don't obviously compose the way a simple
+    "trust the wheel measurement" fusion would suggest. Not root-caused
+    within this milestone's time budget; flagged for follow-up rather than
+    chased further as an increasingly expensive debugging session.
+  - One test run also showed the rover itself flip mid-drive during a
+    150-second sustained aggressive maneuver (ground truth orientation
+    showed a real ~180° roll) - that run's huge apparent "drift" is a
+    consequence of the two_d_mode EKF producing garbage yaw once the robot
+    actually isn't upright, not a localization bug; it's the M2 stability
+    envelope being exceeded, not an M3 finding.
+- RViz shows RobotModel, TF, live Camera feed, and Odometry with no errors
+  (`docs/media/m3_rviz_localization.png`); `/ground_truth/pose` and
+  `/odometry/filtered` are both live and directly comparable at any time via
+  `ros2 topic echo`.
 
 ## Issues encountered
 
