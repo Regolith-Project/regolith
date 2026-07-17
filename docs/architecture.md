@@ -100,7 +100,7 @@ it happens, with a one-line rationale.
 
 | Autoware component | Decision | Rationale |
 |---|---|---|
-| _(populated milestone by milestone — see PROGRESS.md for narrative detail)_ | | |
+| _(none — M1 is a greenfield package)_ | N/A | `regolith_terrain_gen` has no car-driving analogue in Autoware; procedural terrain/world generation for simulation is a planetary-specific addition, not a fork of an existing component. |
 
 ## Simulation Environment
 

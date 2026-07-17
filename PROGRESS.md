@@ -9,7 +9,7 @@ component reuse log.
 | Milestone | Status |
 |---|---|
 | M0 — Environment verified | Done |
-| M1 — Procedural lunar terrain | Not started |
+| M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Not started |
 | M3 — Localization | Not started |
 | M4 — Autonomous navigation | Not started |
@@ -65,6 +65,37 @@ component reuse log.
   `ros-humble-teleop-twist-keyboard`, `ros-humble-robot-localization` (M3
   fallback per the plan).
 
+## M1 acceptance results
+
+- `ros2 launch regolith_bringup terrain_only.launch.py seed:=42` generates
+  the world (heightmap, PBR textures, 4 rock mesh variants, 130 scattered
+  rocks, manifest) and opens it in Gazebo. Screenshot:
+  `docs/media/m1_lunar_terrain_seed42.png` — craters, rock scatter, long
+  shadows from a 12° sun elevation, near-black sky all present.
+- Determinism verified: two runs with `--seed 42` produced byte-identical
+  `heightmap.png`; `--seed 7` produced a different heightmap, as expected.
+- New package `regolith_terrain_gen` (`planetary/regolith_terrain_gen` in
+  `regolith.universe`): fBm base (value noise, no external noise library) +
+  power-law crater field (60 craters, 2-40 m diameters, bowl+rim profile) +
+  1.5° regional slope, normalized to a 10 m height range on a 513x513
+  heightmap over a 200x200 m world. 130 rocks (4 low-poly icosphere-derived
+  variants) scattered outside a 12 m spawn-zone keep-out, seated on the
+  actual terrain elevation at their position. Everything needed for M4's
+  costmap (crater positions/depths, rock footprints) is recorded in
+  `manifest.json`.
+- New package `regolith_bringup` (`planetary/regolith_bringup`): first real
+  content in the package the plan's table designates as the integration
+  point; `terrain_only.launch.py` calls `regolith_terrain_gen` in-process via
+  an `OpaqueFunction` (no shelling out / stdout-parsing needed) and hands the
+  resulting world path to `ros_gz_sim`'s `gz_sim.launch.py`.
+- `regolith.universe`'s existing ~500 MB / hundreds-of-packages tree was left
+  untouched for this milestone — built with
+  `colcon build --packages-select regolith_terrain_gen regolith_bringup`,
+  so `rosdep install --from-paths src` failures on car-specific packages
+  missing `tier4_*`/CUDA rosdep keys don't block M1. The `COLCON_IGNORE`
+  stripping pass (plan section 4) is deferred to whichever milestone first
+  needs a full-workspace build.
+
 ## Issues encountered
 
 - This Claude Code session runs as a background job with no attached TTY, so
@@ -84,3 +115,12 @@ component reuse log.
   command line, since it literally contains the pattern text — killing the
   shell running the command before it can report anything. Use anchored
   patterns (`pkill -f "^gz sim"`) or `pgrep`/PID-based kills instead.
+- Initial SDF had `<gravity>` nested inside `<physics>` — sdformat warns and
+  silently ignores it there; gravity must be a direct child of `<world>`.
+- Bowl-shaped craters viewed from a steep top-down angle with off-axis
+  lighting read as domes to the human eye (verified against the raw
+  heightmap data — the crater profile was always a genuine depression). This
+  is the well-known "crater/dome" perceptual illusion seen in real lunar/Mars
+  orbital imagery. Fixed by choosing a shallower camera pitch and a sun
+  azimuth roughly aligned with the camera's viewing direction, rather than
+  by changing the terrain data.
