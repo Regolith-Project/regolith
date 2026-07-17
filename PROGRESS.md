@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | Substantially done (see notes) |
-| M4 — Autonomous navigation | Not started |
+| M4 — Autonomous navigation | Pipeline built and individually verified; full acceptance not met (see notes) |
 | M5 — Demo polish and packaging | Not started |
 
 ## Decisions
@@ -43,6 +43,20 @@ component reuse log.
   separate, unvetted external repo, which is squarely the "disproportionate
   for this PoC" case the plan anticipated. `robot_localization` (already
   installed in M0 as exactly this fallback) is used instead.
+- **M4 follower: minimal pure pursuit in `regolith_vehicle_interface`, not
+  `autoware_pure_pursuit`**: unlike `ekf_localizer`, `autoware_pure_pursuit`
+  *is* present in this fork, but it depends on `autoware_control_msgs`,
+  `autoware_planning_msgs`, `autoware_trajectory_follower_base`, and
+  `autoware_vehicle_info_utils`, and it outputs a steering-tire-angle Control
+  message - it's a lateral controller built for Ackermann-steered vehicles.
+  Retrofitting it for a skid-steer rover would mean pulling in that whole
+  dependency chain and then translating steering-angle output back into a
+  differential left/right-wheel command, which is both extra integration
+  surface and a conceptual mismatch (pure pursuit's own geometry assumes
+  Ackermann kinematics). A minimal pure pursuit computing linear+angular
+  velocity directly is both simpler and a more natural fit for skid-steer,
+  matching the plan's explicit fallback. See `regolith_vehicle_interface/
+  pure_pursuit_node.py`.
 
 ## Environment
 
@@ -203,6 +217,69 @@ plan's own framing that drift is expected and worth visualizing, not hidden.
   (`docs/media/m3_rviz_localization.png`); `/ground_truth/pose` and
   `/odometry/filtered` are both live and directly comparable at any time via
   `ros2 topic echo`.
+
+## M4 acceptance results
+
+**Status: full pipeline built and each stage individually verified working;
+the "3 consecutive full 60-100 m runs" acceptance criterion is not met.**
+Recorded honestly, same as M3 - real progress, real remaining gap.
+
+- Three new packages, all `ament_python`:
+  - `regolith_costmap` (`costmap_node.py`): reads `manifest.json` + the
+    heightmap, downsamples to a configurable grid (1 m/cell by default),
+    computes slope (gradient) and roughness (local elevation std-dev),
+    marks cells lethal above a slope threshold (20°) or inside a rock
+    footprint from the manifest, inflates lethal cells by the rover radius,
+    and publishes a transient-local `nav_msgs/OccupancyGrid` on `/costmap`.
+    Verified visually (`docs/media/m4_costmap_and_planned_path.png`): crater
+    rims and rocks read clearly as obstacle rings/blocks against the terrain.
+  - `regolith_planner` (`astar.py` + `planner_node.py`): cost-aware A* (not
+    shortest-path - traversal cost scales with cell cost, so the search
+    prefers low-risk routing) over `/costmap`, from the EKF-estimated
+    current pose to an RViz "2D Goal Pose" click (`/goal_pose`), with light
+    path smoothing. Publishes `nav_msgs/Path` on `/planned_path`. Verified
+    both standalone (sub-100ms planning time on the 256x256 grid) and
+    visually - the same screenshot shows a path visibly weaving around
+    crater rims and rocks rather than cutting through them.
+  - `regolith_vehicle_interface` (`pure_pursuit_node.py`): minimal pure
+    pursuit (see the reuse-decision note above for why not
+    `autoware_pure_pursuit`) outputting `cmd_vel` directly. Modest speed
+    profile: slows for high-cost cells and, after a stability finding below,
+    stops translating entirely and rotates in place first whenever the
+    heading error exceeds 30° before resuming forward motion. Minimal
+    recovery per the plan ("do not build elaborate FDIR"): if the rover
+    strays >4 m from the path or makes no progress for 8s, it stops and
+    re-publishes the last goal to itself to trigger a fresh plan from
+    wherever it currently is - verified triggering correctly in testing.
+- End-to-end run with a modest (~16 m) goal crossing costmap-flagged terrain:
+  planner produced a path in an eyeblink, the follower drove it, stall
+  recovery fired and re-planned correctly when progress stalled. Multiple
+  such partial runs completed without incident.
+- **Not achieved**: the rover flipped (real ~90-180° roll, confirmed via
+  ground-truth orientation, not an estimation artifact) partway through
+  three separate longer-goal test attempts, always coincident with a
+  terrain-collision-box boundary crossing (z-height jumped at the same
+  moment). This reproduced across three different mitigation attempts:
+  reducing follower speed/turn aggressiveness, increasing terrain
+  collision resolution from 24 to 64 cells/axis (which also cratered the
+  physics real-time factor to ~0.09, making full 60-100 m test runs
+  impractically slow to even observe), and adding a rotate-in-place-first
+  behavior for large heading errors. None fully eliminated it. This is
+  believed to be a genuine consequence of the box-grid terrain collision
+  approximation's step discontinuities (see heightmap.py's
+  `build_terrain_collision_boxes_sdf` - itself downstream of the confirmed
+  dartsim heightmap/mesh collision limitation from M2), landing at
+  `grid_resolution=24` as the best available performance/stability balance
+  found, not a validated fix. **Follow-up needed**: either a genuinely
+  smooth collision surface (revisit if gz-physics ever ships working native
+  heightmap/mesh collision for dartsim) or per-cell-boundary blending in the
+  box-grid approach itself.
+- Consequence for the "3 consecutive 60-100 m runs" acceptance check: not
+  attempted at full distance given the demonstrated flip risk and the
+  RTF-vs-resolution trade-off making iteration on a fix impractically slow
+  within this session. The pipeline (costmap -> plan -> follow -> recover)
+  is real and demonstrated at shorter range; closing the gap to the full
+  acceptance distance is the clearest remaining M4 work.
 
 ## Issues encountered
 
