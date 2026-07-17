@@ -10,7 +10,7 @@ component reuse log.
 |---|---|
 | M0 — Environment verified | Done |
 | M1 — Procedural lunar terrain | Done |
-| M2 — Rover spawns and drives (teleop) | Not started |
+| M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | Not started |
 | M4 — Autonomous navigation | Not started |
 | M5 — Demo polish and packaging | Not started |
@@ -96,6 +96,29 @@ component reuse log.
   stripping pass (plan section 4) is deferred to whichever milestone first
   needs a full-workspace build.
 
+## M2 acceptance results
+
+- New package `regolith_rover_description` (`planetary/regolith_rover_description`):
+  Leo-Rover-sized 4-wheel skid-steer chassis (URDF/xacro), IMU, forward-tilted
+  RGB camera, `gz-sim-diff-drive-system` plugin (multi-joint skid-steer mode),
+  `JointStatePublisher` and `Imu` system plugins. `regolith_bringup` gained
+  `teleop_demo.launch.py`: generates terrain, spawns the rover, bridges
+  cmd_vel/odom/imu/camera/camera_info/joint_states/tf between ROS and Gazebo.
+- `ros2 launch regolith_bringup teleop_demo.launch.py seed:=42` + manual
+  `cmd_vel` Twist commands (standing in for `teleop_twist_keyboard`, which
+  publishes the same topic/type): rover drives forward and turns repeatedly
+  over the crater/rock field without flipping (verified via the ground-truth
+  `/world/.../dynamic_pose/info` orientation quaternion staying at
+  identity/pure-yaw, not tipping into roll/pitch) and without sinking (z
+  stable at the resting height on repeated checks). `/odom`, `/imu`,
+  `/camera/image`, `/camera/camera_info`, `/joint_states`, `/tf` all publish;
+  RViz shows the robot model, TF frames, and a live camera feed
+  (`docs/media/m2_rviz_camera_tf.png`).
+- Stability tuning: widened track (0.36→0.46 m), lowered chassis height
+  (0.14→0.11 m), increased wheel friction (μ 1.0→1.4), and capped
+  `max_angular_velocity` at 0.3 rad/s (initially 1.2, then 0.6 - still
+  flipped once under combined fast-forward+fast-turn before this final cut).
+
 ## Issues encountered
 
 - This Claude Code session runs as a background job with no attached TTY, so
@@ -124,3 +147,62 @@ component reuse log.
   orbital imagery. Fixed by choosing a shallower camera pitch and a sun
   azimuth roughly aligned with the camera's viewing direction, rather than
   by changing the terrain data.
+- **The M2 rover-on-terrain physics saga** (this consumed most of the M2
+  session; recording it in full so it isn't re-litigated). Symptom: the
+  rover's wheels spun at the commanded rate (confirmed via `/joint_states`)
+  but the chassis never translated - or fell through everything, or the
+  simulation appeared to "freeze" the rover solid - depending on the exact
+  test. Confirmed real, separate findings along the way:
+  - `gz sim -v 4` (debug verbosity, invisible at default `-v`) logs
+    `"Heightmap/Mesh construction from an SDF has not been implemented yet
+    for dartsim"`. Both the native `<heightmap>` collision geometry and
+    generic `<mesh>` collision geometry are no-ops for dartsim in this
+    gz-physics 7.8.0 install, reproduced identically under the `bullet` and
+    `bullet-featherstone` engine plugins too (`--physics-engine
+    gz-physics-bullet-plugin` / `-bullet-featherstone-plugin`). This part is
+    a genuine, real engine limitation - box primitives are the fallback
+    (`regolith_terrain_gen`'s `build_terrain_collision_boxes_sdf`), matching
+    the plan's anticipated "static mesh instead of heightmap" fallback
+    (substituting boxes since mesh doesn't work either).
+  - What turned out to be **wrong, in order tried and discarded**: reducing
+    box-grid resolution, splitting collision into separate `<model>`s vs.
+    many `<collision>` elements on one link, removing rocks, removing rock
+    *collision* specifically, changing gravity magnitude, disabling
+    `allow_auto_disable`, adding an 8 s `TimerAction` delay before spawning,
+    switching the ROS↔GZ `/pose` bridge from bidirectional to one-way,
+    replicating the launch file's `GZ_SIM_SYSTEM_PLUGIN_PATH` env var
+    manually. None of these were the actual bug; each seemed to "fix" or
+    "reproduce" the symptom in some isolated test only because the tests
+    differed in the one thing that actually mattered (below), which wasn't
+    controlled for.
+  - **Actual root cause**: the rover was being spawned at a fixed height
+    (`z:=1.0`, later `z:=2.0`) that had nothing to do with the *local*
+    terrain elevation at the spawn point. `build_terrain_collision_boxes_sdf`
+    sizes each box to the average heightmap value in its footprint - at
+    `grid_resolution=1` (one box for the whole world, an early attempt) that
+    average can easily be several meters for a given seed, and even at finer
+    resolutions the local elevation right at the nominal "origin" spawn
+    point depends on the regional slope/base terrain for that seed. Spawning
+    at a Z below the actual box surface means the rover starts *embedded in
+    solid geometry*, and DART's response to that invalid initial state is
+    unpredictable - a wheeled multi-body could look "frozen" (no visible
+    integration), "falling through" (numerically unstable contact resolving
+    away from the overlap in the wrong direction), or explode to absurd
+    coordinates, depending on exactly how deep the overlap is and where. A
+    single free rigid body (test boxes used throughout isolation) tolerates
+    the same bad spawn far more gracefully, which is why every "isolate with
+    a plain box" test kept passing and pointed away from the real cause.
+  - **Fix**: `generate_world` now looks up and returns the actual elevation
+    at the spawn point (`elevation_lookup`, already computed for rock
+    placement) and writes it to `manifest.json` as `spawn_zone.elevation_m`.
+    `teleop_demo.launch.py` reads that value and spawns at
+    `elevation_m + 0.5` instead of a hard-coded constant. Once fixed, the
+    *original* box-grid design (fine resolution, full 130 rocks, separate
+    `<model>`s per rock) worked exactly as first written - none of the
+    discarded workarounds above were ever necessary.
+  - Lesson for future milestones: **any** code that spawns a body into
+    procedurally generated terrain must compute its Z from real elevation
+    data, never a constant, and this class of bug can look like almost
+    anything (freeze/fall-through/explosion) depending on overlap depth -
+    if a spawned body behaves strangely, check the spawn pose against actual
+    local terrain height before suspecting the physics engine.

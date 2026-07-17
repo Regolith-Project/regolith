@@ -101,6 +101,7 @@ it happens, with a one-line rationale.
 | Autoware component | Decision | Rationale |
 |---|---|---|
 | _(none — M1 is a greenfield package)_ | N/A | `regolith_terrain_gen` has no car-driving analogue in Autoware; procedural terrain/world generation for simulation is a planetary-specific addition, not a fork of an existing component. |
+| _(none — M2 is a greenfield package)_ | N/A | `regolith_rover_description`/vehicle simulation has no Autoware analogue either: Autoware assumes a car-shaped vehicle interface, not a skid-steer rover description or a `gz-sim` DiffDrive-based simulated drivetrain. The vehicle *interface* layer (translating stack trajectory commands to skid-steer `cmd_vel`) is still planned as a genuine reuse point in `regolith_vehicle_interface` (M4). |
 
 ## Simulation Environment
 
