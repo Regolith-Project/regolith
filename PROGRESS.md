@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | Substantially done (see notes) |
-| M4 — Autonomous navigation | Pipeline built and individually verified; full acceptance not met (see notes) |
+| M4 — Autonomous navigation | Pipeline built and verified; flip root-cause found and fixed (see "Rover flip fix" below); full 60-100 m / 3-consecutive-run acceptance still not re-attempted at that exact distance (see notes) |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -619,3 +619,100 @@ re-read line-by-line), not just taken on trust.
   Killed by PID. Worth remembering: after any standalone/background ROS
   testing, verify with `ps aux | grep -i regolith` (or similar), not just
   the launcher-process pkill patterns used throughout this project.
+
+## Rover flip fix (terrain collision + simulated recovery)
+
+The M4/M5 flip issue (rover chassis rolling ~90-180°, always coincident with a
+terrain-collision-box boundary crossing) was root-caused and fixed, rather
+than left as a documented limitation. Previous sessions had already tried
+reducing follower speed/turn aggressiveness, raising box-grid resolution from
+24 to 64 cells/axis (which tanked physics real-time-factor to ~0.09), and a
+rotate-in-place-before-driving behavior - none eliminated it. This pass
+actually measured the collision geometry instead of continuing to tune
+follower parameters around it.
+
+- **Root cause, measured, not assumed**: the box-grid terrain collision
+  fallback (`build_terrain_collision_boxes_sdf` in
+  `regolith_terrain_gen/heightmap.py` - the only working collision option;
+  dartsim/bullet/bullet-featherstone all lack heightmap/mesh collision, see
+  M2's "physics saga" above) used flat-topped boxes. Adjacent cells meet at a
+  vertical cliff equal to their height difference: on seed 42 at
+  `grid_resolution=24`, steps averaged 0.31 m and reached 2.27 m against the
+  rover's 0.09 m wheel radius - 81% of all cell boundaries had a step taller
+  than the wheel. Driving (especially turning) across such a step produces a
+  sudden horizontal contact normal that rolls the chassis. Critically, the
+  flip hotspot used to reproduce this fix (-9, 44.8 on seed 42) sits on
+  near-flat terrain (1.7° slope), not a crater rim - confirming this was a
+  collision-geometry artifact, not primarily a "steep/rough terrain" problem,
+  which is why earlier follower-side mitigations (slow down on high-cost
+  cells) never fully fixed it.
+- **Fix part 1 - prevention, tilted + smoothed slabs**: each box is now
+  tilted to match the local terrain gradient (a "shingle" approximating the
+  true tangent plane) instead of sitting flat, and slightly widened
+  (`overlap_frac=0.12`) so neighbors overlap with no gap a wheel could drop
+  into. Tilting alone was insufficient: the residual lip between two tilted
+  neighbors equals the local terrain *curvature* (discrete Laplacian of the
+  cell-average heights, /4), which is nonzero even on gently-bending flat
+  ground - measured up to 1.11 m on seed 42 (12x the wheel radius), with 31%
+  of boundaries still exceeding the wheel radius. Fixed by `_smooth_surface`:
+  a separable `[1,2,1]` blur of the cell-average heights (`smoothing_passes`,
+  default 3) applied *before* tilting, removing the curvature term so
+  neighboring slab tops very nearly meet. At 3 passes: max lip 1.11 m -> 0.10
+  m, boundaries exceeding wheel radius 31% -> 0%, generalizing across seeds
+  7/123/2024 (0.84-1.01 m -> 0.07-0.13 m). Uses the *same* 576 boxes as
+  before, so this is free on real-time-factor - unlike the earlier
+  resolution-increase attempt, which bought smoothness by brute-force box
+  count and paid for it in RTF. Slab thickness is a small constant (2.5 m,
+  not scaled with terrain height) specifically to avoid re-introducing an RTF
+  hit via bloated per-box bounding boxes. Spawn clearance is unaffected -
+  spawn Z still comes from the fine heightmap via `manifest.json`, not this
+  smoothed collision grid.
+- **Fix part 2 - honest simulated-recovery backstop**: a wheeled rover cannot
+  physically self-right, and prevention, while now far more effective, isn't
+  provably 100% - so `regolith_bringup/scripts/flip_recovery_node.py` (new
+  node, wired into `hello_moon.launch.py`) watches `/ground_truth/pose` and,
+  if the rover stays flipped (roll/pitch > 60°, 1s debounce), teleports it
+  back to its last recorded upright pose via gz-sim's `/world/.../set_pose`
+  service. Every log line explicitly labels this "SIMULATED RECOVERY" /
+  "not physical" - it exists to keep an unattended demo running, not to claim
+  real self-righting hardware. `pure_pursuit_node.py`'s existing flip
+  detection (`_check_flipped`, raw `/imu`-based since the EKF's `two_d_mode`
+  estimate can never show a real flip) now just pauses following instead of
+  halting permanently; once the recovery node uprights the rover, the
+  attitude check clears and following resumes on its own. An earlier version
+  of the recovery node (built earlier in this same pass, found still running
+  as a live user demo process when the fix work started) used a fixed 2s
+  backoff and cleared its pose history on every reset, which could re-select
+  a recovery pose right back on the same lip - confirmed via logs showing 29
+  consecutive teleports to the same spot (-9, 44.8). Fixed with progressive
+  backoff (2s -> 4s -> 8s... capped at 40s) that does *not* clear history, so
+  a relapse walks back further along the actually-driven trail instead of
+  looping.
+- **Verification**: 3 clean autonomous goal-reaching runs, zero flips, max
+  observed roll/pitch under ~5°/6° (vs. the previous 60-180° flips):
+  seed 42 spawn->(0,25) 25 m, seed 42 (0,24)->(0,55) 31 m (55 m combined
+  through the original y≈44 flip zone), seed 7 (0,0)->(30,15) 34 m diagonal
+  (crosses multiple cell boundaries while turning - the previously worst
+  case). A manual stress-drive repeatedly crossing the original hotspot at
+  0.3 m/s produced zero driving-induced flips; a deliberately induced flip
+  (manual teleport-drop) correctly exercised the new progressive-backoff
+  recovery with no relapse loop. This is real progress on the plan's
+  "3 consecutive full 60-100 m runs" acceptance bar but not a re-attempt at
+  that literal distance/seed-cluster combination yet - the runs above are
+  shorter and were chosen to specifically stress the confirmed flip
+  mechanism (boundary crossings, sustained turning) rather than to replay
+  the exact M4 acceptance check end to end. Re-running the original
+  60-100 m/3-consecutive-seed acceptance check is the natural next step to
+  close M4 out fully.
+- **Process gotcha found along the way**: killing ROS/Gazebo processes can
+  leave stale `/dev/shm/fastrtps_*` segments behind that wedge DDS message
+  delivery on the next launch, producing what looks like a stall (goals
+  never reaching the planner) but is actually a discovery/transport problem,
+  not a code bug. Clearing `/dev/shm/fastrtps_*` before relaunching fixed it.
+  Also, `ros2 topic pub --once /goal_pose` can miss the planner due to
+  discovery timing; a brief `-r 2` publish is more reliable than `--once`.
+- **Not yet done**: `smoothing_passes` (default 3) and `overlap_frac`
+  (default 0.12) are new tunable parameters, not yet swept for a formally
+  optimal value - 2 passes also works (max lip 0.194 m on seed 42) if less
+  crater-rim smoothing is preferred. The original 60-100 m/3-seed acceptance
+  check (previous bullet) is still open.
