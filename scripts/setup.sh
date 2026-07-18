@@ -9,6 +9,19 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
+if [ ! -f /opt/ros/humble/setup.bash ]; then
+  echo "ERROR: ROS 2 Humble not found at /opt/ros/humble." >&2
+  echo "Install ros-humble-desktop first - see the Quick Start prerequisites in README.md." >&2
+  exit 1
+fi
+for tool in vcs rosdep colcon; do
+  if ! command -v "$tool" >/dev/null; then
+    echo "ERROR: '$tool' not found on PATH." >&2
+    echo "Install python3-vcstool, python3-rosdep, and python3-colcon-common-extensions - see README.md." >&2
+    exit 1
+  fi
+done
+
 if [ ! -d src/regolith.universe ]; then
   mkdir -p src
   vcs import src < regolith.repos

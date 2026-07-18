@@ -25,12 +25,12 @@ Documentation improvements are always welcome — from fixing typos to writing t
 ## Development Setup
 
 ```bash
-# Prerequisites: ROS 2 Humble or Jazzy on Ubuntu 22.04/24.04
+# Prerequisites: ROS 2 Humble + Gazebo Harmonic on Ubuntu 22.04 (or WSL2) -
+# see README.md's Quick Start for the full list
 
 git clone https://github.com/Regolith-Project/regolith.git
 cd regolith
-rosdep install --from-paths src --ignore-src -y
-colcon build --symlink-install
+./scripts/setup.sh   # pulls in regolith.universe and builds the regolith_* packages
 ```
 
 ## Code of Conduct

@@ -14,7 +14,7 @@
 
 <p align="center">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache%202.0-blue.svg" alt="License"></a>
-  <a href="https://www.ros.org/"><img src="https://img.shields.io/badge/ROS%202-Humble%20|%20Jazzy-blue?logo=ros" alt="ROS 2"></a>
+  <a href="https://www.ros.org/"><img src="https://img.shields.io/badge/ROS%202-Humble-blue?logo=ros" alt="ROS 2"></a>
   <a href="https://github.com/Regolith-Project/regolith/issues"><img src="https://img.shields.io/github/issues/Regolith-Project/regolith" alt="Issues"></a>
 </p>
 

@@ -13,10 +13,28 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 SEED=42
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --seed) SEED="$2"; shift 2 ;;
-    *) echo "Unknown argument: $1" >&2; exit 1 ;;
+    --seed)
+      [ $# -ge 2 ] || { echo "ERROR: --seed requires a value" >&2; exit 1; }
+      SEED="$2"; shift 2 ;;
+    *) echo "Usage: $0 [--seed N]" >&2; echo "Unknown argument: $1" >&2; exit 1 ;;
   esac
 done
+
+if ! [[ "$SEED" =~ ^[0-9]+$ ]]; then
+  echo "ERROR: --seed must be a non-negative integer, got '$SEED'" >&2
+  exit 1
+fi
+
+if [ ! -f /opt/ros/humble/setup.bash ]; then
+  echo "ERROR: ROS 2 Humble not found at /opt/ros/humble." >&2
+  echo "Install ros-humble-desktop first - see the Quick Start prerequisites in README.md." >&2
+  exit 1
+fi
+if ! command -v gz >/dev/null; then
+  echo "ERROR: 'gz' (Gazebo) not found on PATH." >&2
+  echo "Install gz-harmonic and ros-humble-ros-gzharmonic - see README.md." >&2
+  exit 1
+fi
 
 if [ ! -f install/setup.bash ]; then
   echo "No build found - running scripts/setup.sh first..."

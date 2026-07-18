@@ -525,3 +525,97 @@ Recorded honestly, same as M3 - real progress, real remaining gap.
   appear nowhere in the codebase; generated terrain assets are written
   under `~/.cache/regolith/worlds/seed_<int>/` with default permissions,
   no `/tmp` usage or predictable-path temp-file races.
+
+## Post-M5 quality/stability/UX pass
+
+Reviewed the same scope as the security pass (everything this project
+authored - meta-repo plus `regolith.universe/planetary/`). Every change
+below was independently re-verified after the fact (rebuilt, re-ran, or
+re-read line-by-line), not just taken on trust.
+
+- **Flip detection** (`pure_pursuit_node.py`): the M5 notes above call out
+  that stall recovery had no way to tell "flipped" from "just stuck" - it
+  would silently cycle replan/timeout forever after a real flip. Fixed by
+  subscribing to the raw `/imu` topic (not the EKF's fused estimate, which
+  runs `two_d_mode` and so can never show roll/pitch even when the chassis
+  is physically upside-down) and computing roll/pitch from its orientation
+  quaternion each control step. Beyond a `flipped_attitude_deg` parameter
+  (default 60°) it stops the rover, logs one clear error pointing at this
+  file, then a throttled warning while it stays flipped, and an info log if
+  attitude ever recovers. Re-verified: fed the node the actual quaternion
+  recorded during the M5 tour flip (roll ≈ 177.6°) standalone - correct
+  error/resume sequence; then launched the full demo and drove normally for
+  several seconds - no false trigger.
+- **`astar.py`**: `plan_path` now bounds-checks start/goal indices before
+  indexing the cost grid - out-of-range (especially negative) indices would
+  otherwise silently wrap via numpy's negative-index semantics instead of
+  failing. Structurally unreachable via the planner node (which already
+  bounds-checks before calling in), but the module is safer standalone.
+- **`planner_node.py`**: replaced one vague "goal may be unreachable or in
+  a lethal cell" warning with three specific ones - goal cell is lethal,
+  start cell is lethal (flagged as possibly localization drift into an
+  inflated obstacle), or genuinely no path exists - to make a failed replan
+  actually diagnosable from the log.
+- **`costmap_node.py`**: a missing/corrupt `manifest.json` or a
+  `resolution_m:=0` param used to produce a raw traceback or a
+  `ZeroDivisionError`; both now fail with one clear log line (pointing at
+  deleting the stale `~/.cache/regolith/worlds/seed_<N>` dir if that's the
+  cause) and a clean `exit 1` instead.
+- **All five launch files**: `seed:=abc` or a negative seed used to produce
+  a raw Python traceback deep in `launch`; now validated up front with one
+  clear `RuntimeError` naming the bad value. Re-verified with `seed:=abc`
+  (clean single-line error) and a full `seed:=42` launch (unaffected).
+- **`hello_moon.launch.py` didn't actually launch RViz** - a real, fairly
+  significant bug: the top-level README's Quick Start told users to run
+  `./scripts/demo.sh` then "click 2D Goal Pose in RViz," but no RViz node
+  was ever included in that launch file's node list, so the documented
+  default-mission demo was undriveable as written. Fixed by adding an RViz
+  node (new `rviz` launch arg, default `true`, off via `rviz:=false`).
+  Re-verified independently: launched clean and confirmed `rviz2` actually
+  starts and loads the config with no errors (it did not before this fix).
+- **`rover.rviz`**: added Costmap, PlannedPath, and an "EKF Estimate"
+  Odometry display (kept raw wheel odometry too, disabled by default so it
+  doesn't visually compete with the fused estimate), an explicit Tools list
+  including "2D Goal Pose" → `/goal_pose`, and pulled the default view back
+  from `Distance: 4` to `12` so the whole local costmap is visible instead
+  of just the chassis.
+- **`scripts/demo.sh` / `scripts/setup.sh`**: added upfront checks for ROS 2
+  Humble, Gazebo, and (`setup.sh`) `vcs`/`rosdep`/`colcon` being present,
+  plus seed-argument validation in `demo.sh` - all failing with one clear
+  line pointing at the README's prerequisites instead of a raw "command not
+  found" partway through.
+- **Documentation consistency pass**: fixed several stale/inaccurate claims
+  found by reading the docs as a new contributor would - `docs/architecture.md`
+  claimed car-specific packages are excluded "via `COLCON_IGNORE`" and that
+  `ekf_localizer` "is kept" (both false; the actual mechanism is
+  `--packages-up-to`, and `ekf_localizer` was replaced - see the reuse log
+  above); `CONTRIBUTING.md`'s dev-setup snippet predated `scripts/setup.sh`
+  and would fail on a fresh clone (`rosdep install --from-paths src` against
+  an empty `src/`); the top-level README's ROS badge claimed Jazzy support
+  that doesn't exist anywhere in this project; `regolith_bringup`'s and
+  `regolith_costmap`'s READMEs hadn't caught up to `hello_moon.launch.py`
+  existing; `heightmap.py`'s docstring said the default collision-grid
+  resolution was 32 when the code (and PROGRESS.md M4) both say 24.
+- **Housekeeping**: confirmed `__pycache__` directories present on disk
+  under `planetary/*/regolith_*/__pycache__/` are not tracked by git (the
+  upstream fork's `.gitignore` already covers them) - no fix needed.
+- **Left alone, deliberately**: the five launch files share substantial
+  copy-pasted structure (bridge config, spawn logic, EKF setup) that grows
+  with each one; a shared helper module was considered but not built - the
+  package is `ament_cmake` with launch files installed as plain data, so a
+  shared helper needs either an installed Python module or fragile
+  `sys.path` tricks, and all five files are individually working and
+  independently verified. Not worth the risk at this scale. M3's drift and
+  M4's physics-collision flip root causes were left untouched, per the
+  brief for this pass - only failure *visibility* around them was in scope,
+  not the underlying physics/estimation fixes themselves.
+- **Cleanup note for future sessions**: the review agent's own standalone
+  verification runs (testing the flip-detection node in isolation) left
+  several orphaned ROS node processes running well after it reported
+  everything killed - `pkill -f "^gz sim"`/`"^ros2 launch ..."` doesn't
+  catch child nodes that outlive their parent launch process. Found via
+  `ps aux` showing three duplicate full node sets from different launch
+  times all still running and publishing on the same topics simultaneously.
+  Killed by PID. Worth remembering: after any standalone/background ROS
+  testing, verify with `ps aux | grep -i regolith` (or similar), not just
+  the launcher-process pkill patterns used throughout this project.

@@ -67,11 +67,13 @@ Regolith follows the same two-tier layout as upstream Autoware:
   is a genuine GitHub fork of
   [`autoware.universe`](https://github.com/autowarefoundation/autoware_universe),
   preserving fork relationship and history. Car-specific packages (lane/HD-map
-  planning, traffic-light logic, NDT map localisation, etc.) are excluded from
-  the build via `COLCON_IGNORE`; reusable packages (common utilities, Autoware
-  message definitions, `ekf_localizer`, trajectory/control components) are kept.
-  New planetary packages live under `planetary/` in that repo, namespaced
-  `regolith_*`.
+  planning, traffic-light logic, NDT map localisation, etc.) are currently
+  excluded from the build by building only the planetary packages
+  (`--packages-up-to regolith_bringup` in `scripts/setup.sh`); a proper
+  `COLCON_IGNORE`/stripping pass over the untouched upstream tree is deferred
+  (see PROGRESS.md). See the reuse log below for which Autoware components
+  were reused vs. replaced. New planetary packages live under `planetary/` in
+  that repo, namespaced `regolith_*`.
 
 ## Hello-World PoC Scope
 
