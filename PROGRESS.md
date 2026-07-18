@@ -489,3 +489,39 @@ Recorded honestly, same as M3 - real progress, real remaining gap.
     for the reasons above; documented as before as a manual step for anyone
     wanting a GUI recording (right-click "Follow" in the GUI, screen-record
     on the Windows side).
+
+## Post-M5 security review
+
+- Scope: everything this project actually authored - the meta-repo (minus
+  gitignored `PLAN.md`) and `regolith.universe`'s `planetary/` tree plus its
+  new `.github/workflows/regolith-build.yaml`. Deliberately excluded the
+  untouched upstream `autoware.universe` C++ tree - out of scope, not this
+  project's code to audit or fix.
+- **Credential exposure check (the main reason to run this pass now)**: a
+  GitHub fine-grained PAT was pasted directly into a terminal earlier in
+  this project's development (during the initial GitHub auth setup - see
+  "Issues encountered" above). Checked full git history and working tree of
+  both repos for that token or any other credential-shaped string
+  (`github_pat_`/`ghp_`/etc., and generic `api_key`/`password`/`secret`/
+  `token` assignments with real-looking values) - independently confirmed
+  clean, nothing was ever committed. No rotation or history rewrite needed.
+- **Fixed**: `regolith-build.yaml` had no `permissions:` block, so its
+  `GITHUB_TOKEN` would inherit the repo/org default scope (often
+  read-write) for a job that only needs to build - unnecessary standing
+  privilege if a compromised transitive apt/rosdep dependency ever ran
+  something malicious mid-build. Added `permissions: contents: read`.
+  Confirmed the rest of the workflow was already sound: `pull_request`
+  (not the secrets-exposing `pull_request_target`), no untrusted
+  `${{ }}` input interpolated into any `run:` step, and the one third-party
+  action (`actions/checkout@v4`) is tag-pinned.
+- **Reviewed, no changes needed**: shell scripts (`scripts/setup.sh`,
+  `scripts/demo.sh`) already quote every expansion and pass the seed
+  through `ros2 launch` as a single argv element rather than a shell
+  string, so injection isn't possible; every launch file casts the `seed`
+  launch argument with `int(...)` before it reaches any file path or
+  subprocess call, which rules out path traversal through it; all
+  `ExecuteProcess` calls use list-form `cmd=[...]`, never a shell string,
+  and `shell=True`/`os.system`/`eval`/`exec`/`pickle`/unsafe `yaml.load`
+  appear nowhere in the codebase; generated terrain assets are written
+  under `~/.cache/regolith/worlds/seed_<int>/` with default permissions,
+  no `/tmp` usage or predictable-path temp-file races.
