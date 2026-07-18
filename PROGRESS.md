@@ -13,7 +13,7 @@ component reuse log.
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | Substantially done (see notes) |
 | M4 — Autonomous navigation | Pipeline built and individually verified; full acceptance not met (see notes) |
-| M5 — Demo polish and packaging | Not started |
+| M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
 
@@ -363,3 +363,129 @@ Recorded honestly, same as M3 - real progress, real remaining gap.
     anything (freeze/fall-through/explosion) depending on overlap depth -
     if a spawned body behaves strangely, check the spawn pose against actual
     local terrain height before suspecting the physics engine.
+
+## M5 acceptance results
+
+- `hello_moon.launch.py` created as the single entry point superseding
+  `autonomous_demo.launch.py`, adding a `mission` launch arg: default `none`
+  (click a goal in RViz yourself, identical to M4's demo) or `tour` (runs
+  `tour_mission.py`'s scripted 5-waypoint loop automatically, no
+  interaction needed). `scripts/demo.sh` wraps it as the one-command path:
+  builds if `install/` is missing, then launches with `mission:=tour`.
+- `scripts/setup.sh` narrowed to build only the `regolith_*` packages
+  (`--packages-up-to regolith_bringup`) and run `rosdep install` against
+  just `planetary/`, not the whole `regolith.universe` tree - the untouched
+  car-specific Autoware packages carry `tier4_*`/CUDA-only rosdep keys that
+  don't resolve on a stock install. Documented as deferred, not fixed: a
+  real "strip or `COLCON_IGNORE` the untouched tree" pass is still open
+  for whichever milestone first needs a full-workspace build.
+- Minimal build-only GitHub Actions CI added at
+  `regolith.universe/.github/workflows/regolith-build.yaml`, scoped to
+  `planetary/**` paths only so it doesn't collide with or attempt to run
+  the fork's many pre-existing Autoware CI workflows. No simulation step -
+  GPU/Gazebo rendering isn't available on standard GitHub runners.
+- **Confirmed again, running the full scripted tour end-to-end**: the M4
+  flip issue is real and reproduces during ordinary unattended demo use, not
+  just under deliberately long test goals. Seed 42's tour got partway to
+  waypoint 1 and then, per `/ground_truth/pose`, the chassis orientation was
+  `x ≈ 0.99, w ≈ 0` - a roll of approximately 180°, i.e. upside-down (the
+  accompanying `z ≈ 4.96 m` reading is not itself unusual - this seed's
+  spawn point sits at `z ≈ 5.3 m` local terrain elevation to begin with, per
+  a later clean run's identity-orientation spawn pose; the flip is the
+  orientation reading, not the height). The follower's stall recovery kept
+  firing and replanning against the same coordinates (it has no way to
+  detect "upside down," only "not making progress"), so the tour script's
+  90s per-waypoint timeout - not a genuine arrival - was what eventually
+  moved it on to waypoint 2. This is the same root cause documented under M4
+  (box-grid collision step discontinuities), now additionally confirmed to
+  affect the polished one-command demo path, not just adversarial test
+  goals.
+  - **Consequence for this milestone**: rather than keep tuning
+    collision-grid parameters against a physics-engine limitation already
+    investigated at length under M4 (see the RTF-vs-resolution trade-off
+    noted there), the demo video (below) was descoped from the full
+    5-waypoint tour to a shorter, reliable sequence - spawn, teleop, and a
+    single short-range autonomous leg - with the flip risk stated plainly in
+    the README rather than edited around. This is the same "smaller honest
+    scope over cosmetic full-scope" call made throughout this project.
+- README quickstart rewritten and cross-checked line-by-line against the
+  actual commands used in this session (`git clone`, `./scripts/setup.sh`,
+  `./scripts/demo.sh`), replacing the previous "coming soon" placeholder.
+  Doing that check caught a real bug: both scripts use `set -euo pipefail`,
+  but `/opt/ros/humble/setup.bash` references an unset variable
+  (`AMENT_TRACE_SETUP_FILES`) on its first line and aborts under `-u` in a
+  clean shell (reproduces with a bare
+  `bash -c 'set -euo pipefail; source /opt/ros/humble/setup.bash'`) - it had
+  gone unnoticed because this session's interactive shell had already
+  sourced it once before, which leaves the variable set for the rest of
+  that shell. Fixed by wrapping just the `source /opt/ros/humble/setup.bash`
+  (and `install/setup.bash`) lines in `set +u` / `set -u` in both
+  `scripts/setup.sh` and `scripts/demo.sh`. Re-ran `./scripts/demo.sh` after
+  the fix in a clean invocation - confirmed it builds/skips-build correctly,
+  generates terrain, launches Gazebo, bridges topics, and spawns the rover
+  cleanly end to end.
+- Cinematic auto-follow camera: investigated whether gz-sim 8's GUI could be
+  scripted to automatically track the rover (for a hands-off recording).
+  Found no clean, scriptable follow-camera mechanism in this install within
+  the time available - the GUI's "Follow" behavior is a manual right-click
+  action on the model in the scene tree. Documented as a manual step in the
+  README rather than building a custom camera-follow plugin, which would be
+  a disproportionate amount of new code for a cosmetic recording aid.
+- **Automated video/GIF capture: two dead ends, then a real fix.** Recording
+  the full findings here so the dead ends aren't re-investigated from
+  scratch later:
+  - `ffmpeg -f x11grab` against the WSLg `:0` display captures solid black,
+    even though `xdotool search` confirms a real "Gazebo Sim" window exists
+    at that point in time. WSLg remotes each application window's rendered
+    content directly to the Windows side per-window (RAIL-style); the X11
+    root window this session's display variable points at is never actually
+    composited with real pixels, so desktop-capture tools have nothing to
+    read.
+  - Second attempt: record the rover's own onboard `/camera/image` ROS topic
+    instead (already bridged, no GUI dependency) via a small `cv_bridge`
+    subscriber writing PNG frames. This partially worked but the rendered
+    image was frozen on the very first frame for roughly two-thirds of every
+    capture window before suddenly starting to update (confirmed via
+    `md5sum` across frame samples - frames 0 through ~450 of a 700-frame,
+    60s capture were byte-identical, then genuinely started changing around
+    frame ~500). A second short capture, run right after the first one had
+    "warmed up," froze again from frame 0 - pointing to gz-sim's render loop
+    deprioritizing sensor rendering when it has no actively-viewed GUI
+    viewport driving it, consistent with the x11grab finding above.
+  - **Fix**: gz-sim ships a server-side `gz-sim-camera-video-recorder-system`
+    plugin (`gz::sim::systems::CameraVideoRecorder`, found via
+    `/usr/share/gz/gz-sim8/worlds/camera_video_record_dbl_pendulum.sdf`) that
+    renders a camera sensor straight to an mp4 file, entirely independent of
+    the GUI/compositor - it sidesteps both dead ends above completely. Added
+    to `regolith_rover.urdf.xacro`'s camera sensor behind a `record_video`
+    xacro arg (default `false`, off by default so the shipped rover carries
+    no extra overhead normally), wired through `hello_moon.launch.py` as a
+    new `record_video` launch argument. Started/stopped via
+    `gz service -s /rover/camera/record_video ...` (see `regolith_bringup`'s
+    README for the exact calls). First attempt at using it hit one more
+    real bug: the world's `<sensor>` plugin block can't contain literal
+    `--` sequences inside an XML comment (SGML/XML forbids `--` inside
+    comments) - the original draft comment describing the CLI calls with
+    `--reqtype`/`--req` broke xacro's XML parser ("not well-formed (invalid
+    token)"); fixed by moving the CLI examples out of the XML comment and
+    into the README instead.
+  - Recording itself needed one adjustment: with the recorder active,
+    physics real-time-factor dropped noticeably (recording is not free), so
+    short `sleep`-paced teleop bursts barely moved the rover in sim-time;
+    switched to sustained `ros2 topic pub -r 5 ...` streams instead of short
+    bursts, which resolved it.
+  - The raw capture (teleop drive + a short single-goal autonomous leg,
+    reaching "Goal reached" cleanly, no flip) came out to 257s of sim-time -
+    longer than the 60-90s target, since recording ran for however long the
+    manual drive commands took. Sped up 3.2x with `ffmpeg`'s `setpts` filter
+    to a brisk 80s clip (with an on-screen "sim time, sped up 3.2x" label so
+    the pacing isn't misleading) - saved as `docs/media/m5_demo_tour.mp4`,
+    plus an 8s excerpt as the README hero GIF
+    (`docs/media/m5_demo_hero.gif`). Both show continuous, upright driving;
+    no flip occurs in this particular recorded run (the flip risk documented
+    above is real but probabilistic, not guaranteed on every run - see M4).
+  - The cinematic third-person Gazebo-GUI view (vs. this first-person
+    onboard-camera view) still isn't achievable from this headless session
+    for the reasons above; documented as before as a manual step for anyone
+    wanting a GUI recording (right-click "Follow" in the GUI, screen-record
+    on the Windows side).

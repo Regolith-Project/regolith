@@ -9,12 +9,26 @@
 set -euo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")/.."
 
-mkdir -p src
-vcs import src < regolith.repos
+if [ ! -d src/regolith.universe ]; then
+  mkdir -p src
+  vcs import src < regolith.repos
+fi
 
+# ROS 2's setup.bash isn't safe under `set -u` (references unbound vars like
+# AMENT_TRACE_SETUP_FILES on first source) - relax it for this line only.
+set +u
 source /opt/ros/humble/setup.bash
-rosdep install --from-paths src --ignore-src -y
+set -u
 
-colcon build --symlink-install --parallel-workers "${COLCON_PARALLEL_WORKERS:-2}"
+# Builds only the regolith_* packages (under src/regolith.universe/planetary/),
+# not the full autoware.universe tree: none of them depend on any autoware_*
+# package, and the untouched car-specific tree has rosdep keys
+# (tier4_*/CUDA-only packages) that don't resolve on a stock install - see
+# PROGRESS.md M1. The stripping/COLCON_IGNORE pass from the plan's section 4
+# is deferred to whichever milestone first needs a full-workspace build.
+rosdep install --from-paths src/regolith.universe/planetary --ignore-src -y
+
+colcon build --symlink-install --parallel-workers "${COLCON_PARALLEL_WORKERS:-2}" \
+  --packages-up-to regolith_bringup
 
 echo "Done. Source install/setup.bash and run: ros2 launch regolith_bringup hello_moon.launch.py"

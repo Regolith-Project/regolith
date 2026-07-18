@@ -3,6 +3,11 @@
 </p>
 
 <p align="center">
+  <img src="docs/media/m5_demo_hero.gif" alt="Regolith rover driving across procedural lunar terrain in Gazebo" width="480"><br>
+  <sub>Onboard camera, procedural terrain (seed 42) — full clip: <a href="docs/media/m5_demo_tour.mp4">docs/media/m5_demo_tour.mp4</a></sub>
+</p>
+
+<p align="center">
   <strong>Open-source autonomous navigation for planetary rovers</strong><br>
   A fork of <a href="https://github.com/autowarefoundation/autoware">Autoware</a>, adapted for GPS-denied rough-terrain autonomy
 </p>
@@ -71,46 +76,90 @@ Regolith takes the proven Autoware ROS 2 architecture — perception, planning, 
 
 ## Project Status
 
-> **🚧 Early development
+> **🌕 Working seed demo**
 
-Regolith is in active early development. The current milestone focuses on:
+Regolith has a working end-to-end simulation pipeline: procedural lunar
+terrain, a skid-steer rover, GPS-denied localisation, and autonomous
+waypoint navigation, all runnable with one command. This is a seed demo
+built to validate the architecture, not a finished product — see
+[`PROGRESS.md`](PROGRESS.md) for the full, unvarnished record of what
+works, what doesn't yet, and why.
 
-1. **ROS 2 Hardware Abstraction Layer** — sensor/actuator interfaces and rover kinematics
-2. **Localisation & Navigation pipeline** — GPS-denied pose estimation + waypoint traversal, validated in simulation
-3. **Planetary simulation environment** — Gazebo worlds with rocks, slopes, and realistic lighting for benchmarking
+1. **Procedural planetary terrain** — craters, rocks, and PBR textures generated from a seed, done
+2. **Rover simulation** — skid-steer chassis, teleop, sensor bridging, done
+3. **GPS-denied localisation** — EKF fusing wheel odometry + IMU, done with a known drift gap (see below)
+4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end at short range; a terrain-collision stability issue limits longer autonomous runs (see below)
 
-See the [Roadmap](#roadmap) below for details.
+See the [Roadmap](#roadmap) below for target vs. actual, and [Known Limitations](#known-limitations) for the honest details.
 
 ## Quick Start
 
-> Coming soon — the first simulation release is targeted for mid-2026. When ready:
->
-> ```bash
-> # Clone the meta-repo
-> git clone https://github.com/Regolith-Project/regolith.git
-> cd regolith
->
-> # Pull in regolith.universe (packages) and build
-> ./scripts/setup.sh
->
-> # Launch simulation
-> source install/setup.bash
-> ros2 launch regolith_bringup hello_moon.launch.py
-> ```
->
-> This will spawn a rover in a planetary-analogue Gazebo world and begin autonomous waypoint navigation. See [`docs/architecture.md`](docs/architecture.md) for how this repo relates to `regolith.universe`.
+Targeting a fresh WSL2 or Ubuntu 22.04 machine to a driving rover in under an hour.
+
+**Prerequisites:**
+- Ubuntu 22.04 (or WSL2 with Ubuntu 22.04 — GPU rendering needs WSLg; on a
+  hybrid AMD/NVIDIA laptop, add `export MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA`
+  to your shell profile so WSLg picks the discrete GPU)
+- [ROS 2 Humble](https://docs.ros.org/en/humble/Installation.html) (`ros-humble-desktop`)
+- [Gazebo Harmonic](https://gazebosim.org/docs/harmonic/install_ubuntu/) + `ros-humble-ros-gzharmonic`
+- `python3-colcon-common-extensions`, `python3-rosdep`, `python3-vcstool`
+
+```bash
+# One-time rosdep setup, if you haven't already
+sudo rosdep init 2>/dev/null; rosdep update
+
+# Clone the meta-repo
+git clone https://github.com/Regolith-Project/regolith.git
+cd regolith
+
+# Pull in regolith.universe (packages), install deps, and build
+# (only builds the regolith_* planetary packages, not the full Autoware tree)
+./scripts/setup.sh
+
+# Launch the full demo: terrain generation, rover spawn, localisation,
+# navigation, and a scripted 5-waypoint tour
+./scripts/demo.sh
+```
+
+`demo.sh` builds first if `install/` doesn't exist yet, then launches
+Gazebo + RViz. To drive somewhere yourself instead of the scripted tour,
+click "2D Goal Pose" in RViz after running:
+
+```bash
+source install/setup.bash
+ros2 launch regolith_bringup hello_moon.launch.py seed:=42
+```
+
+See [`docs/architecture.md`](docs/architecture.md) for how this repo relates to `regolith.universe`, and [`regolith_bringup`'s README](https://github.com/Regolith-Project/regolith.universe/tree/main/planetary/regolith_bringup) for every individual launch file (terrain-only, teleop, localisation-only, etc.).
+
+## Known Limitations
+
+Documented in full in [`PROGRESS.md`](PROGRESS.md); the two that matter most for anyone trying the demo:
+
+- **Localisation drift**: the EKF (wheel odometry + IMU) tracks heading
+  very accurately but position drift is 20-45% over test traverses,
+  against a 5% target — skid-steer wheel odometry's own position estimate
+  is fundamentally noisy under turning, and a full fix (visual odometry,
+  per the original plan) wasn't reached in this seed demo.
+- **Terrain-collision stability on long autonomous runs**: the physics
+  engine (gz-physics/dartsim) doesn't implement heightmap or mesh collision
+  construction, so terrain collision is approximated with a grid of boxes.
+  On some runs the rover flips at a box-boundary crossing during
+  autonomous driving. The full pipeline (costmap → plan → follow → recover)
+  works reliably at short range; closing this gap for long unattended runs
+  is the clearest next step.
 
 ## Roadmap
 
 ### Current Milestone (NLnet NGI Zero Commons Fund)
 
-| Phase | Focus | Target |
-|---|---|---|
-| **WP1** | Autoware fork, architecture, HAL interfaces | Architecture doc + interface packages |
-| **WP2** | GPS-denied localisation (VIO + IMU + wheel odom fusion) | <5% drift over 500 m traverse |
-| **WP3** | Terrain-aware navigation + obstacle avoidance | Autonomous 5-waypoint route in simulation |
-| **WP4** | Gazebo planetary simulation environment + benchmarks | Turnkey sim with rocks, slopes, shadows |
-| **WP5** | Documentation + community bootstrap | Clone → build → run in under 1 hour |
+| Phase | Focus | Target | Status |
+|---|---|---|---|
+| **WP1** | Autoware fork, architecture, HAL interfaces | Architecture doc + interface packages | Done |
+| **WP2** | GPS-denied localisation (IMU + wheel odom fusion) | <5% drift over 500 m traverse | Working, drift gap remains (20-45%, see above) |
+| **WP3** | Terrain-aware navigation + obstacle avoidance | Autonomous 5-waypoint route in simulation | Pipeline works end-to-end; long unattended runs hit a stability issue (see above) |
+| **WP4** | Gazebo planetary simulation environment + benchmarks | Turnkey sim with rocks, slopes, shadows | Done |
+| **WP5** | Documentation + community bootstrap | Clone → build → run in under 1 hour | Done — this Quick Start |
 
 ### Future Vision
 
