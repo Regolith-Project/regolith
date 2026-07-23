@@ -42,12 +42,15 @@ if [ ! -f install/setup.bash ]; then
 fi
 
 # A prior launch (crashed, backgrounded, or just left running in another
-# terminal) leaves gz sim + every ROS node from this demo still alive with no
-# ROS_DOMAIN_ID/namespace isolation - a second launch then fights the first
-# over the same /goal_pose, /planned_path, /odometry/filtered, /clock,
-# /cmd_vel topic names. This has actually happened (see PROGRESS.md's
-# "Process-cleanup gotcha" and the overnight-freeze incident it caused).
-# Anchor on the launch process's own process group so every descendant is
+# terminal) leaves gz sim + every ROS node from this demo still alive. Since
+# 2026-07-23 hello_moon.launch.py claims a private ROS_DOMAIN_ID per invocation
+# (see PROGRESS.md's "Per-launch ROS_DOMAIN_ID isolation"), so a leftover stack
+# can no longer cross-talk with a new launch on shared /goal_pose, /clock,
+# /cmd_vel etc. - the graph-collision that caused the overnight freeze is now
+# structurally prevented. This preflight kill is kept anyway: a genuinely
+# orphaned duplicate stack still burns GPU/CPU (gz sim + a full node set) even
+# when it's graph-isolated, so reclaiming those resources before starting is
+# still worthwhile. Anchor on the launch process's own process group so every descendant is
 # caught even if the launch parent itself already died and its children were
 # reparented (pgid survives reparenting). Match installed executable paths,
 # not "regolith" as a bare substring - this repo is checked out under a path

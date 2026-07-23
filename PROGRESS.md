@@ -1042,3 +1042,199 @@ diagnosis below is log archaeology, not a re-observed live failure**.
     something; not done here since it's a larger change (would need
     threading through every node's config) and the preflight-kill + on_exit
     changes above already close the actual gap that let this happen.
+    **Update 2026-07-23: this follow-up is now done - see "Per-launch
+    ROS_DOMAIN_ID isolation" below.**
+
+## Per-launch ROS_DOMAIN_ID isolation
+
+The follow-up flagged at the end of the overnight-freeze section above (and in
+SPEC.md's known-gaps list) is now implemented: each `hello_moon.launch.py`
+invocation claims its own `ROS_DOMAIN_ID`, so two concurrently-running
+invocations physically cannot share a DDS discovery domain and therefore
+cannot merge into one ROS graph - regardless of whether `demo.sh`'s
+preflight-kill ran, and regardless of invocation path (via `demo.sh` or a bare
+`ros2 launch regolith_bringup hello_moon.launch.py`, which the launch file's
+own docstring documents as a supported path with nothing stopping two of them).
+
+- **Why a domain id, not topic namespacing**: `ROS_DOMAIN_ID` isolates DDS
+  discovery itself - the actual mechanism that let two `gz sim`/EKF/planner
+  stacks find each other and merge in the first place. Two different domain
+  ids use disjoint DDS port ranges, so the two stacks never even discover one
+  another. Topic namespacing alone would not have isolated the `/clock`
+  merging between two `gz sim` instances (two servers each publishing their
+  own sim-time onto one graph produced the "jump back in time / Resetting
+  RViz" storm that broke `rviz2` in the original incident); domain isolation
+  covers that case too because the second `gz sim` is on a different graph
+  entirely.
+- **Where it's set**: at the very top of `hello_moon.launch.py`'s
+  `_generate_and_launch` `OpaqueFunction`, `os.environ["ROS_DOMAIN_ID"]` is set
+  *before* any of the returned actions are built or spawned. In ROS 2 launch a
+  `Node`/`ExecuteProcess` captures the environment at the moment it actually
+  spawns (not when the action object is constructed), and that includes the
+  processes inside the *included* `ros_gz_sim/gz_sim.launch.py`, which spawn
+  after the `OpaqueFunction` has already returned. Mutating `os.environ`
+  directly inside the running `OpaqueFunction` (rather than emitting a
+  `SetEnvironmentVariable` action and worrying about action ordering) is the
+  simplest way to guarantee it lands before every spawn. **This was verified
+  empirically, not just reasoned from the launch API** - see verification
+  below, which confirms the included `gz sim` process really does inherit it.
+- **Allocation scheme - lock-file registry, giving an actual guarantee (not a
+  probabilistic one) for the realistic case**: a purely random pick in the
+  valid range would leave a small-but-real collision chance between two
+  simultaneous launches, which given this project's don't-round-a-probabilistic-
+  fix-up-to-solved convention isn't good enough to call structural. Instead
+  `_allocate_domain_id()` keeps a registry directory
+  `~/.ros/regolith_domain_ids/`: each in-use id `N` is a file `N.lock`
+  containing the claiming launch's PID, and the whole claim (scan for a free
+  id + write the claim file) runs under an exclusive `flock` on a
+  `.registry.lock` sentinel. Two launches started at the same instant
+  therefore serialise on the flock and are *guaranteed* to pick different ids -
+  this is a true mutual-exclusion guarantee, not a low-probability mitigation.
+  A crashed/SIGKILLed launch that never cleaned up its claim file is handled by
+  a PID-liveness check (`os.kill(pid, 0)`): a stale claim whose holder PID is
+  dead is reclaimed by the next launch, so a leaked lock file self-heals rather
+  than permanently burning an id. Cleanup on normal exit is a best-effort
+  `atexit` unlink; correctness does not depend on it running.
+- **Range**: ids 1-101. 0-101 is the commonly-cited Linux-safe range (the DDS
+  spec allows up to 232, but ids above ~101 push the computed DDS ports into
+  the Linux ephemeral-port range and collide); 0 is skipped deliberately
+  because it's the default domain every un-configured ROS process on the box
+  lands on, so avoiding it also keeps us clear of unrelated ROS traffic.
+- **Honest statement of the guarantee** (per this project's convention -
+  stating exactly what this does and does not promise):
+  - Between any two `hello_moon.launch.py` invocations that both successfully
+    claim an id, graph isolation is **absolute**: distinct DDS domains cannot
+    discover each other, full stop. This holds whether the launches are back-
+    to-back or overlapping, via `demo.sh` or bare `ros2 launch`, and whether
+    or not the preflight-kill ran.
+  - The one documented residual is exhaustion: the guarantee is that no two
+    concurrent launches share an id *as long as fewer than 101 regolith
+    launches are alive at once*. If 101 were somehow already live, the 102nd
+    falls back to a random pick (rather than refusing to start) and could
+    collide - a case that requires 101 concurrent lunar-rover sims on one
+    machine, far beyond anything this PoC's RAM/GPU could run, so it is called
+    out for honesty, not because it's reachable in practice.
+  - An explicitly user-set `ROS_DOMAIN_ID` in the environment is honoured
+    as-is (the user asked for that specific domain) - it is recorded in the
+    registry best-effort so a concurrent auto-allocation avoids it, but is
+    never overridden or refused. Two launches that a user *deliberately* pins
+    to the same preset id will collide; that's explicit user intent, not
+    something this scheme second-guesses.
+  - This is the structural backstop; `demo.sh`'s preflight-kill and the
+    `on_exit=Shutdown()` handlers are kept (not removed) - they still reclaim
+    GPU/CPU from genuinely-orphaned duplicate stacks, which domain isolation
+    does nothing about (an isolated orphan still burns a full gz sim + node
+    set of resources).
+- **Verification actually performed** (headless, `headless:=true`, to avoid the
+  WSLg GUI-crash gotcha), two overlapping launches seed 42 and seed 7 started
+  ~5 s apart and left to fully spawn:
+  1. The two invocations claimed **different ids - 18 and 85** (from each
+     launch's `[hello_moon.launch] Using ROS_DOMAIN_ID=...` line).
+  2. **Env propagation confirmed by reading `/proc/<pid>/environ` of every
+     spawned process**: all of launch 1's processes - including the included
+     `gz_sim.launch.py`'s `gz sim -r -s .../seed_42/world.sdf` subprocess -
+     carried `ROS_DOMAIN_ID=18`; all of launch 2's - including its
+     `gz sim .../seed_7/...` - carried `ROS_DOMAIN_ID=85`. This is the
+     load-bearing check that the env var reaches the included sub-launch's
+     spawned process, not just the top-level nodes.
+  3. **Graph isolation confirmed**: `ROS_DOMAIN_ID=18 ros2 node list` showed
+     exactly one complete stack (one `ekf_filter_node`, one `regolith_costmap`,
+     one `regolith_planner`, one `regolith_pure_pursuit`, one
+     `regolith_flip_recovery`, one `ros_gz_bridge`, ...), `ROS_DOMAIN_ID=85
+     ros2 node list` showed exactly one *other* complete stack, neither listed
+     the other's nodes (never two of any node), and `ROS_DOMAIN_ID=0 ros2 node
+     list` (the default domain) showed nothing - i.e. neither stack leaked onto
+     the default domain either. Pre-fix, a single domain-0 `ros2 node list`
+     would have shown two of every node - the exact merged-graph condition that
+     caused the freeze.
+  4. **Self-heal confirmed**: both launches were hard-terminated (SIGTERM to the
+     launch process group, then SIGKILL of a surviving `gz sim`), which killed
+     them before `atexit` could release `18.lock`/`85.lock` - exactly the
+     leaked-lock case. Confirmed the holder PIDs (2572, 2713) were then dead and
+     that the reclaim path removes such a stale lock on the next allocation, so
+     the leak is self-healing. Process list verified actually empty afterward
+     (`pgrep` for all node/gz patterns returned nothing), not merely trusted
+     from exit codes; leftover stale locks and `/dev/shm/fastrtps_*` segments
+     were cleared.
+  - The allocator's pure logic (distinctness across many sequential claims,
+    stale-lock reclamation, live-lock non-reclamation, preset honouring) was
+    also exercised in a standalone unit test against a temp registry dir before
+    the live run.
+- **No rebuild needed**: the installed launch file is a symlink into `src/`
+  (`colcon --symlink-install`), so the edit is live without a `colcon build`.
+- **Left as-is deliberately**: the four narrower milestone launch files
+  (`terrain_only`, `teleop_demo`, `localization_demo`, `autonomous_demo`) were
+  *not* given the same treatment. `hello_moon.launch.py` is the one entry point
+  the overnight freeze actually involved and the one both `demo.sh` and the
+  documented direct-launch path use; the narrower files are single-layer
+  debugging aids not part of the collision scenario, and the launch files
+  deliberately don't share a helper module (see the M5 quality pass note on why
+  a shared launch helper wasn't built for this `ament_cmake` package). Factoring
+  the allocator into a shared, installed module so all five could use it is a
+  reasonable future tidy-up, not done here to keep the change scoped to the
+  actual failure mode.
+
+## Stuck-detector live-fire attempt: not caught this session
+
+Attempted to observe `flip_recovery_node.py`'s stuck detector (`_check_stuck`/
+`_recover_stuck`) fire on its own against a genuinely-occurring stall, as
+opposed to the unit-test and manually-observed-lock validation already on
+record above. **Result: not caught. Zero `STUCK RECOVERY` events across 92
+tight-turn maneuvers and ~38 minutes of active driving.** Recording this
+honestly rather than implying a catch that didn't happen, per this project's
+convention.
+
+- **Setup**: `ros2 launch regolith_bringup hello_moon.launch.py seed:=42
+  headless:=true rviz:=false` (no `mission:=tour` - manual driving), on its
+  own isolated `ROS_DOMAIN_ID=8` per the allocator above. Driven from spawn
+  (0, 0) - confirmed 17.3 m clearance to the nearest rock and 28.3 m to the
+  nearest crater from `seed_42`'s `manifest.json`, matching the clearance of
+  the location that produced the original discovery.
+- **Method**: 92 repeated tight-turn bursts published directly to `/cmd_vel`
+  via `ros2 topic pub -r 20`. 71 attempts used the confirmed repro shape
+  (0.3 m/s linear + 0.15 rad/s angular, ~1-2 m radius, 22 s per burst); 21
+  attempts (every third, for variety) used a tighter/faster variant (0.35 m/s
+  + 0.25 rad/s, 15 s per burst). Each burst was followed by a brief 3 s
+  straight-line leg before the next attempt. The launch's stdout (including
+  `flip_recovery_node`'s `output="screen"` log) was captured to a file and
+  grepped for `STUCK RECOVERY` after every attempt so a catch would have been
+  noticed immediately, not just at the end.
+- **The rover was genuinely being driven and genuinely upright throughout**,
+  not idling: ground-truth position moved attempt-over-attempt (e.g. from
+  (0,0) after 12 attempts to (2.57, 3.93) after 12 more, ending at
+  (-3.82, -0.68) after all 92 - all well inside the clear zone), and
+  `/ground_truth/pose` orientation stayed near-identity (small roll/pitch
+  quaternion components) the entire session - no flips, no `SIMULATED
+  RECOVERY` events either. `grep -c "STUCK RECOVERY"` against the full
+  captured log returned 0.
+- **Time accounting**: active driving ran 15:22:39-16:01:05 (38 min 26 s
+  across the 92 bursts), inside a total session (launch start to process
+  cleanup) of about 40 minutes - somewhat under the suggested 45-60 minute
+  window but well over 2x the suggested 30-40 maneuver count, and the earlier
+  batches already showed no sign of the failure becoming easier to trigger
+  with variation, so the session was called there rather than padding wall
+  time for its own sake.
+- **Consistent with, not contradicting, the existing rarity estimate**:
+  PROGRESS.md's stuck-detector section above already downgraded this from an
+  initial "~25% small-sample" estimate to "plausibly well under 10%" after a
+  prior 20-attempt stress test also reproduced zero freezes. This session's
+  92 further zero-freeze attempts (112 total tight-turn attempts across both
+  sessions with zero natural stalls) is consistent with that revised, low
+  estimate - it does not newly falsify the original discovery (which remains
+  on record above with its own evidence: the frozen ground-truth position/yaw
+  at 17.8 m clearance, confirmed not a terrain-collision artifact), it just
+  continues to demonstrate the failure is now rare enough that on-demand
+  reproduction, let alone catching the *detector* fire on one, is a
+  significant time investment.
+- **No code changes made** - this was an observation-only session, per its
+  brief. No bug was found in the detector itself; there was simply nothing
+  for it to detect this time. `README.md`'s and `docs/SPEC.md`'s "hasn't yet
+  been observed catching a naturally-occurring stall live" caveats are left
+  exactly as they were - this session doesn't change that status, it just
+  adds one more (negative) data point to it.
+- **Process cleanup**: launch process group and the standalone
+  `/ground_truth/pose` echo were both killed via `dangerouslyDisableSandbox`
+  (per the WSL2 background-process-escapes-sandbox gotcha already documented
+  above); confirmed via `pgrep` afterward that no `gz sim`, bridge, or
+  `regolith_*` node remained running (only this session's own shell matched
+  the search pattern, expected self-match, not a leftover process).

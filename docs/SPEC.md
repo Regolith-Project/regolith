@@ -364,7 +364,23 @@ stability item — see §7.
    is excluded from the build via `--packages-up-to`, not via
    `COLCON_IGNORE`/deletion as the plan's stripping policy eventually calls
    for — deferred, not done.
-8. Local `main` is ahead of `origin/main`, unpushed, as of this writing
+8. **Concurrent-launch graph collision** — *addressed 2026-07-23, not an open
+   gap anymore, recorded here for continuity*: an overnight freeze was
+   root-caused to two overlapping `hello_moon.launch.py` invocations sharing
+   one DDS domain and merging into a single ROS graph over identical topic
+   names (`/goal_pose`, `/clock`, `/cmd_vel`, ...). Three layers now guard
+   this: `demo.sh`'s preflight process-kill, `on_exit=Shutdown()` on every
+   long-running node so one dying node tears the whole tree down, and — the
+   structural backstop — each `hello_moon.launch.py` invocation now claims a
+   **private `ROS_DOMAIN_ID`** (lock-file registry under
+   `~/.ros/regolith_domain_ids/`, flock-serialised so two simultaneous
+   launches are *guaranteed* distinct ids, stale claims self-healed via a
+   PID-liveness check). Between any two launches that both claim an id, graph
+   isolation is absolute regardless of invocation path; the only residual is
+   id exhaustion beyond 101 concurrent sims (falls back to a random pick),
+   unreachable on this PoC's hardware. See `PROGRESS.md`'s "Overnight freeze"
+   and "Per-launch ROS_DOMAIN_ID isolation" sections.
+9. Local `main` is ahead of `origin/main`, unpushed, as of this writing
    (commit count has grown since this figure was last checked — see
    `git status` for the current count).
 
