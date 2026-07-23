@@ -41,6 +41,48 @@ if [ ! -f install/setup.bash ]; then
   ./scripts/setup.sh
 fi
 
+# A prior launch (crashed, backgrounded, or just left running in another
+# terminal) leaves gz sim + every ROS node from this demo still alive with no
+# ROS_DOMAIN_ID/namespace isolation - a second launch then fights the first
+# over the same /goal_pose, /planned_path, /odometry/filtered, /clock,
+# /cmd_vel topic names. This has actually happened (see PROGRESS.md's
+# "Process-cleanup gotcha" and the overnight-freeze incident it caused).
+# Anchor on the launch process's own process group so every descendant is
+# caught even if the launch parent itself already died and its children were
+# reparented (pgid survives reparenting). Match installed executable paths,
+# not "regolith" as a bare substring - this repo is checked out under a path
+# containing that word, so a substring match self-matches this very script.
+echo "Checking for leftover processes from a previous run..."
+found_leftover=0
+for pid in $(pgrep -f "ros2 launch.*hello_moon\.launch\.py" 2>/dev/null || true); do
+  found_leftover=1
+  pgid="$(ps -o pgid= -p "$pid" 2>/dev/null | tr -d ' ')"
+  [ -n "$pgid" ] && kill -TERM -- "-$pgid" 2>/dev/null || true
+done
+if pgrep -f "install/regolith_[a-z_]*/lib/" >/dev/null 2>&1; then
+  found_leftover=1
+  pkill -TERM -f "install/regolith_[a-z_]*/lib/" 2>/dev/null || true
+fi
+if pgrep -f "ruby .*gz sim.*regolith_moon" >/dev/null 2>&1; then
+  found_leftover=1
+  pkill -TERM -f "ruby .*gz sim.*regolith_moon" 2>/dev/null || true
+fi
+if [ "$found_leftover" = "1" ]; then
+  echo "Found leftover processes from a previous run - stopping them..."
+  sleep 2
+  pkill -KILL -f "ros2 launch.*hello_moon\.launch\.py" 2>/dev/null || true
+  pkill -KILL -f "install/regolith_[a-z_]*/lib/" 2>/dev/null || true
+  pkill -KILL -f "ruby .*gz sim.*regolith_moon" 2>/dev/null || true
+  sleep 1
+fi
+if pgrep -f "install/regolith_[a-z_]*/lib/" >/dev/null 2>&1 \
+   || pgrep -f "ros2 launch.*hello_moon\.launch\.py" >/dev/null 2>&1; then
+  echo "ERROR: could not fully stop a previous run's processes." >&2
+  echo "Check 'ps aux | grep regolith' and stop them manually before continuing -" >&2
+  echo "starting a second launch on top of a live one silently corrupts both (see PROGRESS.md)." >&2
+  exit 1
+fi
+
 # ROS 2's setup.bash isn't safe under `set -u` (references unbound vars like
 # AMENT_TRACE_SETUP_FILES on first source) - relax it for these two lines only.
 set +u

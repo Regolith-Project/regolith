@@ -87,8 +87,8 @@ works, what doesn't yet, and why.
 
 1. **Procedural planetary terrain** — craters, rocks, and PBR textures generated from a seed, done
 2. **Rover simulation** — skid-steer chassis, teleop, sensor bridging, done
-3. **GPS-denied localisation** — EKF fusing wheel odometry + IMU, done with a known drift gap (see below)
-4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end at short range; a terrain-collision stability issue limits longer autonomous runs (see below)
+3. **GPS-denied localisation** — EKF fusing wheel odometry + IMU, done, within target on measured test legs (see below)
+4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end including the full 60-100 m acceptance distance; a rare tight-turn stall has a detector + recovery (see below)
 
 See the [Roadmap](#roadmap) below for target vs. actual, and [Known Limitations](#known-limitations) for the honest details.
 
@@ -136,18 +136,27 @@ See [`docs/architecture.md`](docs/architecture.md) for how this repo relates to 
 
 Documented in full in [`PROGRESS.md`](PROGRESS.md); the two that matter most for anyone trying the demo:
 
-- **Localisation drift**: the EKF (wheel odometry + IMU) tracks heading
-  very accurately but position drift is 20-45% over test traverses,
-  against a 5% target — skid-steer wheel odometry's own position estimate
-  is fundamentally noisy under turning, and a full fix (visual odometry,
-  per the original plan) wasn't reached in this seed demo.
-- **Terrain-collision stability on long autonomous runs**: the physics
+- **Localisation drift**: an earlier pass through this demo measured 20-45%
+  position drift against a 5% target and attributed it to lunar-gravity
+  wheel slip. That figure turned out to be measured before a terrain-
+  collision smoothing fix and isn't reproducible on the current code —
+  re-measured drift is 0-4% over straight and gently-turning test legs,
+  within target. See [`PROGRESS.md`](PROGRESS.md)'s "M3 drift
+  re-investigation" for the full correction.
+- **A rare, intermittent stall in tight turns**: while re-investigating the
+  drift figure above, the rover was observed to occasionally freeze mid-turn
+  (wheels lock, no flip, no terrain-geometry cause found) due to what
+  appears to be a physics-engine friction-cone effect under lunar gravity.
+  A detector + automatic recovery now exists in `flip_recovery_node.py`,
+  verified in isolation; it hasn't yet been observed catching a naturally-
+  occurring stall live, since the failure is too rare to reproduce on
+  demand. See `PROGRESS.md` for details.
+- **Terrain-collision flip risk on long autonomous runs**: the physics
   engine (gz-physics/dartsim) doesn't implement heightmap or mesh collision
   construction, so terrain collision is approximated with a grid of boxes.
-  On some runs the rover flips at a box-boundary crossing during
-  autonomous driving. The full pipeline (costmap → plan → follow → recover)
-  works reliably at short range; closing this gap for long unattended runs
-  is the clearest next step.
+  A smoothing fix and a simulated flip-recovery backstop address this — the
+  full 60-100 m / 3-consecutive-seed acceptance check has since passed 3/3
+  with zero flips (see `PROGRESS.md`).
 
 ## Roadmap
 
@@ -156,8 +165,8 @@ Documented in full in [`PROGRESS.md`](PROGRESS.md); the two that matter most for
 | Phase | Focus | Target | Status |
 |---|---|---|---|
 | **WP1** | Autoware fork, architecture, HAL interfaces | Architecture doc + interface packages | Done |
-| **WP2** | GPS-denied localisation (IMU + wheel odom fusion) | <5% drift over 500 m traverse | Working, drift gap remains (20-45%, see above) |
-| **WP3** | Terrain-aware navigation + obstacle avoidance | Autonomous 5-waypoint route in simulation | Pipeline works end-to-end; long unattended runs hit a stability issue (see above) |
+| **WP2** | GPS-denied localisation (IMU + wheel odom fusion) | <5% drift over 500 m traverse | Done — re-measured at 0-4% on test legs after a terrain fix (see above); full-course re-measurement still pending |
+| **WP3** | Terrain-aware navigation + obstacle avoidance | Autonomous 5-waypoint route in simulation | Pipeline works end-to-end; a rare tight-turn stall has a detector + recovery, not yet observed catching a live occurrence (see above) |
 | **WP4** | Gazebo planetary simulation environment + benchmarks | Turnkey sim with rocks, slopes, shadows | Done |
 | **WP5** | Documentation + community bootstrap | Clone → build → run in under 1 hour | Done — this Quick Start |
 

@@ -11,7 +11,7 @@ component reuse log.
 | M0 — Environment verified | Done |
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
-| M3 — Localization | Substantially done (see notes) |
+| M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
 | M4 — Autonomous navigation | **Done** — full 60-100 m / 3-consecutive-seed acceptance check passed (see "M4 acceptance check: full 60-100 m / 3-consecutive-run result" below) |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
@@ -795,3 +795,250 @@ verify that fix. **Result: pass, 3/3.**
   (e.g. `install/regolith_planner/lib`), and verify the process list is
   actually empty afterward rather than trusting the kill command's exit
   code.
+
+## M3 drift re-investigation: the 20-45% figure is stale, and a second, unrelated failure mode found
+
+Revisiting the M3 "Substantially done" status above, since the 20-45%
+position-drift figure recorded there turns out to be **pre-fix and no longer
+representative of the current codebase**, and a live-testing session while
+investigating it surfaced a second, previously-undocumented failure mode.
+
+- **Timeline check**: the M3 drift measurement (commit `7390059a7`) predates
+  the terrain-collision smoothing fix (commit `8515e1f36`, "Rover flip fix"
+  above) by about 17 hours. The pre-fix `heightmap.py` used flat-topped
+  axis-aligned collision boxes with cliff-like steps at cell boundaries -
+  the current file's own commit notes put those at an average 0.31 m, up to
+  2.27 m, i.e. taller than the 0.09 m wheel radius, **even on flat ground**.
+  Driving straight at 0.3-0.35 m/s across those steps makes a wheel
+  spin/slip climbing each cliff, which is what the original test measured as
+  "genuine, speed-dependent wheel slip under lunar gravity." At 0.1 m/s the
+  wheel climbs quasi-statically, hence that test's 0% figure - the speed
+  dependence was a seam-crossing artifact, not a steady-state traction
+  effect. The smoothing fix that resolved rover flips removed those seams as
+  a side effect, and with them, apparently, most of the drift.
+- **Re-measured on current terrain** (seed 42, straight-line and turning
+  runs driven directly via `/cmd_vel`, autonomy stack idle, so these numbers
+  are the localization pipeline in isolation): straight-line drift is
+  **0.0%** at both ~4 m and ~16 m. A full **53 m** straight-line leg (chosen
+  via a manifest clearance scan so it doesn't cross any rock/crater) gave
+  **0.17-0.20%** EKF-vs-ground-truth drift end to end, computed correctly as
+  each stream's own displacement over the run (comparing absolute
+  coordinates across a run that included manual `gz set_pose` teleports is
+  invalid - neither the wheel-odometry dead-reckoning nor the EKF are
+  informed of a physical teleport, so their absolute frames desync from
+  ground truth's; the first pass at this measurement produced a false ~70%
+  figure for exactly this reason, before the mistake was caught). The error
+  also does not accelerate with distance - it shrinks from 0.62% at 5.7 m
+  travelled to 0.20% at 47.7 m, consistent with a small fixed
+  settling/startup transient rather than a growing steady-state rate.
+  Gentle-turn runs (radius 1-2 m circles) measured 2.5-4% - still inside the
+  <5% target. **The "lunar-gravity traction slip" explanation for the M3
+  drift figure is retracted**; on current code, M3 appears to already meet
+  its acceptance target. (Caveat: these are isolated wheel-odom+IMU+EKF
+  tests, not the full autonomous pipeline over the actual 60-100 m M4
+  acceptance course; re-measuring drift during a real M4-style autonomous
+  run, rather than a manually-driven straight/turn leg, would be the
+  natural way to close this out completely.)
+- **A second, unrelated failure mode found along the way: an intermittent
+  wheels-locked-but-upright stall in tight turns.** While re-running the
+  turning tests above, the rover once froze solid - zero further change in
+  *both* ground-truth position and yaw - mid-maneuver, at a location
+  verified (via the terrain manifest) to have 17.8 m of clearance from the
+  nearest rock or crater, on smooth (~1.9° local slope) ground, with
+  `/cmd_vel` still commanding a steady 0.3 m/s + 0.15 rad/s turn the entire
+  time. Attitude stayed upright throughout (roll/pitch ~0°), so this is
+  invisible to `flip_recovery_node`'s 60° flip detector - it is a distinct
+  mobility failure, not a flip, and (since wheel odometry froze in lockstep
+  with ground truth) it contributes ~0 to the localization drift numbers
+  above; it's a "the rover stops making progress" bug, not a "the rover
+  mislocalizes" bug.
+  - Root cause (moderate-high confidence on the mechanism; the exact dartsim
+    internals weren't instrumented directly): a skid-steer wheel in a tight
+    turn must scrub laterally against the ground, and lunar gravity gives a
+    much smaller wheel normal force (and thus a narrower friction cone) than
+    Earth gravity would for the same `mu1`/`mu2` = 1.4 friction coefficient.
+    The physics engine's contact solver appears to occasionally collapse to
+    an all-static solution where the commanded wheel joint velocity is
+    infeasible against that narrow cone, and the wheels simply stop
+    rotating. Confirmed *not* a terrain-collision-geometry artifact: the
+    exact stall coordinates were checked against the reconstructed collision
+    mesh and sit mid-slab, nowhere near a seam. Confirmed genuinely
+    reproducible but rare: repeated attempts at the same maneuver, same
+    location, mostly complete a full loop cleanly; one attempt out of
+    several produced a full freeze, one other showed a brief "near-miss" dip
+    in commanded-vs-actual speed before self-recovering. A follow-up stress
+    test (20 further repeats of similar tight-turn maneuvers, across two
+    sessions) reproduced zero further hard freezes, consistent with this
+    being a low-probability event (plausibly well under 10%, not the ~25%
+    a small initial sample suggested) rather than something that reliably
+    reproduces on demand.
+  - Confirmed fix mechanism, independent of the actual root-cause
+    mechanism: switching the commanded `/cmd_vel` to a plain straight line
+    (no angular component) reliably broke the lock immediately in manual
+    testing, even though the rover's position had not budged on its own.
+    This is consistent with a static/kinetic friction distinction (once
+    moving, the resumed turn is much less likely to re-lock) and, unlike
+    the flip case, is a recovery action a real rover's FDIR could plausibly
+    take too - it doesn't need the flip backstop's "this is simulated, not
+    physical" caveat.
+  - **Fix implemented**: `flip_recovery_node.py` now carries a second,
+    independent detector alongside its existing flip detector. It watches
+    for ground-truth speed staying below `stuck_min_speed_mps` (default
+    0.02 m/s) while `/cmd_vel` commands more than `stuck_min_commanded_mps`
+    (default 0.03 m/s-equivalent, combining linear and angular command
+    magnitude), sustained past `stuck_debounce_s` (default 3.0 s so it can't
+    fire during ordinary acceleration ramps or brief planner replans), and
+    recovers by taking over `/cmd_vel` for `stuck_nudge_duration_s` (default
+    1.0 s) with a straight `stuck_nudge_speed_mps` (default 0.2 m/s)
+    command, published at `stuck_nudge_rate_hz` (default 30 Hz, faster than
+    `pure_pursuit_node`'s 10 Hz control loop so the override actually reaches
+    gz-sim instead of being immediately overwritten). Verified with a
+    standalone unit test (`FlipRecoveryNode` instantiated directly, fed
+    synthetic `/ground_truth/pose`/`/cmd_vel` messages, no Gazebo involved,
+    on an isolated `ROS_DOMAIN_ID` so it can't cross-talk with a live sim):
+    fires exactly once on a frozen-pose-plus-active-command condition, does
+    not fire while the rover is genuinely moving, and does not fire while
+    idle with zero `/cmd_vel`. The recovery mechanism itself (a straight
+    `/cmd_vel` override breaking the lock) was validated manually against
+    the live simulator during the investigation above, separately from this
+    unit test of the detection logic. Given the failure's rarity, a live,
+    naturally-occurring recovery was not captured on video/log during this
+    session - the unit test plus the earlier manual confirmation are the
+    evidence trail for this fix, not a reproduced-end-to-end live capture.
+
+## Terrain density increase: the rover rarely had to turn
+
+User feedback: the rover "doesn't really need to turn left and right, goes
+more or less straight line." Investigated with real data rather than just
+tuning by feel, since the actual costmap-lethality behavior turned out to
+matter more than raw obstacle counts.
+
+- **First checked whether craters even register as obstacles at all** (the
+  suspicion going in was that the crater bowl/rim profile's slope might be
+  too shallow to ever cross `slope_lethal_deg=20°` once smoothed by the
+  costmap's block-averaging down to 1 m/cell). Directly measured: false -
+  craters do produce real lethal cells at the current config (a heightmap
+  built with `crater_count=0` produces exactly 0 lethal cells; the normal
+  60-crater heightmap produces ~7% lethal coverage from craters alone), so
+  this wasn't the root cause.
+- **Root cause, found by testing the actual shipped tour route**: for seed
+  42 with `tour_mission.py`'s fixed 5 waypoints
+  (`(0,0)→(12,8)→(18,-4)→(4,-14)→(-10,-6)→(0,0)`), only 1 of the 5 legs'
+  straight lines crossed any lethal cell at all - the other 4 were
+  completely clear. A broader random sample (200 random 10-20 m pairs, 200
+  random 60-100 m pairs, well clear of the world edge) put the baseline
+  blocked-fraction at ~55-62% depending on seed - i.e. the terrain already
+  had real obstacles fairly often, but this specific fixed waypoint set
+  landed in the unlucky clear majority four times over, which is what
+  produced the "basically straight" impression in practice.
+- **Fix**: raised `crater_count` 60→100, `rock_count` 130→190, and lowered
+  `spawn_zone_radius_m` 12.0→9.0 in `regolith_terrain_gen/config.py`.
+  Values were chosen by measuring straight-line-blocked fraction and A*
+  reachability together (not eyeballed) across seeds 7, 42, and 123: a more
+  aggressive density increase (crater_count=150, rock_count=260) pushed the
+  fixed tour route to 4/5 legs blocked, but also raised genuine A*
+  unreachable-goal failures from a baseline 0-1 per 24 sampled goals to 4-9
+  per 24 - too much risk of "click a goal, it's actually unreachable" for
+  the size of ask here. The shipped values raise blocked-fraction for
+  10-20 m legs from ~55-62% to ~65-70% across the three seeds tested, while
+  keeping genuine (non-goal-on-obstacle) A* failures at 0-1 per 24 sampled
+  goals - the same order as baseline, not meaningfully worse.
+- **Live-verified after regenerating and relaunching** (seed 42): the
+  previously-completely-clear tour leg 1 (`(0,0)→(12,8)`, 14.1 m) now
+  produces a genuinely curved path - 1.47 m maximum perpendicular deviation
+  from the straight line, not the ~0 m it had before. A farther (~74 m)
+  goal still resolves to a valid 109-waypoint path, confirming A*
+  reachability held up at longer range too.
+- **Honest caveat**: this is a density increase, not a placement-algorithm
+  change (craters/rocks are still placed independently and uniformly at
+  random, with no minimum spacing between them or guarantee against long
+  clear corridors). It measurably reduces how often a given seed/waypoint
+  combination gets unlucky, but doesn't *guarantee* every route on every
+  seed requires turning - a specific seed/waypoint pair could still land
+  in the clear tail of the distribution. A stratified/jittered placement
+  grid (bounding the maximum possible clear-corridor length directly,
+  rather than relying on density alone) would give a firmer guarantee if
+  that's ever needed, at the cost of being a larger change to the
+  generator's placement algorithm; not done here as it was more than this
+  request asked for.
+
+## Overnight freeze: two overlapping demo launches cross-talking on the ROS graph
+
+User report: the sim ran for several hours, then froze with an error, GUI
+showing nothing coherent. Root-caused from `~/.ros/log/` (each ROS node
+writes its own per-process log; `ros2 launch` writes a `launch.log` per
+invocation, named with its own PID) rather than a live repro, since the
+processes were already gone by the time this was investigated - **the
+diagnosis below is log archaeology, not a re-observed live failure**.
+
+- **Two `hello_moon.launch.py` invocations were running at once.**
+  `~/.ros/log/2026-07-21-15-22-17-*-8110/` (no `mission:=tour`, no rviz)
+  started at 15:22:18. `~/.ros/log/2026-07-21-15-30-33-*-8606/`
+  (`mission:=tour` + rviz) started at 15:30:33 - eight minutes later, on top
+  of the first one, without checking it had actually exited.
+- **Trigger**: session 1's `parameter_bridge` process died with **SIGABRT
+  (exit code -6)** at 15:39:29, ~17 min into that session (see its
+  `launch.log`: `[ERROR] ... process has died [pid 8116, exit code -6, ...]`,
+  no further lines after that - no clean shutdown was ever logged for this
+  session). The proximate cause of the abort itself wasn't recoverable from
+  the available logs (a C++ process's SIGABRT with no captured traceback) -
+  not claiming a cause for that part.
+- `hello_moon.launch.py` had no `on_exit` handling, so `ros2 launch` did
+  **not** tear the rest of session 1's tree down when the bridge died - its
+  `gz sim`, `ekf_node`, `costmap_node`, `planner_node`, `pure_pursuit_node`,
+  and `flip_recovery_node` kept running as orphans. Neither launch sets a
+  distinct `ROS_DOMAIN_ID` or namespaces its topics, so when session 2
+  started, both full stacks ended up sharing `/goal_pose`, `/planned_path`,
+  `/odometry/filtered`, `/clock`, and `/cmd_vel`.
+- **Confirmed via matching timestamps across the two sessions' own PIDs**:
+  session 1's `planner_node` (pid 8125) and session 2's `planner_node`
+  (pid 8621) logged **identical** `"Planned path: ... start=(122, 127)/
+  (136, 127) goal=(128, 128)"` lines at the same sim-timestamps (e.g. both
+  at `1784671676.79...`), and both sessions' `flip_recovery_node` instances
+  (pid 8129 vs 8625) logged identical "STUCK RECOVERY" events at identical
+  timestamps - two independently-simulated rovers, one merged ROS graph.
+- Consequence: a merged, non-monotonic `/clock` (two `gz sim` instances each
+  publishing their own) produced a burst of "Detected jump back in time /
+  Resetting RViz" and "Moved backwards in time" warnings in `rviz2`,
+  `ekf_node`, and `robot_state_publisher`'s logs early in session 2 - this
+  is almost certainly the "GUI showing nothing coherent" the user saw.
+  `pure_pursuit_node`'s deviation/replan logic - which had **no retry cap or
+  give-up condition** - looped "Deviated X m - stopping and replanning"
+  **49,928 times** over the ~9 hour run, consistent with alternating between
+  pose estimates from two different rovers' EKF instances every time a new
+  plan arrived from whichever `planner_node` last computed one.
+- **This exact failure mode was already documented** from earlier M4 testing
+  ("Process-cleanup gotcha" above: "a prior failed/backgrounded launch's
+  full node set was still running and fighting the new launch's nodes over
+  the same topic names") - the lesson was written down but never turned
+  into an automated safeguard, so it recurred, this time for 9 hours
+  unattended instead of being caught immediately during interactive testing.
+- **Fixes made** (implemented, not yet live-verified against a real repro of
+  this exact scenario - flagging that honestly rather than claiming a
+  re-test that didn't happen):
+  - `scripts/demo.sh`: added a preflight step that finds and kills any
+    leftover `hello_moon.launch.py` process tree (by process group, so it
+    catches orphans whose launch parent already died - process group
+    membership survives reparenting), plus a belt-and-suspenders match on
+    this repo's installed executable paths (`install/regolith_*/lib/...`,
+    not a bare `"regolith"` substring match, which would self-match the
+    script's own invocation from a repo checked out under a path containing
+    that word - see the "Process-cleanup gotcha" note above), and refuses to
+    proceed if the process list isn't actually empty afterward.
+  - `hello_moon.launch.py`: every long-running node (everything except the
+    intentionally one-shot `spawn_rover`) now has an `on_exit=Shutdown()`
+    handler, so a single node dying unexpectedly brings the whole demo down
+    instead of leaving orphans for a later launch to collide with.
+  - `pure_pursuit_node.py`: added `max_consecutive_replans` (default 8) -
+    after that many deviate/stall-triggered replans on the *same* goal with
+    no intervening progress or new goal, it logs an error and stops
+    retrying that goal rather than looping forever. This is a fix
+    independent of the root cause above: even a single, correctly-isolated
+    run had no floor on this loop at all, which is what let the underlying
+    graph-collision bug run for 9 hours instead of failing loudly and fast.
+  - **Not fixed / left as a follow-up**: distinct `ROS_DOMAIN_ID` per launch
+    (or topic namespacing) would make the two-stacks-collide failure mode
+    structurally impossible even if process cleanup somehow still missed
+    something; not done here since it's a larger change (would need
+    threading through every node's config) and the preflight-kill + on_exit
+    changes above already close the actual gap that let this happen.
