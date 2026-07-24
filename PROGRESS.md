@@ -1238,3 +1238,242 @@ convention.
   above); confirmed via `pgrep` afterward that no `gz sim`, bridge, or
   `regolith_*` node remained running (only this session's own shell matched
   the search pattern, expected self-match, not a leftover process).
+
+## "Gazebo shows nothing but terrain" - the rover was never missing, just 2-3 px
+
+User-reported bug: launching `hello_moon.launch.py` with a GUI, the Gazebo window
+showed the procedural terrain (and craters) but apparently nothing else - no
+visible rover. Root-caused and fixed, but the investigation went through one wrong
+turn worth recording honestly rather than editing out.
+
+- **First hypothesis (wrong): a GUI scene-broadcast race.** The rover is spawned
+  ~3s after gz-sim's GUI starts, via a separate `ros2 run ros_gz_sim create`
+  service call, rather than being present in `world.sdf` from the start like the
+  rocks/terrain. Comparing the always-open launch window against a freshly-opened
+  `gz sim -g` client, the fresh client *appeared* to show a small object the
+  original window didn't, at the rover's screen location - interpreted at the
+  time as proof that an already-open gz-sim GUI never picks up entities added
+  later via the spawn service (a real, documented class of gz-sim GUI bug in
+  general, just not what was happening here). Baked the rover directly into the
+  generated `world.sdf` at its spawn pose to eliminate that race structurally
+  (`hello_moon.launch.py`'s `_bake_rover_model_sdf`, converting the xacro'd URDF
+  via `gz sdf -p` and splicing the `<model>` block in before `</world>`, same
+  place rocks are already assembled in `worldgen.py`). This is a reasonable
+  simplification on its own merits (one less runtime dependency, the world file
+  is now fully self-contained) but **retested after the change and the rover
+  still didn't visibly appear** - proving the scene-broadcast race was never the
+  actual cause. The original "fresh client shows it, old one doesn't" comparison
+  was almost certainly a JPEG-compression artifact or a stray dust-particle
+  sprite mistaken for the rover, not a real signal - a caution for next time to
+  verify a tiny (sub-5px) blob against a second, independent method before
+  trusting it as evidence.
+- **Actual root cause, confirmed by direct measurement**: the world's default GUI
+  `camera_pose` (`-110 -110 35 0 0.28 0.78`, chosen to frame the whole 200 m
+  crater field with its low-sun long shadows for a nice establishing shot) is
+  about 155 m from the rover's spawn point at the origin. The rover is a 0.4 m
+  chassis - at that range it projects to roughly 2-3 pixels, and the world's
+  intentionally-dark lunar ambient (`<scene><ambient>0.06 0.06 0.07</ambient>`)
+  makes it blend further into the equally dark background/shadowed terrain.
+  Confirmed three ways: (1) an isolated single-model test world (just the rover
+  + a flat ground plane, default lighting) rendered it perfectly, ruling out any
+  problem with the model/material itself; (2) `gz model --list` and
+  `/world/regolith_moon/pose/info` both confirmed the rover was a live, correctly
+  posed entity in the full world the whole time; (3) temporarily moving the
+  camera to ~11-28 m from the rover (first attempt put the camera *underground*,
+  at z=2.5 against ~5.2 m local terrain elevation, seeing only the terrain's
+  underside - corrected to a sane height) showed the rover clearly, sunlit,
+  distinctly shaped against the surrounding round rocks.
+- **The fix**: moved the default `camera_pose` in `worldgen.py`'s
+  `build_world_sdf` from `-110 -110 35 0 0.28 0.78` to `-22 -22 13 0 0.3 0.78` -
+  same elevated 3/4 angle and lighting mood, ~5x closer to the spawn zone.
+  Re-verified via screenshot: the rover is now a small but clearly distinguishable
+  shape (lighter chassis top, darker wheels) even in the raw, non-contrast-boosted
+  capture, unlike before where no amount of levels/contrast adjustment recovered
+  a rover-shaped signal from the noise at 155 m. No screenshots or other docs
+  referenced the old camera framing (checked before changing it).
+- **Build note**: `hello_moon.launch.py` is symlink-installed (edits are live, no
+  rebuild needed), but `regolith_terrain_gen` is an `ament_python` package whose
+  `--symlink-install` uses a pip-style editable (`.egg-link`) install rather than
+  a plain file symlink - the previous colcon build predates this session, so the
+  installed `worldgen.py` was a stale copy until `colcon build --symlink-install
+  --packages-select regolith_terrain_gen` was re-run. Verified afterward that the
+  editable link resolves imports back to the `src/` copy going forward
+  (`regolith_terrain_gen.worldgen.__file__` points into `build/regolith_terrain_gen/
+  regolith_terrain_gen/`, itself a symlink into `src/regolith.universe/...`), so
+  further edits to this package's Python files are live without another rebuild.
+- **Diagnostic byproduct, not a bug**: found that synthetic X11 scroll/click
+  events from `xdotool` do not reach gz-sim's GUI at all under this WSLg setup
+  (zero effect across three attempts, with and without explicit window
+  focus/activate) - gz-sim's Qt GUI is very likely a native Wayland client here,
+  which XTest-based tools can't drive. Camera repositioning for debugging had to
+  go through editing `world.sdf`'s `camera_pose` and relaunching rather than
+  interactively panning/zooming - worth knowing before trying interactive GUI
+  automation in this environment again.
+
+## "The rover seems to be underground" - visual/collision terrain mismatch, fixed
+
+User-reported bug: the rover appeared to be sunk into the ground rather than sitting
+on top of it. Root-caused and fixed - the rover's physics were never broken, it was
+resting exactly where its (invisible) collision geometry supported it; the problem
+was that the *rendered* terrain and the *physical* terrain were two different
+surfaces that didn't line up.
+
+- **Root cause**: the visual `<heightmap>` (`worldgen.py`) is the full-resolution
+  (513x513 px, ~0.39 m/px) fBm+crater heightmap. Collision, per the existing note in
+  `heightmap.py`, can't use native `<heightmap>`/`<mesh>` geometry on this
+  dartsim/bullet install, so it's approximated with a coarse 24x24 grid of tilted,
+  blurred ("smoothed") boxes (~8.3 m cells) - a fix for an earlier flip bug (see
+  M4/M5 above). Nobody had checked whether that smoothed surface still visually
+  lines up with the fine heightmap it approximates. Measured directly (real
+  generation code, not a re-implementation) across the 9 m spawn zone: seed 42 -
+  the launch file's default - showed a mean visual-above-collision gap of **+0.150
+  m**, up to **+0.346 m**, against a **0.09 m** wheel radius (80% of the spawn zone
+  exceeded the wheel radius). Confirmed live: launched headless, `/ground_truth/pose`
+  settled to a `z` matching the *collision* surface's prediction to within 1 cm, not
+  the visual surface - exactly consistent with "wheels resting on an invisible lower
+  surface while a higher one is drawn as the ground." The gap is seed-dependent (7
+  seeds checked ranged -0.066 m to +0.254 m mean) - not a crater-rim issue (checked:
+  zero craters had rim influence reaching the seed-42 spawn zone) - most likely
+  coincidental alignment between the origin and the coarsest fBm octave for a given
+  seed. Not universal, but the default seed was one of the worst.
+- **The fix**: made the visual heightmap and the collision surface the *same*
+  surface by construction, instead of narrowly patching the spawn zone. Refactored
+  `heightmap.py`: `_build_smoothed_surface` (the block-average + blur + per-cell
+  tilt math) is now a shared helper used by both `build_terrain_collision_boxes_sdf`
+  (as before) and a new `_synthesize_visual_heightmap`, which evaluates that same
+  per-cell tilted plane at every full-resolution pixel. `build_heightmap` now
+  returns `(raw_heightmap, visual_heightmap, craters, elevation_lookup)` - the raw
+  fine terrain is kept only to derive the collision surface from; `visual_heightmap`
+  (saved as the PNG) and `elevation_lookup` (used for rock placement and the
+  spawn-point manifest elevation) both come from the synthesized, collision-matched
+  surface. This also fixes rock placement for free - rocks were already positioned
+  via `elevation_lookup`, so they now automatically sit on the same ground the rover
+  does, no separate change needed.
+- **A normalization gotcha caught before it shipped**: `save_heightmap_png` used to
+  normalize the PNG by the array's own max height. That was harmless for the raw
+  heightmap (already forced to max out at exactly `height_range_m` during
+  generation) but would have silently reintroduced the same mismatch through the
+  back door for the new synthesized surface, whose peak is generally *below*
+  `height_range_m` (smoothing shaves off spikes) - self-normalizing would have
+  rescaled it back up to fill the full range, distorting it relative to the
+  un-rescaled collision boxes. Fixed by normalizing against the fixed
+  `cfg.height_range_m` instead (now an explicit parameter).
+- **cfg fields, not scattered keyword defaults**: `collision_grid_resolution`
+  (24), `collision_overlap_frac` (0.12), and `collision_smoothing_passes` (3) moved
+  from keyword defaults on `build_terrain_collision_boxes_sdf` onto `TerrainConfig`,
+  so the collision-box builder and the visual synthesizer are structurally
+  guaranteed to use identical values rather than relying on two call sites' defaults
+  happening to match.
+- **Verified two ways**: (1) numerically, re-running the same gap measurement
+  against the fixed code across the same 5 seeds - max absolute gap dropped from
+  tens of centimeters to **under 1.8 cm** in every case (the residual is just
+  nearest-cell-lookup rounding in the measurement harness itself, not a real
+  discrepancy); (2) live, relaunching seed 42 headless end-to-end with no errors -
+  `/ground_truth/pose`'s settled `z` (5.302 m) now matches
+  `manifest.json`'s `spawn_zone.elevation_m` (5.247 m) plus the rover's fixed
+  wheel-bottom-to-`base_link` offset (0.055 m) to within a millimeter.
+- **Incidental bug found and fixed along the way, unrelated to the main fix**:
+  `craters.py`'s spawn-zone keep-out (`place_craters`) excluded a crater's *bowl*
+  radius from the spawn zone, but `apply_craters` actually sculpts a raised rim out
+  to 1.6x that radius (the rim gaussian's tail). A large crater could satisfy the
+  keep-out on its center while its rim still poked into the "guaranteed clear"
+  spawn zone. No seed tested actually hit this (seed 42 had zero offending craters),
+  so it wasn't the cause of the reported bug, but the exclusion math itself was
+  wrong for any seed that could place one there - fixed by excluding
+  `radius * 1.6` instead of `radius`.
+- **Left alone**: the collision grid still doesn't cover the outermost <3 m strip
+  at the +x/+y world edge (a pre-existing artifact of cropping the heightmap to a
+  multiple of the block size) - noted in the new synthesis function's docstring
+  rather than fixed, since it's well outside the ~9 m spawn zone / normal driving
+  area and unrelated to this bug.
+
+## The rover is STILL underground - gz heightmap min/max normalization (the real cause)
+
+The user came back: the rover was *still* visibly below the surface after the two
+fixes above. Both prior "fixes" were real improvements but neither addressed the
+actual mechanism, and the "underground" section above is **wrong on one important
+point** (see the normalization bullet below). Corrected here rather than edited in
+place.
+
+- **What the two prior sections got right, and where they stopped short.** The
+  "underground" fix genuinely made `visual_heightmap` (the PNG) and the collision
+  boxes the *same absolute-metre surface* - that part is correct and still stands.
+  But it only ever verified that equality **in Python metres** (`elevation_lookup`
+  vs `_collision_top_z`) and against `/ground_truth/pose` - it never checked what
+  **gz-sim actually draws from the PNG**. That was the blind spot: the PNG is not
+  the surface gz renders.
+- **Real root cause: gz-sim min/max-normalizes the heightmap image.** gz-sim's
+  ogre2 `<heightmap>` does **not** map `pixel/65535 -> height * <size>.z` linearly.
+  It stretches whatever pixel range the PNG actually contains to fill the full
+  `<size>.z`: the image's lowest pixel is drawn at `<pos>.z`, its highest at
+  `<pos>.z + <size>.z`, linearly between. Our `save_heightmap_png` was writing a
+  **partial-range** PNG - `visual_heightmap / height_range_m`, i.e. pixels spanning
+  only ~`[0.074, 0.93]` of full scale (min height 0.736 m, max 9.299 m over a 10 m
+  `<size>.z`). gz then stretched that `[0.074, 0.93]` band back up to `[0, 1]`,
+  lifting every mid-range height. At the origin the drawn ground rose from the
+  intended 5.247 m to ~5.4-5.5 m while the collision boxes stayed at 5.247 m, so the
+  rover - correctly resting on the collision surface - rendered sunk ~0.2-0.25 m into
+  the visibly-drawn ground.
+- **The prior section's normalization bullet was backwards.** It says
+  `save_heightmap_png` was fixed to normalize by the fixed `height_range_m` "instead
+  of the array's own max" to avoid "rescaling it back up to fill the full range."
+  That reasoning assumes gz decodes the PNG *linearly* - it doesn't. Filling the full
+  range is exactly what was needed; refusing to is what left gz to do the rescaling,
+  uncontrolled. Both the old array-max normalization *and* the fixed-`height_range_m`
+  normalization produced a partial-range PNG (min pixel != 0), so both were broken by
+  gz's min/max stretch; the change between them didn't touch the actual bug.
+- **How this was pinned down (evidence, not theory):**
+  - Rendered the scene server-side from a scripted camera sensor (the GUI's Qt/Wayland
+    window can't be screenshotted under WSLg, and `/gui/screenshot` isn't registered;
+    a downward `depth_camera` sensor also refused to publish on this GL stack, so a
+    plain RGB camera + `ros_gz_bridge` -> PNG was the working path).
+  - **Calibration**: rendered two synthetic ramp heightmaps that share the same value
+    *span* but different absolute values (centre 0.5 vs 0.3). They rendered
+    **pixel-identical** - only possible if gz normalizes by the image's own span, not
+    by absolute pixel value. (A flat/constant heightmap renders degenerately and a
+    heightmap with no `<texture>` block crashes the ogre2 fragment-shader compile on
+    this WSLg GL3Plus stack - both are incidental gotchas, worked around.)
+  - **Measurement**: dropped a striped 0.25 m ruler at the origin in the real world
+    and read the terrain-occlusion height off the pixels. Before the fix the terrain
+    occluded the ruler at **z~=5.48 m** (collision/spawn = 5.247 m); a Z-sweep of the
+    actual rover confirmed it (fully buried at its 5.30 m rest pose, only the chassis
+    slab poking out at 5.6 m, cleanly on top only by ~6.0 m).
+- **The fix** (`heightmap.py`, `worldgen.py`, `generate.py`): stop fighting gz's
+  normalization - feed it. `save_heightmap_png` now writes a **full-range** PNG
+  (min/max-normalized to `[0, 65535]`) and returns the real-world `(z_min, z_span)`
+  that full range corresponds to. `worldgen.build_world_sdf` puts those straight into
+  the heightmap element: `<pos> z = z_min`, `<size> z = z_span` (instead of `0` and
+  the fixed `height_range_m`). gz's decode then reproduces the exact absolute surface:
+  `pos_z + (pixel/65535)*size_z == H(x,y)` for every pixel. Collision boxes,
+  `elevation_lookup`, spawn Z and rock placement are **unchanged** (still absolute
+  metres) - only the PNG encoding and the two SDF numbers that decode it changed, so
+  the drawn ground and the physical ground now coincide by construction. This holds
+  whether gz's decode is min/max-stretch *or* plain linear (a full-range PNG makes the
+  two identical), so it's robust to the exact decode rule.
+- **Verified:**
+  1. New regression test `test_rendered_png_decodes_back_to_absolute_surface` (seeds
+     42/123/7/1/2): saves the PNG, decodes it the way gz does (`z_min +
+     pixel/65535 * z_span`) and asserts it matches `visual_heightmap` to within 16-bit
+     quantization (~1.3e-4 m). This is the check the prior tests never made. Full suite
+     now **11/11 pass** (the 6 pre-existing checks still pass - collision math untouched).
+  2. Live render, same server-side-camera method: baked the rover into the regenerated
+     seed-42 world, let physics settle it (base_link z = 5.302 m, identical to before -
+     physics untouched), and the rover now renders **clearly on top of the terrain,
+     wheels on the ground, casting a shadow** - vs. completely invisible/buried at the
+     same pose before the fix. Ruler re-measured: terrain now occludes at **z~=5.25 m**,
+     matching the 5.247 m collision surface (was 5.48 m).
+  3. End-to-end `hello_moon.launch.py seed:=7 headless:=true`: launches clean, no
+     errors; `/ground_truth/pose` settles to z = 6.191 m = manifest spawn elevation
+     6.135 m + the 0.055 m wheel-bottom offset. Signature changes wire through fine.
+- **Honest caveats / residual uncertainty:** the ruler read-off has ~0.1 m precision
+  (0.25 m segments, dim low-sun lighting), so "5.48 -> 5.25" is "clearly moved down by
+  ~0.2 m to sit on the collision surface", not a sub-cm claim - the sub-cm guarantee
+  comes from the decode being exact algebra (verified by the unit test), not from the
+  pixel measurement. I did **not** fully pin gz's exact normalization constants (the
+  measured pre-fix 5.48 m is a touch higher than a pure image-min/max model predicts
+  ~5.27 m, plausibly gz filtering/mip-mapping the extreme crater-floor/rim pixels);
+  the fix sidesteps this because a full-range PNG decodes to the true surface under
+  either a linear or a min/max rule. If a future seed's terrain has its extreme min/max
+  pixels as tiny isolated features that gz filters out, a small residual stretch could
+  in principle reappear - the regression test models the ideal decode, not that
+  filtering, so watch for it. Nothing was committed - changes are left staged for review.
