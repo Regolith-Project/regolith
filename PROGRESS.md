@@ -1477,3 +1477,60 @@ place.
   pixels as tiny isolated features that gz filters out, a small residual stretch could
   in principle reappear - the regression test models the ideal decode, not that
   filtering, so watch for it. Nothing was committed - changes are left staged for review.
+
+## "Still no rover, and a green thing under the surface" - framing, and a retracted claim
+
+User came back a third time: the rover still doesn't show, plus "a weird green thing
+under the surface, that might be the rover placeholder". Two separate findings, and
+one earlier claim in this document turns out to be **wrong** and is retracted below.
+
+- **The GUI *can* be screenshotted under WSLg - the previous section's claim is
+  wrong.** That section says gz-sim's GUI "can't be screenshotted under WSLg" and that
+  its Qt GUI "is very likely a native Wayland client, which XTest-based tools can't
+  drive", so all visual verification went through scripted server-side camera sensors.
+  The GUI is in fact an **XWayland** client: `xdotool search --name "^Gazebo Sim$"`
+  finds it and `import -window <id> shot.png` (ImageMagick) captures it fine. What is
+  true is the narrower observation that *synthetic input* (xdotool click/scroll) does
+  not reach it, and that `/gui/screenshot` is not registered in this build - those two
+  are real and still stand. Generalising them into "the GUI can't be captured" is what
+  was wrong, and it mattered: every previous round verified the *sensor* render path
+  and never once looked at what the GUI actually drew, which is the only thing the
+  user was ever reporting on. Screenshotting the GUI directly is now the primary check.
+- **Root cause of "no rover": framing, not rendering.** Screenshotting the real
+  `hello_moon.launch.py` GUI showed the rover present, correctly lit, sitting on the
+  terrain and casting a shadow - just **7x2 px of lit chassis in a 1200 px window**.
+  The previous fix had moved the camera from ~155 m to ~32 m, which took the rover
+  from 2-3 px to ~13 px: a 4x improvement that still leaves it indistinguishable from
+  terrain noise in the dark lunar lighting. The earlier section calls that move
+  "clearly distinguishable ... even in the raw, non-contrast-boosted capture", which
+  was too generous a reading of a 13 px blob.
+- **The fix** (`worldgen._gui_camera_pose`, new): compute the opening pose from the
+  spawn point rather than hardcoding it - back off 4.5 m in x and y and sit 3.0 m above
+  the ground, aimed at the chassis. Measured on a real GUI screenshot, seed 42: lit
+  chassis **7x2 px -> 43x17 px**. Two robustness points fall out of computing it
+  rather than hardcoding: the pose now tracks the seed's actual spawn elevation
+  (5.2 m for seed 42 vs 6.1 m for seed 7 - irrelevant at 155 m, not at 7 m), and
+  clearance is sampled under the *camera*, not under the rover, so terrain rising
+  behind the rover can't bury the camera. New `test_gui_camera_framing.py` pins all
+  three failure modes (too far / underground / mis-aimed) across 5 seeds; suite 26/26.
+- **The green object could not be reproduced - reported as unexplained, not fixed.**
+  Searched for it three ways and found nothing: (1) the whole codebase has no green
+  material anywhere - chassis is 0.55 grey, wheels 0.08 grey, rocks 0.32/0.30/0.29,
+  and `gz sdf -p` preserves both rover materials correctly through the URDF->SDF
+  conversion; (2) measured every GUI screenshot taken this session - maximum
+  green-excess (`G - (R+B)/2`) is **1/255**, i.e. the frames are pure greyscale, no
+  green pixel exists to explain; (3) the only genuinely green pixels found anywhere
+  were in **RViz**, and they are toolbar icons (the green status checkmark and the
+  "2D Goal Pose" arrow), not scene geometry. So either it predates this session's
+  regenerated worlds, or it is in a window/state not reproduced here. Left open
+  rather than guessed at.
+- **Process notes from this round, both previously-recorded traps that bit again:**
+  `xdotool search ... | head -1` picked an **orphaned Gazebo window from a previous
+  launch**, producing one screenshot that matched neither the old nor the new camera
+  pose and briefly looked like the GUI was ignoring `<camera_pose>` entirely (it does
+  honour it - verified by launching the same world at three poses and comparing).
+  Always count the matching windows, don't take the first. Separately, `pkill -f
+  "install/regolith"` and `pgrep -f "gz sim"` each **self-matched the invoking shell**
+  and killed it mid-script; `pgrep -f "gz[ ]sim"` (bracket trick) avoids this.
+- **Incidental, not investigated:** RViz's 3D view was empty with every display
+  unchecked in the one screenshot taken of it. Not what was reported, not chased.
