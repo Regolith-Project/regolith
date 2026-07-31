@@ -283,11 +283,6 @@ Recorded honestly, same as M3 - real progress, real remaining gap.
 
 ## Issues encountered
 
-- This Claude Code session runs as a background job with no attached TTY, so
-  neither `sudo` nor `gh auth login`'s interactive prompts could be driven
-  from here directly. Resolved by having the user configure passwordless
-  `sudo` for their own account and complete GitHub's device-code auth flow
-  (`gh auth login --web`) from their side.
 - The Ubuntu 22.04 universe repo's `gh` package is a stale 2.4.0 (2022) build
   whose device-code flow tripped GitHub's rate limiter (`slow_down`). Fixed by
   installing the current `gh` release directly from GitHub's `.deb` releases
