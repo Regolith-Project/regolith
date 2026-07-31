@@ -146,14 +146,14 @@ Whether you're fixing a typo, adding a sensor driver, improving the planner, or 
 
 ## About
 
-Regolith is developed by [Astro42](https://astro42.com) (Wozify Engineering Group Kft), a Budapest-based European space software consultancy with an ESA track record. Project funding is pending.
+Regolith is developed by [Astro42](https://astro42.com) a British-Hungarian space software consultancy with an ESA track record. Project funding is pending.
 
 ## License
 
 Regolith is licensed under the [Apache License 2.0](LICENSE).
 
 ```
-Copyright 2026 Wozify Engineering Group Kft (t/a Astro42)
+Copyright 2026 Wozify Engineering Group Kft / Wozify Technologies Ltd (t/a Astro42)
 
 Licensed under the Apache License, Version 2.0
 ```
