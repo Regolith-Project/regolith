@@ -1534,3 +1534,446 @@ one earlier claim in this document turns out to be **wrong** and is retracted be
   and killed it mid-script; `pgrep -f "gz[ ]sim"` (bracket trick) avoids this.
 - **Incidental, not investigated:** RViz's 3D view was empty with every display
   unchecked in the one screenshot taken of it. Not what was reported, not chased.
+
+
+## Terrain realism pass: floating rocks, missing craters, unchallenging terrain
+
+Reported: "big floating rocks, not cool", "more craters would be nice", "a terrain a
+bit more challenging". All three were measured before anything was changed, and all
+three turned out to be real defects rather than tuning preferences. A fourth, unreported
+defect surfaced during the measurements.
+
+**Read the performance sub-section below before trusting any RTF number in this
+document's earlier notes.** A first version of this section claimed the finer terrain
+grid was paid for by a rock-collision fix and that the simulation came out *faster*.
+That was wrong, it is retracted in full, and the corrected measurements are given below.
+
+### 1. Rocks floated - a fixed offset applied to a variable mesh
+
+`scatter_rocks` placed each rock's model ORIGIN at `elevation_lookup(x, y) - 0.12 *
+scale`, assuming that buried it. Rock meshes are normalized by their bounding RADIUS,
+but `displace_rock`'s anisotropic stretch leaves each variant's lowest vertex anywhere
+from **0.51 to 1.00 units** below its origin. Measured across 12 variants, every rock
+therefore hovered **0.39-0.88 x scale** above the surface - up to **~2.1 m of clear air
+under a 2.4 m boulder**.
+
+Fixed in `scatter.seat_rock_z`, which seats a rock off its actual geometry instead of a
+constant: each vertex is scaled and rotated into world axes, and the resting origin is
+`max over vertices of (terrain(x+vx, y+vy) - vz)`, then sunk by `rock_embed_frac`. Taking
+the max over vertices (not the terrain height at the rock's centre) is also what stops
+rocks on sloped ground hanging off their downhill edge. Rocks also now get a small random
+roll/pitch, not yaw alone.
+
+Result, seeds 42/7/123, 190 rocks each: **0 floating rocks** (was: all of them), lowest
+vertex now embedded 3-13 cm. Locked down by `test_rock_placement.py`.
+
+> **This result was true but did not mean what it says.** It measures rocks against
+> `elevation_lookup`, which is the same convention the rocks are seated in - so it could
+> not detect that the ground gz actually DRAWS is that surface transposed. Rocks really
+> did still float on screen. See "Rendered terrain was TRANSPOSED" below. The seating
+> maths in this section is correct and unchanged; it was the surface being drawn that was
+> wrong.
+
+### 2. Rock collisions never worked at all
+
+Not reported, found while measuring the above. The rocks' `<collision>` geometry was
+`<mesh>` - which this gz-sim 8 / gz-physics 7.8.0 install silently ignores, the same
+dartsim limitation `heightmap.py` already records for terrain. **The rover drove straight
+through every boulder** while the costmap dutifully planned around them.
+
+Verified directly rather than inferred - a probe dropped onto each geometry type:
+
+| geometry | probe settles at | verdict |
+|---|---|---|
+| box (control) | 3.10 m | works |
+| ellipsoid | 2.45 m | works |
+| **mesh** | **-38.3 m** | **falls straight through** |
+
+Rocks now use an `<ellipsoid>` fitted to each variant's actual per-axis extents
+(`fit_collision_ellipsoid`) - an ellipsoid rather than a sphere because these boulders are
+deliberately anisotropic, and fitted slightly INSIDE the mesh so the rover never stops
+against thin air.
+
+Confirmed solid in the real generated world: a wheel-sized probe dropped over a 2.4 m
+boulder falls dead vertically to **z = 8.33** (that boulder's computed top is **8.48**),
+then rolls off and travels 11.9 m before settling on terrain. Note the first two attempts
+at this check were badly designed and produced a **false pass** and then a false
+"inconclusive": this world runs well below real time, so a 12 s wall-clock wait is only a
+couple of seconds of sim time and caught the probe still mid-air. Horizontal displacement,
+not final height, is the reliable contact signal - a probe in free fall never moves
+laterally.
+
+**This is a correctness fix and nothing more.** See below - the claim that it also bought
+back most of the physics budget was wrong.
+
+### 3. Craters existed in the data and nowhere else
+
+The heightmap the world RENDERS and COLLIDES is not the fine crater-sculpted array: it is
+the block-averaged, 3-pass-blurred collision grid (`_build_smoothed_surface`), previously
+at 24 cells/axis = **8.3 m cells**. Craters below roughly twice the cell size are averaged
+clean away. Measured crater depth retained in the rendered surface, seeds 42/7/123:
+
+| crater diameter | depth retained (old 8.3 m cells) |
+|---|---|
+| 0-5 m | **-12%** (centres came out slightly RAISED) |
+| 5-10 m | -2% |
+| 10-20 m | +1% |
+| 20-40 m | +18% |
+
+Of **100 craters placed, a mean of 2** survived into the rendered surface at all. Raising
+`crater_count` alone - the obvious fix - would have changed nothing visible. This is why
+the world read as uncratered. Two things follow, and they cost very differently:
+raising the crater size floor from 2 m to 6 m is **free** (it just stops placing craters
+the surface cannot represent), while making *small* craters survive needs a finer
+collision grid, which is not free at all.
+
+### 4. Retraction: what the finer grid actually costs
+
+**Retracted.** The first version of this section claimed that the 190 dead `<mesh>` rock
+collisions were consuming ~70% of the physics budget, that replacing them with ellipsoids
+reclaimed it, and that the terrain grid therefore got 4.5x finer *and* the simulation got
+~10% faster. All of that is wrong. It rested on cross-session RTF figures
+(`res24 + mesh rocks = 0.134` against `res24, no rocks = 0.454`) that do not reproduce.
+
+Absolute RTF on this machine drifts substantially between sessions - the same world
+re-measured three times back to back spanned 0.173-0.228 - so only comparisons measured
+**interleaved in one session** mean anything. Re-measured that way, seed 42, 3 reps of
+3000 steps each, spread within each case under 5%:
+
+| case | terrain boxes | RTF |
+|---|---|---|
+| res24, no rock collisions | 576 | 0.568 |
+| res24, 190 **mesh** rocks | 576 | 0.499 |
+| res24, 190 **ellipsoid** rocks | 576 | 0.488 |
+| res48, 190 ellipsoid rocks | 2601 | 0.220 |
+
+So all 190 rocks together cost about **12%**, not 70%, and mesh versus ellipsoid is
+**within noise**. The ellipsoid change buys correctness and nothing else. Terrain box
+count is the entire story, and a finer grid is a straight cost:
+
+| collision grid | cell size | boxes | RTF | craters visible | slope p95 |
+|---|---|---|---|---|---|
+| 24 (previously shipped) | 8.3 m | 576 | **0.479** | 12 | 6.1 deg |
+| 32 | 6.3 m | 1024 | 0.388 | 20 | 8.2 deg |
+| **40 (now shipped)** | **5.0 m** | **1764** | **0.269** | **32** | **10.4 deg** |
+| 48 | 4.2 m | 2601 | 0.206 | 41 | 11.6 deg |
+
+(Crater visibility here is measured with the *new* 160-crater / 6-50 m settings, which is
+why res24 shows 12 rather than the 2 it produced with the old 2-40 m sizes - that part of
+the improvement is the free part.)
+
+**res40 ships: it is ~1.8x slower than what shipped before**, in exchange for craters
+going 2 -> 32 and slope p95 3.8 -> 10.4 deg. res48 was rejected as too expensive at 2.3x
+for 9 more craters. This is a deliberate trade, not a free win, and autonomous runs take
+correspondingly longer in wall-clock time.
+
+### 5. Settings, and the one metric that regressed
+
+Chosen by sweeping resolution x smoothing x crater params against four metrics at once
+(visible craters, inter-slab lip, slope, and A* reachability through the real costmap),
+seeds 42/7/123, every parameter pinned explicitly:
+
+| | shipped before | now (res40) | res48 (rejected) |
+|---|---|---|---|
+| craters visible in rendered surface | 2 | **32** | 41 |
+| max inter-slab lip | 0.12 m | 0.14 m | 0.13 m |
+| boundaries stepping > 0.09 m wheel radius | **0.7%** | **1.4%** | 0.5% |
+| slope p95 (the surface actually driven) | 3.8 deg | **10.4 deg** | 11.6 deg |
+| costmap lethal cells | 7.0% | 7.1% | 7.3% |
+| 60-100 m goals reachable from spawn | 92.8% | 92.7% | 92.4% |
+
+Note the honest wrinkle: the inter-slab lip metric - the flip proxy that drove the
+original coarse grid - **regresses at res40**, to 1.4% against 0.7% before. Finer cells do
+reduce the lip for a given surface (res48 reaches 0.5%), but the extra crater relief
+res40 introduces more than offsets that at 5.0 m cells. An earlier draft asserted this
+metric "improves"; that is only true at res48, and only because res48 is fine enough to
+win the trade back. Because a proxy regressed, res40 was **not** shipped on the proxy -
+it was put through a real M4 acceptance run (below).
+
+Smoothing stays at 3 passes: dropping to 2 buys more crater relief (41 visible at res40)
+but pushes the lip metric to 5.9%, well past what the flip fix established as safe.
+Options rejected on measurement: 13 m relief, and 200+ craters (reachability 0.9%).
+
+Sub-6 m pitting, which no affordable collision grid can carry, is now drawn into the
+surface **normal map** instead (`textures.py:_small_crater_pits`), where it costs no
+physics resolution at all. Two honest limits on that: it is shading detail, not
+geometry - it changes how the ground lights, never the rover's silhouette against it or
+what the wheels feel - and because the texture tiles every 20 m, the pits repeat on that
+period. They are kept deliberately small (0.4-2.5 m) and shallow so they read as surface
+pitting rather than as landmarks whose repetition gives the tiling away.
+
+## Rendered terrain was TRANSPOSED - the real cause of the floating rocks
+
+Reported: "the last test still had floating rocks in the Gazebo, and the Gazebo window
+froze." Both were investigated with instrumentation, because **no logs of the reported
+run existed** - the only launches in `~/.ros/log` were this session's own headless ones.
+
+### The floating rocks were real, and the previous section's "0 floating rocks" was wrong
+
+The claim above ("0 floating rocks, lowest vertex embedded 3-13 cm") was measured against
+`elevation_lookup`. So were the collision boxes, and so was the visual heightmap ARRAY.
+All three are built in `heightmap.py`'s `[row = y, col = x]` convention, so **they all
+agreed with each other and none of them tested the thing that was broken.** Screenshotting
+the GUI showed a band of boulders hanging in the sky above the horizon.
+
+**gz maps a heightmap image's first axis to world X and its second to world Y - the
+transpose of this module's convention.** Handing gz the array as-written renders the
+terrain mirrored about the `x = y` diagonal. Consequences:
+
+- Rocks are seated on `elevation_lookup`, which matches the COLLISION surface, while the
+  ground being DRAWN was that surface transposed. A rock therefore hung in the air
+  wherever `surface(y, x) < surface(x, y)`, and sank in wherever it was greater.
+- It is invisible on the diagonal itself, and invisible to every array-vs-array test.
+- It is purely visual: physics, costmap and planning were never affected.
+
+Found by rendering a heightmap carrying a single 25 m spike at world `(+60, 0)` and
+screenshotting from directly overhead. Measured, with a second 12 m spike at `(0, -30)`
+to break any symmetry, positions read off the screenshot against ground-truth markers
+(calibrated at 2.05 px/m from plates at known coordinates):
+
+| spike placed at | rendered before fix | rendered after fix |
+|---|---|---|
+| (+60, 0) | **(-8, +67)** | (+55, +6) |
+| (0, -30) | **(-36, +5)** | (-5, -26) |
+
+i.e. exactly `(x, y) -> (y, x)` before, and correct after. (The few-metre residual is the
+offset between a peak's sunlit face and its apex, identical in both columns.)
+
+**Fix:** `save_heightmap_png` now writes `heightmap.T`. Regression tests in
+`test_heightmap_orientation.py` assert on the ENCODED FILE - the one artefact that crosses
+into gz's convention - including that a spike at `(+60, 0)` does not render at `(0, +60)`,
+and that the decoded surface matches `elevation_lookup` everywhere (worst case < 1 cm,
+i.e. 16-bit quantisation). `test_heightmap_collision_match.py` had encoded the old
+assumption and now transposes before comparing; it still guards the VERTICAL mapping it
+was written for. Confirmed visually: the horizon band of floating boulders is gone.
+
+Note how this bug survived two previous "the rover is underground" investigations: both
+were about the VERTICAL mapping (`<pos>`/`<size>` z and gz's min/max stretch), and both
+were verified by comparing arrays. The horizontal error was orthogonal to all of it.
+
+### The "freeze" - two separate things, one of them self-inflicted
+
+- **Not reproduced as a hang in a healthy run.** A 200 s instrumented GUI run produced
+  four visibly different frames. Instrumentation added (`gui_probe.sh` in scratch): per
+  process CPU/RSS, window liveness, gz's own `/stats`, and `/proc/<pid>/wchan`. The
+  discriminator is `/stats`: a frozen WINDOW with a stepping SERVER is a rendering
+  problem, a stopped server is not.
+- **A leaked process from a previous session, mine.** `gz-transport-topic -e -t
+  /world/regolith_moon/pose/info` had been running **2 h 11 m** at ~19% CPU, left behind
+  by an earlier session's diagnostics. gz-transport does **not** honour `ROS_DOMAIN_ID`
+  (that only isolates the ROS graph), so it attached to every `regolith_moon` world
+  started afterwards, including GUI runs. Killed.
+- **A static scene reads as a frozen window.** One GUI run showed four byte-identical
+  frames with RTF "N/A"; `/stats` showed `paused: true, iterations: 2`. Worth knowing
+  before calling a freeze a freeze.
+- **Still open, pre-existing:** running `gz sim -s` DIRECTLY on a generated world
+  segfaults in the Ogre2/Sensors path (the rover carries a camera, so even `-s`
+  initialises rendering). Reproduced identically on a **pre-fix** world, so it is not the
+  transpose change. The normal `hello_moon.launch.py headless:=true` path is unaffected
+  and runs fine. Not yet root-caused.
+
+### The transpose fix silently broke the COSTMAP, and no summary statistic showed it
+
+Found while re-validating the acceptance goals, before the acceptance run - not by a test.
+`save_heightmap_png` now writes `heightmap.T` for gz's benefit, but **`costmap_node` reads
+that same PNG** and indexes it `[row = y, col = x]`, as does the planner's
+`_world_to_grid`. So from the moment the transpose fix landed, the costmap's entire slope
+field was mirrored about the `x = y` diagonal while the rock obstacles - which come from
+the manifest's real x/y - stayed put. The planner was routing around steep ground that
+was not there and straight into ground that was.
+
+What makes this worth recording is how well it hides. A transpose **preserves the
+elevation histogram**, so every aggregate is unchanged - seed 42's total lethal fraction
+is 12.80% read wrongly and 12.81% read correctly. Only per-cell positions move:
+
+| check | value |
+|---|---|
+| total lethal cells, transposed vs correct | 12.80% vs 12.81% (indistinguishable) |
+| cells whose **lethal verdict** differs | **1.73%** |
+
+Fixed by extracting `costmap_node.load_heightmap`, which transposes on load, with the
+convention documented at the one point where it crosses gz's. Two new regression tests in
+`regolith_costmap/test/test_heightmap_orientation.py` assert the file is READ back in
+`[y, x]` (per-cell, on an asymmetric ramp and on a single spike), as the counterpart test
+in `regolith_terrain_gen` asserts it is WRITTEN transposed. A third test pins the reason
+both are needed: it asserts the lethal-fraction metric **cannot** tell the two apart, so
+nobody re-derives confidence from the aggregate later.
+
+This is the third distinct bug from the same root - the two array conventions - and the
+second one that array-vs-array tests were structurally unable to see. The generalisable
+lesson: when one module's convention crosses into another's, the test has to assert on
+the **artefact that crosses** (here the PNG, on both sides of it), and per-cell, because
+the natural summary statistic of a transposed field is identical to the correct one.
+
+### Open, measured, deliberately not fixed yet: costmap decodes the wrong height span
+
+Pre-existing, unrelated to the transpose, found in the same read-through.
+`costmap_node` decodes the heightmap with `pixels / pixels.max() * height_range_m`, i.e.
+it assumes the encoded surface spans the configured `height_range_m` (10.0 m). Since the
+full-range PNG fix, the encoding spans the surface's **actual** min-to-max, which is
+smaller. Every slope in the costmap is therefore overstated by that ratio:
+
+| seed | true span | assumed | slopes overstated | lethal cells (as shipped -> corrected) |
+|---|---|---|---|---|
+| 42 | 8.017 m | 10.0 m | 1.247x | 12.81% -> 12.01% |
+| 7 | 8.338 m | 10.0 m | 1.199x | 12.66% -> 12.24% |
+| 123 | 8.193 m | 10.0 m | 1.221x | 12.93% -> 12.31% |
+
+So the effective slope-lethal threshold is about **16 deg, not the 20 deg configured** -
+the error is conservative (the costmap over-flags, never under-flags), which is why it has
+never shown up as a failure. Fixing it properly means `write_manifest` recording the real
+`(z_min, span)` that `save_heightmap_png` already returns, rather than having the costmap
+re-derive it. **Left unfixed on purpose:** it would change the costmap under the res40
+acceptance run reported below, and an acceptance result should describe the system that
+actually shipped. It is a one-line change plus a manifest field once that run is banked.
+
+### A stale world cache makes offline analysis lie
+
+Also found during goal re-validation: `~/.cache/regolith/worlds/seed_7` and `seed_123`
+still held worlds generated on **18 and 24 July** - 100 craters at 2-40 m, one of them
+with only 130 rocks - because nothing had launched those seeds since the terrain change.
+The first goal validation ran against them and was meaningless (seed 7 "2 craters crossed"
+against the 10 the fresh world has). `hello_moon.launch.py` calls `generate_world`
+unconditionally on every launch, so **live runs are never affected** - but any offline
+script that reads the cache directly gets whatever the last launch left there. Regenerate
+explicitly before measuring, which is now what the goal checker does.
+
+## Floating rocks, reported a third time - tested through the rover's own camera
+
+Reported again: "consistently reappearing floating rocks", with the instruction to test it
+via the internal camera rather than by another array comparison. That instruction was the
+right call and is why this round found anything: **every previous check was circular.**
+
+### The check that kept passing could not fail
+
+`test_rock_placement.py::test_no_rock_floats` measured each rock against
+`elevation_lookup` - the function `scatter.seat_rock_z` seats rocks with. Two things
+measured through one convention agree no matter how wrong the convention is. It stayed
+green through the PNG being written transposed, and it stayed green through the defect
+below. It had a second, independent flaw: it rebuilt the rock variants from a fresh
+`default_rng(seed)` without consuming the draws `generate_world` makes in between
+(`build_heightmap`, then `generate_textures`), so **it graded a set of rocks the shipped
+world never contained.** (Cost me a wasted measurement too: reproducing the variants that
+way also silently rewrote the cached world's `.obj` files with meshes that did not match
+its own manifest.)
+
+Replaced by `test_rock_seating_against_rendered_png.py`, which touches none of the
+generator's helpers. It runs `generate_world` and then reads back only what was written
+to disk: `heightmap.png` transposed out of gz's axis order and stretched full-range using
+the `<pos>`/`<size>` from `world.sdf`, sampled bilinearly; the actual `rocks/*.obj`
+triangles; and the manifest's placements. It also asserts **that it is able to fail** -
+lift every rock 0.5 m and it must go red - because its predecessor could not.
+
+### The real defect: seating sampled a different surface from the one gz draws
+
+`elevation_lookup` took the NEAREST heightmap post. gz interpolates BILINEARLY between
+posts. Anything seated between posts was therefore placed on a surface up to one pixel's
+relief above the one being drawn - at the shipped 0.39 m post spacing, a mean of 0.016 m
+but a worst case of **0.35 m**. A rock is seated off the single highest of its ~40
+vertices, so it picks up the worst overshoot rather than the mean.
+
+`elevation_lookup` is now bilinear. Measured with the new artefact test, over 190 rocks
+per seed:
+
+| | seed 42 | seed 7 | seed 123 |
+|---|---|---|---|
+| rocks floating, before | **1 / 190** | 0 / 190 | 0 / 190 |
+| worst gap, before | **+0.016 m** | -0.008 m | -0.027 m |
+| rocks floating, after | 0 / 190 | 0 / 190 | 0 / 190 |
+| worst gap, after | -0.030 m | -0.030 m | -0.038 m |
+
+Confirmed the new test earns its place: with the bilinear change stashed it fails on seed
+42, with it applied all seeds pass.
+
+**But 1.6 cm on one rock is not what a person notices from across the terrain**, and this
+is recorded as a genuine but small fix rather than as the answer to the report.
+
+### What the camera actually shows
+
+Through the rover's own camera (`/camera/image`, teleporting the rover with gz's
+`set_pose` and holding it against gravity while frames arrive):
+
+- **Close range: seated.** A straight-down frame from 30 m shows every boulder's shadow
+  **attached to its silhouette**. At this world's 12 deg sun elevation a gap of *h* under
+  a rock separates its shadow by 4.7*h*, so a 0.5 m float would show as a 2.4 m gap.
+  Oblique views from 20 m and eye-level views at 90 m agree.
+- **Far range, in the GUI: not seated.** Screenshotting the Gazebo GUI (which *is*
+  capturable - see the note retracting the opposite claim) and stretching the contrast of
+  the horizon band shows **boulders standing clear of the terrain silhouette with sky
+  visible underneath them.** Not silhouetted-on-a-ridge - detached, by several times their
+  own diameter.
+
+So the report is real and reproducible, and the placement is *also* provably correct: at
+those same coordinates the rock is embedded 3-14 cm in the surface the PNG encodes. The
+ground under a distant rock is not being drawn where the data says it is.
+
+### Still open, and deliberately not guessed at
+
+The rendering-side mechanism is **not** root-caused. Terrain LOD simplifying distant
+ground while rock meshes keep full detail is the leading candidate and fits every
+observation, but a distance series through the onboard camera (same boulder at 10, 25, 45,
+70, 90 m) did not cleanly reproduce a gap growing with range, so it is not established.
+Two things that would settle it, neither attempted yet: compare a GUI frame against the
+same view rendered with the terrain replaced by explicit geometry at known LOD, and check
+whether gz-sim exposes the heightmap's LOD/`<sampling>` behaviour through SDF at all.
+
+What is NOT the cause, each ruled out by measurement rather than reasoning: rock placement
+(above), the collision surface diverging from the drawn one (box tops match the drawn
+surface within 5 cm, mean -0.004 m over all 1764 boxes), and the terrain being drawn
+smaller than the world (off-centre top-down frames show it drawn out to its edge).
+
+One artefact of these probes worth knowing before trusting a frame: several eye-level
+shots came out with the near ground missing - the horizon where it belongs, but 100% sky
+below it, matching the background colour exactly rather than being shadow. That is not
+understood either, it appeared only for a camera close to the ground, and it is the reason
+the close-range conclusions above rest on the top-down and oblique frames instead.
+
+## M4 acceptance re-run at res40: harness corrections
+
+The res40 terrain change (above) regressed the inter-slab lip proxy from 0.7% to 1.4%, so
+it was put through a real M4 acceptance run rather than shipped on the proxy. Two things
+about the harness are worth recording, because the first attempt produced a **false
+failure** and the second would have produced a meaningless pass.
+
+- **Reusing a recorded goal is only valid if the goal is still valid.** The first attempt
+  reused the exact goals from the original M4 pass, on the reasoning that a like-for-like
+  comparison beats a fresh draw. For seed 42 that goal, `(-63.64, 63.64)`, is **lethal
+  under the new terrain** - the planner correctly refused it (`Goal cell (209, 46) is
+  lethal (obstacle or too-steep slope)`) once every 3 s, the rover never moved, and the
+  run would have burned its whole 9000 s timeout looking exactly like a navigation
+  failure. It was a goal-selection failure. Goals are now validated against the SAME
+  costmap the running system builds, with the same parameters `hello_moon.launch.py`
+  passes to `costmap_node` (resolution 1.0 m, rover radius 0.3 m, slope lethal 20 deg):
+  the goal cell and its 8 neighbours must be non-lethal (the planner snaps to a cell
+  centre) and the cell must be connected to spawn through non-lethal cells.
+  Note the earlier reachability sweep in the terrain section used 0.5 m / 0.35 m instead,
+  so its 92.4-92.8% figures are indicative, not the system's own numbers.
+- **The watcher must join the launch's `ROS_DOMAIN_ID`.** Every launch claims a private
+  domain via the lock-file registry. A watcher left on the default domain 0 sees no topics
+  at all: it published the goal into an empty graph and waited. The harness now reads the
+  domain back off the launch's stdout, and the watcher aborts after 150 s without a
+  `/ground_truth/pose` instead of silently burning the timeout. (`ROS_DOMAIN_ID` does not
+  isolate **gz**-transport, which is a separate partition - see the leaked-subscriber note
+  in the previous section.)
+
+- **Re-validated before the run, against the CORRECTED costmap.** The goals below were
+  originally picked against the costmap that read the heightmap without the gz transpose
+  (see the regression above), so they were re-checked - on freshly regenerated worlds -
+  before any run started. All three are still valid: goal cell and its 8 neighbours
+  non-lethal, connected to spawn through non-lethal cells. Crater counts reproduce
+  exactly. The rock-cluster column depends on how wide a corridor counts as "on the
+  line", and is reported below at 6 m and 10 m rather than at one flattering width -
+  seed 42's cluster is 6-10 m off the line, not straddling it.
+
+Goals selected by the corrected picker, all 60-100 m, reachable, crossing craters and a
+rock cluster:
+
+| seed | goal | straight-line | craters crossed | rocks in clusters, 6 m / 10 m corridor |
+|---|---|---|---|---|
+| 42 | (52.33, -66.98) | 85.0 m | 12 | 0 / 3 |
+| 7 | (-45.00, 77.94) | 90.0 m | 10 | 8 / 11 |
+| 123 | (76.32, -47.69) | 90.0 m | 10 | 8 / 15 |
+
+("In a cluster" = at least 3 rocks within 10 m of each other, all within the stated
+corridor of the straight line. An earlier draft of this table gave 1 / 5 / 6 from a
+picker whose corridor width was not recorded; these are the re-measured numbers.)
