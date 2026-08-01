@@ -1909,13 +1909,21 @@ ground under a distant rock is not being drawn where the data says it is.
 
 ### Still open, and deliberately not guessed at
 
-The rendering-side mechanism is **not** root-caused. Terrain LOD simplifying distant
-ground while rock meshes keep full detail is the leading candidate and fits every
-observation, but a distance series through the onboard camera (same boulder at 10, 25, 45,
-70, 90 m) did not cleanly reproduce a gap growing with range, so it is not established.
-Two things that would settle it, neither attempted yet: compare a GUI frame against the
-same view rendered with the terrain replaced by explicit geometry at known LOD, and check
-whether gz-sim exposes the heightmap's LOD/`<sampling>` behaviour through SDF at all.
+The rendering-side mechanism is **not** root-caused, but it now has a name. The installed
+`libgz-rendering8-ogre2.so` exports `Ogre::TerraWorkspaceListener` alongside
+`Ogre2Heightmap`, i.e. the `<heightmap>` visual is rendered by **Ogre-Next's Terra**, a
+GPU terrain system with distance-based LOD. Rocks are ordinary meshes and take no part in
+it, so distant ground being tessellated coarser than the data while the rocks standing on
+it keep their exact placement is a mechanism that exists in this render path by
+construction. That is consistent with everything measured but still not demonstrated to
+be the cause: a distance series through the onboard camera (same boulder at 10, 25, 45,
+70, 90 m) did not cleanly reproduce a gap growing with range.
+
+The concrete next lever, untried: SDF's `<heightmap><sampling>` (samples per heightmap
+datum, **default 1**, currently not set in `worldgen.py`). Raising it to 2 is the
+documented quality/performance knob for exactly this geometry and is a one-line change to
+test - though note it would cost RTF on a world that is already 1.8x slower since res40,
+so it needs measuring, not just setting.
 
 What is NOT the cause, each ruled out by measurement rather than reasoning: rock placement
 (above), the collision surface diverging from the drawn one (box tops match the drawn
