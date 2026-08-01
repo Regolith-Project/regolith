@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4 — Autonomous navigation | **Regressed — not met at res40.** Passed 3/3 at res24 (see "M4 acceptance check" below), but the re-run after the terrain realism pass is **0/3**: the rover wedges, the stuck recovery never frees it, wheel odometry drifts while it is pinned, and `/goal_reached` then fires 17-36 m from the goal. See "res40 breaks M4 autonomy" below |
+| M4 — Autonomous navigation | **Not met — and the earlier pass did not mean what it looked like.** The re-run is **0/3**: the rover wedges on boulders, the stuck recovery never frees it, wheel odometry drifts while it is pinned, and `/goal_reached` then fires 17-36 m from the goal. Attributed by experiment to **rock collisions, not terrain**: they were a silent no-op before, so the 3/3 pass was driven on a world where all 190 rocks were phantom. See "res40 breaks M4 autonomy" below |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -2003,9 +2003,39 @@ The rover never got wedged like this at res24. Two things changed together, and 
   a rock was not previously *possible*. The earlier 3/3 M4 pass was obtained on a world
   where 190 obstacles were phantom.
 
-Which of the two dominates is untested. The obvious experiment - res24 with working
-ellipsoid collisions, and res40 with rock collisions disabled - is the next thing to run,
-and it is cheap compared to guessing.
+### Attributed: it is the rock collisions, not the terrain
+
+Run rather than argued about. Seed 7, same goal, same 1800 s window in every case, source
+patched in place per variant and restored afterwards (tree verified clean each time):
+
+| config | terrain | rock collisions | **stuck events / 1800 s** | progress in the window |
+|---|---|---|---|---|
+| baseline (the failing run) | res40 | on | **12** | 88.3 m, over 3053 s total |
+| A | **res24** | on | **10** | 98.4 m, false "reached" at 14.2 m |
+| B | res40 | **off** | **0** | 84.5 m and still driving when the window closed |
+
+**Rock collisions are necessary; terrain roughness is not.** Dropping back to res24 - the
+exact terrain that passed 3/3 - barely changes anything (10 events against 12), and still
+produces the same false `/goal_reached` 14.2 m from the goal. Removing only the rock
+`<collision>` block at res40, leaving the visual meshes and the costmap untouched so the
+planner still routes around the same boulders, eliminates the wedging completely: zero
+events, and the fastest progress of any run measured (84.5 m in 1800 s against the
+baseline's 88.3 m in 3053 s).
+
+So the terrain realism pass did not break M4. **The rock-collision correctness fix
+revealed a failure that was always there and merely invisible**: while `<mesh>` collision
+was a silent no-op the rover phased through all 190 boulders, so it could not get caught
+on one. The original 3/3 M4 pass was obtained on a world with no rock obstacles in it at
+all - it demonstrated planning around obstacles, never driving among them.
+
+That reframes the work: this is not a regression to undo by reverting terrain settings,
+it is a capability the rover has never actually had. The fix belongs in recovery and in
+the odometry-during-stall problem (items 2 and 3 above), not in terrain tuning.
+
+Honest limits on this experiment: n = 1 run per variant on a single seed, and the stuck
+count is a proxy for "gets caught on a boulder" rather than a direct observation of the
+contact. The separation is large enough (0 against 10-12) that it is unlikely to be noise,
+but it has not been repeated across seeds.
 
 ## M4 acceptance re-run at res40: harness corrections
 
