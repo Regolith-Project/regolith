@@ -1936,6 +1936,77 @@ below it, matching the background colour exactly rather than being shadow. That 
 understood either, it appeared only for a camera close to the ground, and it is the reason
 the close-range conclusions above rest on the top-down and oblique frames instead.
 
+## res40 breaks M4 autonomy: a false `/goal_reached`, and phantom odometry behind it
+
+The res40 acceptance re-run **failed on its first seed**, and failed in a way that
+reported itself as success. Recording the chain in full, because every link of it was
+measured rather than reasoned about, and because the top-level signal lied.
+
+### Seed 42: `/goal_reached` fired 36 m from the goal
+
+| | |
+|---|---|
+| `/goal_reached` published | yes - "Goal reached (within 1.50 m)" |
+| ground-truth distance to the goal at that moment | **36.2 m** |
+| ground-truth distance travelled | 58.6 m of an 85.0 m traverse |
+| STUCK RECOVERY events | **22** |
+| flip events | **0** |
+| max roll / pitch | 14.5 deg / 17.8 deg |
+
+The harness only caught this because it records `/ground_truth/pose` independently.
+**`/goal_reached` on its own is not a valid acceptance signal** - `pure_pursuit_node`
+measures arrival as `norm(self._path[-1] - position)` where `position` comes from
+`/odometry/filtered`, i.e. the whole check lives in the EKF's frame. If the estimate is
+wrong, the arrival check is wrong with it, consistently and silently.
+
+### The stuck detector fires live at last - and does not recover
+
+Previously recorded here as never once caught firing on a naturally occurring stall
+across 112 attempts over several sessions. At res40 it fires **22 times in a single
+run**. The live-fire evidence this project has been chasing arrived as a failure rather
+than a vindication: detection works, recovery does not. After one successful recovery,
+the remaining 21 fired at a metronomic **~31 s interval across 661 s** - the recovery's
+own backoff, retrying and failing - and the rover was still wedged when the run ended.
+The 1.0 s straight-line `/cmd_vel` override does not free it.
+
+### Phantom wheel odometry - measured live, not inferred
+
+Seed 7 was instrumented while running, logging `/odometry/filtered` against
+`/ground_truth/pose` every 5 s. The trace is unambiguous:
+
+| phase | ground truth moved | EKF believed | divergence |
+|---|---|---|---|
+| driving normally, t = 5-755 s | tracks | tracks | steady **0.17-0.18 m** |
+| wedged, t = 780-1050 s | **0.94 m** | **4.67 m** | grows 0.59 -> 4.28 m |
+| driving again, t = 1050-1235 s | 8.64 m | 8.65 m | frozen at **~4.29 m** |
+
+While the rover is pinned its wheels keep turning, so wheel odometry integrates distance
+that never happens. The EKF fuses only wheel odometry and IMU - there is no absolute
+reference anywhere in the stack - so **the error is permanent**: once the rover breaks
+free the two traces move in lockstep again, 4.3 m apart, forever. Seed 42's 22 stuck
+events accumulated that error until the rover believed it had arrived while standing
+36 m away.
+
+One consequence worth flagging against M3's own acceptance bar: a single stuck event put
+localization error at **9.0% of distance travelled** (4.29 m over 47.6 m), against M3's
+<5% target and the 0-4% currently recorded there. M3's figures were measured on clean
+runs with no stall, so they are not wrong - but they do not describe a run like this one.
+
+### What is probably behind it, and what is not established
+
+The rover never got wedged like this at res24. Two things changed together, and they have
+**not** been separated:
+
+- **res40 terrain** is genuinely rougher (slope p95 3.8 -> 10.4 deg, craters 2 -> 32).
+- **rock collisions started working at all.** Before the ellipsoid fix, `<mesh>` collision
+  was a silent no-op and the rover drove straight through every boulder. Wedging against
+  a rock was not previously *possible*. The earlier 3/3 M4 pass was obtained on a world
+  where 190 obstacles were phantom.
+
+Which of the two dominates is untested. The obvious experiment - res24 with working
+ellipsoid collisions, and res40 with rock collisions disabled - is the next thing to run,
+and it is cheap compared to guessing.
+
 ## M4 acceptance re-run at res40: harness corrections
 
 The res40 terrain change (above) regressed the inter-slab lip proxy from 0.7% to 1.4%, so
