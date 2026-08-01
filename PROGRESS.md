@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4 — Autonomous navigation | **Done** — full 60-100 m / 3-consecutive-seed acceptance check passed (see "M4 acceptance check: full 60-100 m / 3-consecutive-run result" below) |
+| M4 — Autonomous navigation | **Regressed — not met at res40.** Passed 3/3 at res24 (see "M4 acceptance check" below), but the re-run after the terrain realism pass is **0/3**: the rover wedges, the stuck recovery never frees it, wheel odometry drifts while it is pinned, and `/goal_reached` then fires 17-36 m from the goal. See "res40 breaks M4 autonomy" below |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -2056,3 +2056,49 @@ rock cluster:
 ("In a cluster" = at least 3 rocks within 10 m of each other, all within the stated
 corridor of the straight line. An earlier draft of this table gave 1 / 5 / 6 from a
 picker whose corridor width was not recorded; these are the re-measured numbers.)
+
+### Result: 0 / 3. Every run reported success and none of them arrived.
+
+| seed | straight line | GT travelled | **true error at "arrival"** | stuck events | flips | final EKF divergence | max roll / pitch | wall time |
+|---|---|---|---|---|---|---|---|---|
+| 42 | 85.0 m | 58.6 m | **36.2 m** | 22 | 0 | ~36 m | 14.5 / 17.8 deg | 2737 s |
+| 7 | 90.0 m | 88.3 m | **17.4 m** | 22 | 0 | 15.7 m | 11.0 / 15.4 deg | 3053 s |
+| 123 | 90.0 m | 72.8 m | **31.7 m** | 20 | 0 | 30.7 m | 17.9 / 26.1 deg | 3600 s (hit timeout) |
+
+All three published `/goal_reached` with "Goal reached (within 1.50 m)". All three were
+tens of metres away. The 1.50 m is real - in the EKF's frame - and that is the whole
+problem: **the final divergence and the true error are the same number** on every seed
+(seed 7: 15.7 vs 17.4 m; seed 123: 30.7 vs 31.7 m, the remainder being the grid-snapped
+`path[-1]` versus the raw goal). The rover arrives exactly where it believes the goal is.
+
+The bar is "reaches the goal (within 1.5 m) without intervention, 3 consecutive runs".
+Measured against ground truth: **0 / 3, and M4 is no longer met at res40.** The status
+table above is corrected accordingly. The previously recorded 3/3 pass stands as what it
+was - a pass at res24, on a world where all 190 rock collisions were a silent no-op.
+
+Two things that did hold up: **zero flips across all three runs** (max attitude 26.1 deg
+against the 60 deg detection threshold), so the flip fix and its terrain-collision work
+are not implicated; and the goal picker, which produced three goals that were all valid,
+reachable and genuinely obstacle-crossing.
+
+Seed 123 is the clearest picture of the failure: its ground-truth **y stayed pinned
+between -15.3 and -15.5 m for over 1200 s** while x crept from 36 to 48, and the EKF
+meanwhile travelled to y = -30.7. It spent the last ~35 minutes of its hour scrubbing
+against something, and ended with divergence at **29.8% of distance travelled**.
+
+### What has to change before this can be re-run
+
+Not attempted yet, and listed in the order that matters:
+
+1. **The acceptance harness must judge on ground truth, not `/goal_reached`.** This run
+   only caught the failure because the watcher recorded `/ground_truth/pose` separately;
+   a harness trusting the system's own success topic would have recorded 3/3 pass.
+2. **Recovery has to actually recover.** 64 stuck events across three runs, zero of them
+   resolved by the 1.0 s straight-line override, which then retries on a ~31 s backoff
+   indefinitely. It is a detector with a no-op attached.
+3. **A stall must not corrupt localization.** Wheel odometry integrates while the wheels
+   spin against a pinned chassis, and nothing in the stack ever observes absolute
+   position, so the error is permanent. The stuck detector already knows the rover is not
+   moving - that same signal should stop odometry being trusted.
+4. **Attribute the wedging** (res40 roughness vs rock collisions now being real) before
+   tuning anything, per the previous section.
