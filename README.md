@@ -88,7 +88,7 @@ works, what doesn't yet, and why.
 1. **Procedural planetary terrain** — craters, rocks, and PBR textures generated from a seed, done
 2. **Rover simulation** — skid-steer chassis, teleop, sensor bridging, done
 3. **GPS-denied localisation** — EKF fusing wheel odometry + IMU, done, within target on measured test legs (see below)
-4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end and drives 100 m+ traverses among real boulders, recovering from every wedge it hits; it does **not** currently meet the milestone's 1.5 m arrival accuracy, for a measured and structural reason (see below)
+4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end and drives 100 m+ traverses among real boulders, escaping every wedge it hits (26/26) with zero flips; it does **not** meet the milestone's 1.5 m arrival accuracy, which a controlled experiment attributes entirely to localisation rather than to navigation (see below)
 
 See the [Roadmap](#roadmap) below for target vs. actual, and [Known Limitations](#known-limitations) for the honest details.
 
@@ -157,17 +157,21 @@ Documented in full in [`PROGRESS.md`](PROGRESS.md); the two that matter most for
   A smoothing fix and a simulated flip-recovery backstop address this, and
   flips are no longer observed: zero across the three most recent 100 m+
   acceptance runs (see `PROGRESS.md`).
-- **M4's arrival accuracy is not met, and needs a sensor the PoC doesn't
-  have.** An earlier 3/3 pass of the 60-100 m acceptance is retracted: it was
-  run on a world where rock collision was a silent no-op, so the rover drove
-  through all 190 boulders. With collisions working, the rover reaches
-  9.6-19.6 m of its goal rather than 1.5 m. Recovery from wedging is fixed
-  (25 escape maneuvers, 25 successful) and localisation error is ~3x better,
-  but the residual is **lateral slip** — the rover slides sideways about 10%
-  of its total motion, which a differential-drive odometry model cannot
-  represent and an IMU cannot observe. Closing it requires visual odometry,
-  which is explicitly out of scope for this PoC. Full error budget in
-  `PROGRESS.md`.
+- **M4's arrival accuracy is not met, and it needs a sensor this PoC
+  doesn't have.** An earlier 3/3 pass of the 60-100 m acceptance is
+  retracted: it ran on a world where rock collision was a silent no-op, so
+  the rover drove through all 190 boulders. With collisions working the
+  rover ends 3.1-13.1 m from its goal instead of within 1.5 m — and on every
+  seed that distance is exactly the localisation drift plus the stopping
+  tolerance. The rover arrives precisely where it *believes* the goal is.
+  Rerunning the identical build with a simulated 0.5 m / 1 Hz absolute
+  position reference — standing in for the visual odometry the PoC lacks —
+  passes **3/3 at 1.48 m** (an experiment, not a milestone result). So the
+  planner, follower and wedge recovery all meet the bar; what is missing is
+  any exteroceptive observation of position. About 10% of the rover's motion
+  is lateral slip, which a differential-drive odometry model cannot represent
+  and an IMU cannot observe, and it accumulates uncorrected. Full error
+  budget and the controlled comparison are in `PROGRESS.md`.
 
 ## Roadmap
 

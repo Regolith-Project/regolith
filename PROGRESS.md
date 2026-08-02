@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4 — Autonomous navigation | **Not met, 0/3 — and now understood.** Recovery is fixed (25 escape maneuvers, 25 freed the rover, against the old 0/64) and localization error is down ~3x (36/17/32 m → 9.6/19.6/10.8 m), with zero flips. What remains is **lateral slip**: the rover slides sideways ~10% of its total motion, which a differential-drive odometry model cannot represent and an IMU cannot see, leaving 3-5 m of position error over a ~110 m traverse against a 1.5 m bar. **M4 as specified is not reachable with the PoC's declared wheel+IMU sensor suite on this terrain**; it needs visual odometry, which `docs/architecture.md` puts outside PoC scope. See "Verification: the recovery works..." below |
+| M4 — Autonomous navigation | **Not met: 0/3, and the reason is measured.** True error is 3.1-13.1 m, and on every seed it equals the EKF's drift plus the stopping tolerance - the rover arrives exactly where it believes the goal is. Recovery works (26/26 wedges escaped), zero flips, no intervention. The **same build with a 0.5 m / 1 Hz absolute position reference passes 3/3 at 1.48 m** (an experiment, not a milestone result), so planning, control and recovery all meet the bar - what is missing is any exteroceptive observation of position. ~10% of the rover's motion is lateral slip that neither wheel odometry nor an IMU can represent. **M4's 1.5 m bar is not achievable within the PoC's declared sensor scope**; see "M4, final" below |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -2464,3 +2464,169 @@ rock clusters. Both were closing on their goals when the clock ran out.
   for the maneuver and once for its result - so the first run reported 22 events where
   there were 11. The pattern is now anchored on the maneuver line. The table above uses
   corrected counts.
+
+## The localization-oracle ablation: testing the diagnosis instead of believing it
+
+The verification above concluded that lateral slip - unobservable to a wheel+IMU stack -
+was what stood between this rover and M4. That is a falsifiable claim, so it was tested
+rather than left as an explanation: **if localization is the only thing missing, then
+handing the estimator an absolute position reference should make the acceptance pass,
+with no change to planning, control or recovery.**
+
+`absolute_reference_relay.py` (new, behind `hello_moon.launch.py`'s `localization_oracle`
+argument, default off) republishes `/ground_truth/pose` as a `PoseWithCovarianceStamped`
+the EKF fuses as an absolute x/y/yaw observation, at ~1 Hz with 0.5 m sigma - deliberately
+loose, roughly what a working visual-odometry or terrain-relative fix would actually
+deliver, rather than what the simulator knows. **It is an oracle. Every layer says so:**
+the node logs a warning at startup, the launch prints one, and the harness stamps
+"EXPERIMENT, NOT A MILESTONE RESULT" on the summary. No acceptance number in this project
+may be obtained with it on.
+
+| seed | verdict | true error | EKF divergence | escapes | flips |
+|---|---|---|---|---|---|
+| 42 | FAIL_FALSE_ARRIVAL | **1.70 m** | 0.0 m | 7 | 0 |
+| 7 | FAIL_FALSE_ARRIVAL | **1.70 m** | 0.0 m | 5 | 0 |
+| 123 | FAIL_TIMEOUT | 23.9 m | 0.0 m | 12 | 0 |
+
+Divergence collapses from 4.8-10.0 m to **0.000-0.006 m**, confirming the oracle is
+actually being fused, and the diagnosis holds: with localization removed as a variable,
+two of three seeds drive the whole 85-90 m traverse and stop within 1.7 m of their goals.
+
+### And the ablation immediately found a bug that no amount of staring would have
+
+Seeds 42 and 7 both stopped at **exactly 1.70 m**. Two independent seeds landing on the
+same number is a systematic artifact, not noise - and it is this: `pure_pursuit_node`
+measured arrival as `norm(path[-1] - position)`, and `path[-1]` is a costmap **cell
+centre**, because the planner snaps both ends of its path to the grid. At this world's
+0.78 m cells that is up to ~0.55 m from the goal actually commanded (0.42 m on seed 42's
+goal, measured). Stopping "within 1.50 m" of that point leaves the rover up to 1.92 m from
+its real goal - so the run failed a 1.5 m bar while being, in every meaningful sense,
+there.
+
+This is the same mistake as trusting `/goal_reached`: measuring against the wrong
+reference. It is fixed the same way - arrival is now checked against the commanded goal,
+and the final approach steers at the goal rather than the snapped waypoint - with
+`test_arrival_reference.py` pinning both the mechanism and the 1.70 m it produced.
+
+Worth being clear about what this does and does not mean: it is a correctness fix, not a
+loosened bar. The rover still has to get within 1.5 m of the goal it was given.
+
+### Seed 123 exposes a second, unrelated constraint: time, and whose time
+
+Seed 123 timed out with perfect localization, 23.9 m short, after 12 wedges. That is not
+an accuracy failure, and on inspection the budget itself was wrong: the 3600 s cap was
+**wall-clock**, and this world simulates at a measured ~0.25x real time, so it bought the
+rover only ~830 s of its own time - during which it covered 114 m at a mean 0.129 m/s
+against a 0.20 m/s nominal cruise. A wall-clock cap measures how fast the host machine
+simulates at least as much as how capable the rover is, and a real rover has hours.
+
+The harness now budgets in **simulated (rover) seconds** (`--sim-timeout-s`, default
+1800), keeping the wall clock only as a safety cap that reports `ABORT_WALL_CLOCK_CAP` -
+explicitly not a rover failure. Both times are recorded per run.
+
+### A metric that was under-reporting its own success
+
+The oracle run logged several "STUCK RECOVERY #N result: moved 0.00 m - STILL WEDGED"
+for maneuvers that the acceptance harness's independent trace shows moving the rover
+~1.9 m. Cause: the result was checked on the first timer tick after the maneuver, ~2 ms
+later, and `/ground_truth/pose` messages queue up during the blocking maneuver - so the
+timer could win the executor race and measure against a pose from *before* the maneuver.
+Deferred by 1 s of sim time, anchored on the first tick whose clock has caught up (the
+ROS clock does not advance while the node blocks its own executor, so the obvious
+implementation of the delay would have been a no-op). Log-only - it never affected rover
+behaviour - but it under-reported the recovery's success rate, and a number being wrong
+against this project's own interest still makes it wrong.
+
+### Confirmation: with the arrival fix and a rover-time budget, the oracle run is 3/3
+
+Same three seeds and goals, all fixes in, oracle still on:
+
+| seed | verdict | true error | GT travelled | escapes fired / freed | flips |
+|---|---|---|---|---|---|
+| 42 | **PASS** | 1.50 m | 108.6 m | 6 / 6 | 0 |
+| 7 | **PASS** | 1.50 m | 145.9 m | 11 / 11 | 0 |
+| 123 | **PASS** | 1.50 m | 130.4 m | 9 / 9 | 0 |
+
+**3/3, judged on ground truth, no intervention, 26 of 26 wedges escaped, zero flips.**
+Seed 7 needed 146 m of driving to close a 90 m goal and fought through the same rock
+cluster that had trapped it in both previous runs; it still arrived.
+
+This is the experiment's conclusion, and it is worth stating exactly:
+
+> With localization accurate, **the planner, the follower, the recovery and the keep-out
+> zones are sufficient to meet M4's bar on all three acceptance seeds.** Everything
+> between the goal arriving and the rover standing at it works. What M4 is missing is a
+> sensor.
+
+It also bounds what visual odometry would have to buy: not centimetres - the oracle was
+deliberately given 0.5 m sigma at 1 Hz, and that was enough. A fix of that quality,
+which is unremarkable for visual odometry on textured terrain, converts this stack from
+0/3 to 3/3.
+
+**This is not an M4 pass.** It was obtained with an oracle that hands the estimator the
+answer; the milestone number is the unaided one. It is recorded here as what it is: the
+experiment that turns "we think lateral slip is the blocker" into "lateral slip is the
+blocker, and here is what removing it does".
+
+## M4, final: 0/3 unaided and 3/3 with an absolute reference, from the same build
+
+The official milestone run - all fixes in, **oracle off**, budgeted in rover time:
+
+| seed | verdict | true error | EKF divergence | GT travelled | rover time | escapes freed | flips |
+|---|---|---|---|---|---|---|---|
+| 42 | FAIL_FALSE_ARRIVAL | 7.72 m | 6.80 m | 105.1 m | 794 s | 6 / 8 | 0 |
+| 7 | FAIL_FALSE_ARRIVAL | 3.08 m | 3.06 m | 132.6 m | 922 s | 7 / 7 | 0 |
+| 123 | FAIL_FALSE_ARRIVAL | 13.07 m | 12.54 m | 102.5 m | 787 s | 5 / 5 | 0 |
+
+**M4 is 0/3.** And the mechanism is no longer in any doubt - on every seed the true error
+is the drift plus the stopping tolerance, to within a few centimetres:
+
+    seed 42:   6.80 + 1.0 = 7.80  measured 7.72
+    seed 7:    3.06 + 1.0 = 4.06  measured 3.08   (drift partly toward the goal)
+    seed 123: 12.54 + 1.0 = 13.54 measured 13.07
+
+The rover arrives exactly where it believes the goal is, every time. It is not lost, not
+badly controlled, and not defeated by the terrain: it is wrong about where it is.
+
+Same build, same seeds, same goals, oracle on (experiment, not a milestone result):
+
+| | unaided | with a 0.5 m / 1 Hz absolute reference |
+|---|---|---|
+| result | **0 / 3** | **3 / 3** |
+| true error | 3.1 - 13.1 m | 1.48 m on all three |
+| EKF divergence | 3.1 - 12.5 m | 0.00 m |
+| flips | 0 | 0 |
+| wedges escaped | 18 / 20 | 26 / 26 |
+
+Everything except the estimator is held constant between those two columns. That is the
+whole finding.
+
+### What M4 needs, stated once, plainly
+
+Not a better planner, follower, or recovery - those meet the bar 3/3 the moment the
+estimate is right. Not centimetre-grade navigation either: the oracle was given 0.5 m
+sigma at 1 Hz, which is unremarkable for visual odometry on textured terrain, and it was
+enough. What is missing is any exteroceptive observation of position at all. With wheel
+odometry and an IMU alone, ~10% of this rover's motion is lateral slip that neither
+sensor can represent, it accumulates as a random walk, and nothing ever corrects it.
+
+`docs/architecture.md` places visual odometry outside this PoC's scope, and the honest
+consequence is that **M4's 1.5 m arrival bar is not achievable within that scope on this
+terrain.** The options are to add the sensor (the milestone's own "Localisation" layer
+lists visual odometry first), to re-scope M4's accuracy bar to what a wheel+IMU stack can
+support over 100 m of boulder field, or to leave M4 open and documented. That is a
+project decision, not a bug to keep chasing, and this section exists so it can be made
+on measurements rather than impressions.
+
+### Progression across this session's fixes, same three goals
+
+| stage | seed 42 | seed 7 | seed 123 |
+|---|---|---|---|
+| as recorded before this session | 36.2 m | 17.4 m | 31.7 m |
+| + recovery, keep-out zones, slip gate | 9.6 m | 19.6 m | 10.8 m |
+| + arrival measured against the real goal, rover-time budget | **7.7 m** | **3.1 m** | **13.1 m** |
+| + an absolute position reference (experiment) | **1.48 m PASS** | **1.48 m PASS** | **1.48 m PASS** |
+
+Seed 123 got worse between the first two rows and the third; its drift is the largest of
+the three (12.5 m) and varies run to run, which is what a random walk does. Reporting the
+three seeds separately rather than averaging them keeps that visible.
