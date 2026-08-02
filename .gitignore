@@ -8,3 +8,7 @@
 # (PROGRESS.md and ARCHITECTURE.md are tracked deliverables, not excluded)
 .claude/
 PLAN.md
+
+# Python bytecode from running scripts/ directly
+__pycache__/
+*.pyc

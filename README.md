@@ -88,7 +88,7 @@ works, what doesn't yet, and why.
 1. **Procedural planetary terrain** — craters, rocks, and PBR textures generated from a seed, done
 2. **Rover simulation** — skid-steer chassis, teleop, sensor bridging, done
 3. **GPS-denied localisation** — EKF fusing wheel odometry + IMU, done, within target on measured test legs (see below)
-4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end including the full 60-100 m acceptance distance; a rare tight-turn stall has a detector + recovery (see below)
+4. **Autonomous navigation** — costmap + A* planner + path follower, works end-to-end and drives 100 m+ traverses among real boulders, recovering from every wedge it hits; it does **not** currently meet the milestone's 1.5 m arrival accuracy, for a measured and structural reason (see below)
 
 See the [Roadmap](#roadmap) below for target vs. actual, and [Known Limitations](#known-limitations) for the honest details.
 
@@ -143,20 +143,31 @@ Documented in full in [`PROGRESS.md`](PROGRESS.md); the two that matter most for
   re-measured drift is 0-4% over straight and gently-turning test legs,
   within target. See [`PROGRESS.md`](PROGRESS.md)'s "M3 drift
   re-investigation" for the full correction.
-- **A rare, intermittent stall in tight turns**: while re-investigating the
-  drift figure above, the rover was observed to occasionally freeze mid-turn
-  (wheels lock, no flip, no terrain-geometry cause found) due to what
-  appears to be a physics-engine friction-cone effect under lunar gravity.
-  A detector + automatic recovery now exists in `flip_recovery_node.py`,
-  verified in isolation; it hasn't yet been observed catching a naturally-
-  occurring stall live, since the failure is too rare to reproduce on
-  demand. See `PROGRESS.md` for details.
+- **Getting wedged on boulders is common, and recovery is now the thing that
+  handles it**: on rocky terrain the rover wedges every few minutes. It has a
+  detector (ground truth, plus an onboard wheel-slip detector that uses only
+  wheel odometry and the IMU) and an escalating escape maneuver — reverse,
+  turn away, mark the spot as a keep-out zone, replan. Across the three most
+  recent acceptance runs this fired 25 times and freed the rover 25 times.
+  The earlier, rarer "wheels lock in a tight turn" stall is covered by the
+  same machinery. See `PROGRESS.md` for details.
 - **Terrain-collision flip risk on long autonomous runs**: the physics
   engine (gz-physics/dartsim) doesn't implement heightmap or mesh collision
   construction, so terrain collision is approximated with a grid of boxes.
-  A smoothing fix and a simulated flip-recovery backstop address this — the
-  full 60-100 m / 3-consecutive-seed acceptance check has since passed 3/3
-  with zero flips (see `PROGRESS.md`).
+  A smoothing fix and a simulated flip-recovery backstop address this, and
+  flips are no longer observed: zero across the three most recent 100 m+
+  acceptance runs (see `PROGRESS.md`).
+- **M4's arrival accuracy is not met, and needs a sensor the PoC doesn't
+  have.** An earlier 3/3 pass of the 60-100 m acceptance is retracted: it was
+  run on a world where rock collision was a silent no-op, so the rover drove
+  through all 190 boulders. With collisions working, the rover reaches
+  9.6-19.6 m of its goal rather than 1.5 m. Recovery from wedging is fixed
+  (25 escape maneuvers, 25 successful) and localisation error is ~3x better,
+  but the residual is **lateral slip** — the rover slides sideways about 10%
+  of its total motion, which a differential-drive odometry model cannot
+  represent and an IMU cannot observe. Closing it requires visual odometry,
+  which is explicitly out of scope for this PoC. Full error budget in
+  `PROGRESS.md`.
 
 ## Roadmap
 

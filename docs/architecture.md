@@ -83,7 +83,13 @@ narrows this to prove the pipeline end-to-end before broadening it:
 
 - **Localisation** fuses wheel odometry + IMU only — no visual odometry yet.
   Bounded drift over a short traverse is acceptable and is visualized
-  (estimated vs. ground-truth pose), not hidden.
+  (estimated vs. ground-truth pose), not hidden. Because there is no absolute
+  reference anywhere in the stack, an error introduced while the rover is
+  wedged is *permanent*, so wheel slip is gated rather than fused blindly:
+  `wheel_slip_node` republishes `/odom` as `/odom/gated` with a zero-velocity
+  update substituted while it detects the wheels turning without the body
+  moving, from onboard signals only. See PROGRESS.md for the measured
+  detection thresholds and their false-positive rate.
 - **The costmap comes from the generated terrain heightmap** (the world is
   known a priori), not from onboard perception. Sensor-derived costmaps are
   the explicit next milestone after this PoC — the rover still genuinely
@@ -91,9 +97,17 @@ narrows this to prove the pipeline end-to-end before broadening it:
 - Lunar gravity (1.62 m/s²) is modeled; wheel friction/damping is tuned for
   controllability rather than strict physical accuracy.
 
+- **Keep-out zones are learned from stuck events, not perceived.** The a-priori
+  costmap knows where the rocks are but not which gaps between them are really
+  drivable. When the rover wedges, the recovery node publishes the spot and
+  `costmap_node` marks it lethal, so the planner stops routing back into it.
+  This is the "keep-out zone enforcement" bullet above, in its minimal form.
+
 Out of scope for this milestone: visual odometry/SLAM, sensor-derived
 costmaps, additional rover models, ML terrain classification, adaptive speed
-governors, FDIR beyond stop-and-replan, real hardware.
+governors, real hardware. FDIR is deliberately small but no longer just
+stop-and-replan: a reverse/turn escape maneuver with keep-out marking, plus
+the slip gate above. Everything more elaborate stays out.
 
 ### Autoware Component Reuse Log
 

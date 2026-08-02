@@ -66,19 +66,27 @@ if pgrep -f "install/regolith_[a-z_]*/lib/" >/dev/null 2>&1; then
   found_leftover=1
   pkill -TERM -f "install/regolith_[a-z_]*/lib/" 2>/dev/null || true
 fi
-if pgrep -f "ruby .*gz sim.*regolith_moon" >/dev/null 2>&1; then
+# NOTE: this used to match "ruby .*gz sim.*regolith_moon", which matches nothing
+# on this gz build - the server runs as `gz sim -r -s <world>` with no ruby wrapper
+# in the visible command line, so leftover servers survived a cleanup that reported
+# success. That is not cosmetic: ROS_DOMAIN_ID does not isolate gz-transport, so a
+# survivor shares the gz partition with the next launch and can starve /clock,
+# stalling every sim-time timer in the new graph. The bracket in "gz[ ]sim" stops
+# the pattern matching this script's own command line.
+if pgrep -f "gz[ ]sim.*regolith_moon" >/dev/null 2>&1; then
   found_leftover=1
-  pkill -TERM -f "ruby .*gz sim.*regolith_moon" 2>/dev/null || true
+  pkill -TERM -f "gz[ ]sim.*regolith_moon" 2>/dev/null || true
 fi
 if [ "$found_leftover" = "1" ]; then
   echo "Found leftover processes from a previous run - stopping them..."
   sleep 2
   pkill -KILL -f "ros2 launch.*hello_moon\.launch\.py" 2>/dev/null || true
   pkill -KILL -f "install/regolith_[a-z_]*/lib/" 2>/dev/null || true
-  pkill -KILL -f "ruby .*gz sim.*regolith_moon" 2>/dev/null || true
+  pkill -KILL -f "gz[ ]sim.*regolith_moon" 2>/dev/null || true
   sleep 1
 fi
 if pgrep -f "install/regolith_[a-z_]*/lib/" >/dev/null 2>&1 \
+   || pgrep -f "gz[ ]sim.*regolith_moon" >/dev/null 2>&1 \
    || pgrep -f "ros2 launch.*hello_moon\.launch\.py" >/dev/null 2>&1; then
   echo "ERROR: could not fully stop a previous run's processes." >&2
   echo "Check 'ps aux | grep regolith' and stop them manually before continuing -" >&2

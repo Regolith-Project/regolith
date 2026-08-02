@@ -12,7 +12,7 @@ component reuse log.
 | M1 — Procedural lunar terrain | Done |
 | M2 — Rover spawns and drives (teleop) | Done |
 | M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4 — Autonomous navigation | **Not met — and the earlier pass did not mean what it looked like.** The re-run is **0/3**: the rover wedges on boulders, the stuck recovery never frees it, wheel odometry drifts while it is pinned, and `/goal_reached` then fires 17-36 m from the goal. Attributed by experiment to **rock collisions, not terrain**: they were a silent no-op before, so the 3/3 pass was driven on a world where all 190 rocks were phantom. See "res40 breaks M4 autonomy" below |
+| M4 — Autonomous navigation | **Not met, 0/3 — and now understood.** Recovery is fixed (25 escape maneuvers, 25 freed the rover, against the old 0/64) and localization error is down ~3x (36/17/32 m → 9.6/19.6/10.8 m), with zero flips. What remains is **lateral slip**: the rover slides sideways ~10% of its total motion, which a differential-drive odometry model cannot represent and an IMU cannot see, leaving 3-5 m of position error over a ~110 m traverse against a 1.5 m bar. **M4 as specified is not reachable with the PoC's declared wheel+IMU sensor suite on this terrain**; it needs visual odometry, which `docs/architecture.md` puts outside PoC scope. See "Verification: the recovery works..." below |
 | M5 — Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -2132,3 +2132,335 @@ Not attempted yet, and listed in the order that matters:
    moving - that same signal should stop odometry being trusted.
 4. **Attribute the wedging** (res40 roughness vs rock collisions now being real) before
    tuning anything, per the previous section.
+
+## Items 1-3: the harness, the recovery, and the odometry-during-stall fix
+
+Item 4 (attribution) is done and recorded above. This section covers 1-3, which were
+built together because they turned out to be one failure with three parts. Everything
+below was measured on recorded runs; two of the design ideas were killed by that
+measurement and are recorded as such rather than quietly replaced.
+
+### 1. `scripts/m4_acceptance.py` - acceptance judged on ground truth
+
+The previous acceptance harness lived in a scratch directory and did not survive the
+session that wrote it, which is its own lesson: the thing that decides whether a
+milestone passes belongs in the repo. It is now `scripts/m4_acceptance.py`, and it:
+
+- decides pass/fail **only** on `/ground_truth/pose` distance to the goal;
+- treats a `/goal_reached` published further than the tolerance from the goal as
+  `FAIL_FALSE_ARRIVAL` - a distinct, louder verdict than a timeout, and it prints the
+  true error the system claimed as an arrival;
+- publishes the goal and then stays out of the run, so "without intervention" is true;
+- validates the goal against the same costmap `costmap_node` builds, with the same
+  parameters `hello_moon.launch.py` passes it (1.0 m, 0.3 m rover radius, 20 deg lethal
+  slope): goal cell plus its 8 neighbours non-lethal, and connected to spawn. Re-checking
+  the three recorded goals reproduces their straight-line distances exactly (85.0 / 90.0 /
+  90.0 m), so the picker and the run harness agree with what was recorded before;
+- reads the launch's private `ROS_DOMAIN_ID` back off its stdout and joins it, and aborts
+  after 150 s without a `/ground_truth/pose` instead of burning the whole timeout;
+- with `--record-signals`, logs `/odom`, `/imu` and ground truth at 10 Hz to a CSV. That
+  file is the input to `scripts/calibrate_slip_detector.py` below.
+
+One correctness detail worth recording, because it silently corrupts any offline analysis
+of these logs: velocities are per second of **simulated** time and this world runs at
+about 0.28x real time, so integrating `vx` against wall-clock timestamps overstates
+distance by ~3.5x. The signals CSV now carries a `sim_t` column taken from the `/odom`
+header stamp; the calibration script uses it, and falls back to a *measured* wall->sim
+ratio for older recordings rather than assuming 1.0.
+
+### 2. Recovery that actually recovers
+
+The old recovery was a 1.0 s straight-line forward nudge. Measured: 64 firings, 0
+recoveries. Pushing forward into the boulder the rover is wedged against is the wrong
+direction, and after the nudge `pure_pursuit` steered straight back onto the same path
+into the same rock, so the event repeated on a ~31 s metronome for the rest of the run.
+
+It is now an escalating escape maneuver in `flip_recovery_node.py`: **reverse** (back out
+along the way it came in, which is by construction obstacle-free), **turn in place** with
+the direction alternating per attempt, then **mark the obstacle and replan**. Consecutive
+events inside a 120 s window escalate the reverse and turn durations, because a wedge that
+survives one attempt needs a bigger disengagement rather than the same one again.
+
+Three supporting changes were needed for that to mean anything:
+
+- **Keep-out zones (`costmap_node`).** The a-priori costmap knows every rock's footprint
+  but not whether the gap between two of them is really drivable, so a wedge is
+  information the map did not have. The recovery node publishes `/hazard/stuck_point` and
+  the costmap stamps a lethal disc there, in the ESTIMATOR's frame - the frame the planner
+  actually routes in, so the zone stays put relative to the path even as the estimate
+  drifts. Without this the first two steps only buy one more approach.
+- **The planner can start from a lethal cell (`planner_node`).** It used to refuse
+  outright, which strands the rover exactly when a keep-out zone has just been marked
+  around it - the rover is standing next to the hazard it reported. It now plans from the
+  nearest non-lethal cell within 5 cells and says so.
+- **`pure_pursuit` is muted during a maneuver, and its replan budget is restored when the
+  costmap changes.** Publishing at 30 Hz against its 10 Hz is *not* the same as having
+  control: roughly a quarter of the commands gz-sim executed during the old override were
+  still pure_pursuit's forward commands, fighting the recovery. There is now an explicit
+  `/recovery_active` mute. Separately, the 8-replan give-up cap was exhausting itself on
+  approaches the planner could newly route around; a genuinely changed costmap now
+  restores the budget, since the retry is not the attempt that already failed.
+
+The node also reports, per event, whether the maneuver actually moved the rover
+("FREED" / "STILL WEDGED" with the ground-truth distance moved, and a running
+freed/fired tally). "Recovery fired" will not be mistaken for "recovery worked" again.
+
+### 3. A stall must not corrupt localization - and the first two designs were wrong
+
+New node `wheel_slip_node.py` sits between gz and the covariance relay, republishing
+`/odom` as `/odom/gated` with a zero-velocity update (ZUPT) substituted while it judges
+the wheels to be slipping in place. Detection uses **onboard signals only** - wheel
+odometry and the IMU. It deliberately does not use `/ground_truth/pose`, even though the
+stuck detector does: a localization fix that consulted the answer key would make M4's
+numbers meaningless. `scripts/calibrate_slip_detector.py` scores the detector against a
+recorded run, using ground truth only as the label.
+
+**Design 1, refuted.** "While pinned, the body is rigid - so declare slip when the wheels
+claim distance and the IMU sees no attitude change." Scored against a recorded seed-42
+run this fired on **29% of genuinely-driving windows** at a 3 s window: an IMU cannot tell
+constant velocity from rest (Galilean invariance), and a rover driving straight over
+smooth ground for three seconds tilts by nothing measurable. Lengthening the window fixed
+the false positives - the minimum attitude span over 4,700 driving windows goes 0.0000 rad
+(3 s) -> 0.0080 (10 s) -> 0.0276 (15 s) - so the window is 15 s.
+
+**Design 1 still failed on the real thing.** With the false positives gone, the detector
+found **0 of 968** genuinely-slipping windows. The reason is worth recording: during an
+actual wedge the chassis **bucks against the boulder while the wheels spin**, spanning
+0.119-0.195 rad of attitude - *more* than the median driving window (0.163 rad). "Pinned
+means still" is simply false here. Only measuring it showed that.
+
+**Design 2, measured and kept: rotation the gyro never sees.** A wedged rover is usually
+still being commanded to turn, so its wheels spin differentially and wheel odometry
+integrates yaw that never happens; the gyro measures the yaw that did. Gyro-observed
+rotation as a fraction of the wheels' claim, same recording:
+
+| class | n | observed / claimed rotation |
+|---|---|---|
+| slipping (ground truth travelled <25% of the claim) | 3679 | 0.082 - **0.133** |
+| honest driving (>70% of the claim) | 1370 | **0.157** - 0.945 (median 0.395) |
+
+Two disjoint bands with a gap, and the separation holds at every minimum-claimed-rotation
+guard tried (0.5 / 1.0 / 1.5 / 2.0 rad). The threshold sits in the gap at 0.145. Note the
+honest-driving floor is 0.16, not 1.0: skid-steer wheel odometry always over-claims
+rotation because turning requires the wheels to scrub (M3 measured it ~3x off). The test
+is about the *size* of a disagreement that is always present, which is exactly why the
+threshold had to be measured rather than reasoned about. Scored on that recording the
+final detector gets **3665/3665 slipping windows and 0/6962 false positives**.
+
+**A correction to how those labels were computed.** The first version of this table
+labelled each window by ground-truth *endpoint displacement*. That is wrong: the wheels
+claim a path integral, so the answer key has to be one too. The difference is not
+academic - an escape maneuver reverses and then drives forward, netting almost no
+displacement while the body genuinely moved over a metre, so displacement-labelling files
+every recovery maneuver under "slipping". It reported the rotation test as cleanly
+separating on the pre-fix recording (which contained no working maneuvers) and as
+overlapping on the post-fix one (which is full of them). The numbers above are the
+path-length ones; the conclusion survived the correction, but the margin is tighter than
+first written (0.133 -> 0.157, not 0.124 -> 0.169).
+
+**And the separation does not generalise across runs.** Scoring the same detector against
+the *verification* run's own recording, **1.21% (75 of 6199) of honest-driving windows
+fall below the 0.145 threshold** - i.e. they would be false positives. Every one of them
+sits right at the labelling boundary (ground truth travelled almost exactly 70% of the
+claim, so they were already ~30% slipping), and the run itself only declared 9 slip
+episodes over 45 minutes. But "0% false positives" is a statement about one recording,
+not a property of the detector, and it is corrected here rather than left standing.
+
+The rigid-body test is kept as a second, independent signature for the wheels-locked case
+where nothing is commanded to turn - reported honestly as having fired on 0 driving
+windows *and* 0 slipping ones, i.e. never yet caught a real event.
+
+**Limits, stated plainly.** One wedge episode, one seed, one run is the entire evidence
+base for the rotation bands. The 0% false-positive rate is on 6,946 windows of one run's
+driving. Nothing here is validated across seeds yet.
+
+### The stuck detector's own blind spot, found while re-measuring the baseline
+
+Re-running seed 42 under the new harness on the *unmodified* code reproduced the failure
+and exposed something the earlier runs' 22-events-per-run had hidden. Ground truth moved
+**1.93 m in 485 s** while the EKF travelled **10.12 m** over the same window - and the
+ground-truth stuck detector fired **once**, not twenty times. The rover was not stationary;
+it was *creeping and scrubbing* along the obstacle at ~0.4 cm/s, which is above the
+detector's `stuck_min_speed_mps` of 0.02, so its "not moving" test simply never tripped
+while odometry ran away regardless. Divergence reached **9.1 m** by the time the run was
+stopped at t=1190 s.
+
+That is why recovery now has a second trigger: `/wheel_slip` from the onboard detector,
+which keys on the disagreement itself rather than on absolute stillness. Both triggers are
+counted separately in the run log, so each run reports which detector actually caught
+what.
+
+### Two bugs found while setting the verification run up, both worth recording
+
+**The old recovery nudge was ~3.5x shorter than it read.** `_hold`/the old nudge loop
+timed itself with `time.monotonic()` - wall clock - while every velocity it commands is in
+simulated time, and this world runs at a measured **0.28x real time**. So the "1.0 s at
+0.20 m/s" nudge was 0.28 s of rover time, about **6 cm** of travel. That does not excuse
+the design (pushing forward into the obstacle is still the wrong direction), but it does
+change the conclusion drawn from "64 firings, 0 recoveries": part of that was a maneuver
+that barely happened. The escape maneuver now specifies durations in sim time and converts
+them to wall-clock sleeps using a real-time factor measured in the node's own timer
+callback - it cannot read the clock during the maneuver, because it is blocking its own
+executor, which is exactly how the units got mixed up in the first place.
+
+**A leftover `gz sim` starved the ROS clock of a fresh launch.** The first verification
+attempt came up with a silent EKF, no costmap, and a rover that never moved - looking
+exactly like a navigation failure. Cause: a previous launch's `gz sim` was still running.
+`ROS_DOMAIN_ID` does not isolate gz-transport, so both servers shared the gz partition,
+`/clock` stopped reaching the ROS side, and **every sim-time timer in the new graph
+stalled** - the EKF and the costmap publisher included, while callback-driven nodes (the
+relays) kept working, which is what made the symptom look so selective.
+
+The leftover survived cleanup because both `demo.sh` and the new harness matched it as
+`ruby .*gz sim.*regolith_moon`. On this gz build the server runs as `gz sim -r -s <world>`
+with no ruby wrapper in the visible command line, so **the pattern matched nothing and the
+cleanup reported success**. Fixed in both places to `gz[ ]sim.*regolith_moon` (the bracket
+stops the pattern matching the killing process's own command line - see the recurring
+pkill self-match note), and `demo.sh`'s post-kill verification now checks for gz too.
+
+**Harness robustness, from the same incident.** The watcher published the goal 5 times on
+a fixed schedule and then waited. All five landed before the planner had a costmap and a
+pose, so it dropped every one of them ("No costmap or current pose yet - ignoring goal")
+and the run burned its timeout motionless. The watcher now re-sends the goal until a
+`/planned_path` comes back, and gives up with a distinct `ABORT_NO_PATH` verdict rather
+than reporting a navigation failure that never started.
+
+### One design note on the ZUPT: releasing it
+
+Declaring slip uses a 15 s window, but *releasing* it cannot: 15 s after the rover breaks
+free the window still contains the wedge, and holding a zero-velocity update over a rover
+that is really driving loses real distance - the same corruption the ZUPT exists to
+prevent, with the sign flipped. Release is therefore judged on the most recent 5 s, and
+requires the gyro to corroborate past a looser ratio (0.25) than the one that declared
+slip (0.145), so a statistic wobbling around the boundary cannot flicker the gate.
+
+### The ZUPT gate flickered at the message rate - caught live, fixed, pinned by a test
+
+The first verification attempt with everything wired up produced the intended chain on the
+first wedge - `WHEEL SLIP #1` (wheels claiming 3.54 rad of turning, gyro corroborating 14%
+of it), then a keep-out zone marked 20 s later - and then the gate began flickering:
+**24 declare/clear pairs in two seconds**, at the `/odom` message rate.
+
+Cause: `slipping()` judges the full 15 s window while `clearing()` judges the recent 5 s,
+and the two can disagree indefinitely. The rover was still wedged (the long window saw it)
+but had just been commanded to stop, so the recent seconds claimed almost nothing - and the
+release test read that *absence* of evidence as evidence of recovery, released, and was
+immediately re-declared by the long window on the next message.
+
+Fixed by making release require positive evidence: if the wheels have gone quiet, stay
+latched (with nothing being claimed there is nothing for the gate to suppress either way,
+so latching costs nothing), and only release when the wheels are claiming again *and* the
+gyro corroborates past the looser release ratio. A 2 s minimum dwell backs that up. Both
+behaviours are now regression-tested (`test_quiet_wheels_do_not_release_the_gate`).
+
+Worth noting what this cost and what it did not: throughout the flicker the "phantom
+distance kept out of the EKF" counter stayed at 0.93 m, i.e. the gate was toggling over
+wheels that were claiming nothing, so the localization impact was nil - it was a log and
+correctness problem, not a measurement-corrupting one. It was still worth restarting the
+acceptance for, because "slip episodes" as a reported column has to mean episodes.
+
+## Verification: the recovery works, the localization is 3x better, and M4 still fails
+
+Three seeds, the same goals as the recorded 0/3 baseline, judged on
+`/ground_truth/pose` by `scripts/m4_acceptance.py`. **0/3 against M4's 1.5 m bar** - but
+failing for a completely different reason than before, and the reason is now measured
+rather than suspected.
+
+| seed | verdict | true error | GT travelled | EKF divergence | escapes fired / freed | flips |
+|---|---|---|---|---|---|---|
+| 42 | FAIL_TIMEOUT | **9.6 m** | 107.0 m | 4.8 m | 11 / **11** | 0 |
+| 7 | FAIL_TIMEOUT | **19.6 m** | 121.4 m | 5.0 m | 9 / **9** | 0 |
+| 123 | FAIL_FALSE_ARRIVAL | **10.8 m** | 103.9 m | 10.0 m | 5 / **5** | 0 |
+
+Against the baseline on the same three goals (36.2 / 17.4 / 31.7 m true error): error is
+down roughly 3x, and no run ended pinned against a rock.
+
+### What is fixed, and by how much
+
+- **Recovery recovers. 25 escape maneuvers across the three runs, 25 freed the rover**,
+  measured as ground-truth motion during the maneuver (0.49-2.37 m each). The previous
+  recovery was 0 for 64. Nothing was "still wedged" after a maneuver in any run.
+- **Both triggers fire, and the onboard one earns its place.** 17 events were caught by
+  the ground-truth detector and **8 by the onboard wheel-slip detector** - the creeping
+  wedges that are too fast to count as "not moving" and which the ground-truth trigger
+  misses entirely (it fired once in 1190 s of the baseline's permanent wedge).
+- **Zero flips in all three runs** (max attitude 21.5 deg against a 60 deg threshold), so
+  the terrain-collision work still holds.
+- **The gate keeps real phantom distance out of the EKF**: 8.84 m on seed 42, 4.30 m on
+  seed 7, 1.73 m on seed 123.
+- **Seed 123 is still a false arrival**, and that is worth stating plainly: `/goal_reached`
+  fired 10.8 m from the goal. The system's own success signal is still not trustworthy;
+  the harness is what makes that visible.
+
+### Why it still fails: an error budget, not a guess
+
+Decomposing each run's ground truth in the rover's own frame, against what the wheels
+claimed (`scripts/calibrate_slip_detector.py` and the analysis behind it):
+
+| | seed 42 | seed 7 | seed 123 |
+|---|---|---|---|
+| wheels' total over-claim of distance | +1.08 m / 107 m | +0.91 m / 121 m | +6.95 m / 104 m |
+| of that, entering the EKF (gate passing) | 62% | 67% | **91%** |
+| lateral motion (sideways sliding) | 11.4 m (9.8%) | 11.4 m (8.7%) | 12.6 m (11.1%) |
+| dead-reckoning error using the IMU's heading | 3.5 m | 4.0 m | 10.6 m |
+| measured EKF divergence | 4.8 m | 5.0 m | 10.0 m |
+
+Three things follow, and they change what M4's remaining gap actually is:
+
+1. **Distance over-claim is no longer the main problem.** On seeds 42 and 7 the wheels
+   over-claim about **1 m in 110** - a 1% error - because the gate catches the gross
+   episodes. Seed 123 is the exception at 7 m, 91% of it undetected: its slip was
+   distributed through ordinary driving rather than concentrated in wedges, so the
+   rotation-disagreement signature never appeared.
+2. **Heading is not the problem either.** Dead-reckoning the wheels' distance along the
+   *IMU's* heading reproduces seed 42's ground truth to 3.5 m over 107 m. Doing the same
+   along the *wheel-integrated* heading gives 43 m, with the heading itself 56 deg off by
+   the end - so fusing the IMU for attitude (M3's design decision) is carrying the run.
+3. **What is left is lateral slip, and it is structurally unobservable here.** The rover
+   slid sideways 11.4 m on both seeds 42 and 7 and 12.6 m on seed 123 - 8.7-11.1% of all
+   its motion on every run -
+   with a net of only -0.23 m, i.e. a random walk rather than a bias. A differential-drive
+   odometry model assumes zero lateral velocity by construction, so the wheels cannot
+   report it; the IMU measures the heading correctly throughout and so cannot report it
+   either. Nothing in a wheel-plus-IMU stack observes it.
+
+So the honest conclusion is not "the fix did not work". It is that after fixing recovery
+and gating the gross slip, **the residual error over a ~110 m traverse of boulder-strewn
+terrain is dominated by lateral slip that this sensor suite cannot see** - roughly 3-5 m
+on the well-behaved runs. M4's bar is 1.5 m at 60-100 m. Closing that gap needs an
+exteroceptive reference - visual odometry is the standard answer, and is exactly what
+Mars rovers use for exactly this reason - which `docs/architecture.md` explicitly places
+outside this PoC's scope. **M4 as specified is not reachable with the PoC's declared
+sensor suite on this terrain**, and that is a scoping conclusion, not a bug to chase.
+
+The secondary failure is time, not accuracy: seeds 42 and 7 timed out at 3600 s while
+still moving (107 m and 121 m travelled on 85-90 m straight lines), because each wedge
+costs a maneuver plus a replan and the rover spends minutes at a time working through
+rock clusters. Both were closing on their goals when the clock ran out.
+
+### Limits of this verification
+
+- **Seed 7 ran separately from 42 and 123**, on identical code, because a harness bug
+  aborted it in the batch (below). Three independent runs, not three back-to-back in one
+  invocation.
+- One run per seed. The recovery result (25/25) is strong; the error budget rests on three
+  runs and the slip-detector calibration on one recorded wedge.
+- The keep-out zones have a limitation that shows up as drift grows: they are marked in
+  the estimator's frame, so once divergence exceeds the zone radius (1.2 m + rover
+  radius), the marked zone no longer covers the physical rock that caused it. Seed 42
+  marked 12 hazards, several clustered around one obstacle it kept re-encountering, which
+  is consistent with this. The mechanism is self-consistent only while drift stays below
+  the zone size.
+
+### Harness bugs found by running it
+
+- **A goal with a negative x aborted the run.** The watcher is invoked with
+  `--goal {x},{y}`, and argparse reads `-45.00,77.94` as an option flag, not a value
+  ("expected one argument"). Seeds 42 and 123 have positive-x goals and ran fine; seed 7
+  aborted instantly as `ABORT_WATCHER_FAILED`. Fixed to the `--goal=` form, with a
+  regression check. The same hazard applies to the user-facing `--goals` when the *first*
+  goal has a negative x, and is now documented in its help text.
+- **Stuck events were double-counted.** `STUCK RECOVERY #N` appears twice per event - once
+  for the maneuver and once for its result - so the first run reported 22 events where
+  there were 11. The pattern is now anchored on the maneuver line. The table above uses
+  corrected counts.
