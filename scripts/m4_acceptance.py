@@ -432,14 +432,16 @@ def run_watcher(args) -> int:
 # --------------------------------------------------------------------------
 
 
-def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False):
+def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
+            visual_odometry: bool = True):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
         f"source {REPO_ROOT}/install/setup.bash && "
         "exec ros2 launch regolith_bringup hello_moon.launch.py "
         f"seed:={seed} headless:=true rviz:=false "
-        f"localization_oracle:={'true' if oracle else 'false'}"
+        f"localization_oracle:={'true' if oracle else 'false'} "
+        f"visual_odometry:={'true' if visual_odometry else 'false'}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -523,7 +525,8 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     result_path = out_dir / f"seed_{seed}_result.json"
     counters = {"stuck": 0, "flips": 0}
 
-    proc, domain = _launch(seed, log_path, counters, oracle=args.localization_oracle)
+    proc, domain = _launch(seed, log_path, counters, oracle=args.localization_oracle,
+                           visual_odometry=not args.no_visual_odometry)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -609,6 +612,12 @@ def main() -> int:
              "the rover and the milestone. Results are NOT milestone results."
     )
     parser.add_argument(
+        "--no-visual-odometry", action="store_true",
+        help="run on wheel odometry + IMU alone, the sensor suite that scored 0/3. Kept so "
+             "that baseline stays reproducible from the same build rather than surviving "
+             "only as a number in PROGRESS.md - the VO result means nothing without it."
+    )
+    parser.add_argument(
         "--record-signals", action="store_true",
         help="also log /odom, /imu and ground truth at 10 Hz per run - the raw material "
              "for judging a slip detector offline (~5 MB/hour/run)"
@@ -659,7 +668,12 @@ def main() -> int:
 
     passes = sum(1 for r in results if r["verdict"] == "PASS")
     mode = " [LOCALIZATION ORACLE - EXPERIMENT, NOT A MILESTONE RESULT]" if args.localization_oracle else ""
+    # State the sensor suite on the result itself. The same harness now produces
+    # three materially different numbers depending on it, and a table without this
+    # line is not interpretable six months from now.
+    suite = "wheel odometry + IMU" if args.no_visual_odometry else "wheel odometry + IMU + visual odometry"
     print(f"\n=== M4 acceptance: {passes}/{len(results)} (judged on ground truth){mode} ===")
+    print(f"    sensor suite: {suite}")
     print(f"{'seed':>6} {'verdict':>20} {'gt error':>9} {'travelled':>10} {'diverg':>8} {'stuck':>6} {'flips':>6}")
     for r in results:
         if "gt_error_m" in r:
