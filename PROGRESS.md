@@ -1805,7 +1805,8 @@ lesson: when one module's convention crosses into another's, the test has to ass
 the **artefact that crosses** (here the PNG, on both sides of it), and per-cell, because
 the natural summary statistic of a transposed field is identical to the correct one.
 
-### Open, measured, deliberately not fixed yet: costmap decodes the wrong height span
+### Measured, deliberately deferred: costmap decodes the wrong height span
+### (NOW FIXED - see "The costmap height-span decode, fixed" at the end of this file)
 
 Pre-existing, unrelated to the transpose, found in the same read-through.
 `costmap_node` decodes the heightmap with `pixels / pixels.max() * height_range_m`, i.e.
@@ -2630,3 +2631,77 @@ on measurements rather than impressions.
 Seed 123 got worse between the first two rows and the third; its drift is the largest of
 the three (12.5 m) and varies run to run, which is what a random walk does. Reporting the
 three seeds separately rather than averaging them keeps that visible.
+
+## The costmap height-span decode, fixed
+
+The one item this project had explicitly parked until the M4 acceptance run was banked
+(see "costmap decodes the wrong height span" above, and the reason it was left alone:
+fixing it would have changed the costmap underneath a run in progress, and an acceptance
+result should describe the system that actually shipped). That run is banked in commit
+`b8f2f37`, so the fix is now in.
+
+`costmap_node.load_heightmap` decoded the heightmap PNG with
+`pixels / pixels.max() * height_range_m`. Since the full-range PNG fix, the encoding
+spans the surface's own min-to-max, not the configured 10 m the generator is *allowed*
+to use - so every elevation was stretched, and every slope with it.
+
+The fix puts the real numbers where the decoder can read them rather than having it
+guess: `save_heightmap_png` already returned `(z_min, span)` and the world SDF already
+used them for `<pos> z` / `<size> z`, so `write_manifest` now records them as
+`heightmap_z_min_m` / `heightmap_z_span_m` and the costmap decodes
+`z_min + pixels / 65535 * span`. One source of truth, three consumers.
+
+A manifest without those fields is now **refused with an error naming the fix**, rather
+than falling back to `height_range_m`. A silent fallback would reinstate exactly this bug
+with nothing on screen to show for it, and every launch regenerates its world, so the
+only thing that can hit this is a stale cached manifest read by an offline script - which
+has burned this project before (see "A stale world cache makes offline analysis lie").
+
+### Measured, on the three acceptance seeds, freshly generated
+
+At `hello_moon`'s parameters (1.0 m cells, 0.3 m rover radius, 20 deg lethal):
+
+| seed | true span | assumed | ratio | lethal before | lethal after | effective threshold | cells changed |
+|---|---|---|---|---|---|---|---|
+| 42 | 8.017 m | 10.0 m | 1.247x | 12.81% | 12.01% | 16.27 deg | 0.80% |
+| 7 | 8.338 m | 10.0 m | 1.199x | 12.66% | 12.24% | 16.88 deg | 0.42% |
+| 123 | 8.193 m | 10.0 m | 1.221x | 12.93% | 12.31% | 16.60 deg | 0.62% |
+
+This reproduces the prediction made when the bug was first recorded (12.81 -> 12.01,
+12.66 -> 12.24, 12.93 -> 12.31) to the digit, which is the useful part: the earlier
+analysis was right, and the fix does what it was said it would do and nothing else.
+The configured 20 deg threshold was really running at **16.3-16.9 deg**.
+
+On every seed the changed-cell count equals the drop in lethal cells exactly, so **not
+one cell became lethal that wasn't before** - the change is a strict relaxation. That
+matches the original characterization of the error as conservative: it over-flagged
+traversable ground and never under-flagged untraversable ground, which is why it survived
+a whole milestone without ever presenting as a failure.
+
+### What this does and does not mean for M4
+
+It does not reopen or change M4. The banked 0/3 was taken before this fix, so those
+numbers describe a costmap that flagged 0.4-0.8% more of the world lethal than the
+current build does. That is worth stating rather than glossing, but it is not a reason to
+re-run: **M4 fails by 3.1-13.1 m of localization drift**, and the mechanism is pinned to
+the centimetre (true error = EKF divergence + stopping tolerance, on all three seeds).
+Freeing 0.4-0.8% of cells does not move a number that is set by where the rover thinks it
+is. M4 remains 0/3, blocked on the sensor decision, unchanged by this.
+
+### Tests
+
+`regolith_costmap/test/test_heightmap_z_span.py` pins the decode four ways - true metres
+rather than the configured range, absolute elevation preserved, the refusal on an old
+manifest, and the consequence that actually mattered: a 2.29 deg plane read as 2.86 deg,
+with the threshold set between the two, is the difference between an entirely traversable
+costmap and an entirely lethal one. The fifth test is the one that would have caught the
+original bug and is the only one that can catch its return: it runs the **real generator**
+and the **real decoder** against each other with no hand-written manifest in between,
+where fixture-based tests only ever assert what the test file believes the generator does.
+
+`test_heightmap_orientation.py`'s round-trip check got stronger for free - it compared
+against a rescale to `height_range_m` because that was what the loader did; it now
+compares cell-for-cell against the true surface in absolute metres, with only 16-bit
+quantization between them.
+
+80 tests pass across the planetary packages.
