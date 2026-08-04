@@ -2705,3 +2705,106 @@ compares cell-for-cell against the true surface in absolute metres, with only 16
 quantization between them.
 
 80 tests pass across the planetary packages.
+
+## Visual odometry: the sensor M4 was missing, and what it actually bought
+
+The M4 decision recorded above - add the sensor, re-scope the bar, or leave the
+milestone open - was resolved as **add the sensor**. `regolith_visual_odometry` is
+a new package: RGB-D visual odometry publishing body-frame velocity on `/vo/odom`,
+fused by the EKF as `odom1`, from a depth camera added alongside the existing RGB
+one (same link, same intrinsics, so pixel (u,v) is the same ray in each).
+
+**The result, judged on ground truth, oracle off: still 0/3.** The honest table,
+against the previously-banked unaided numbers:
+
+| seed | VO frames usable | true error, VO | true error, no VO | divergence, VO | divergence, no VO |
+|---|---|---|---|---|---|
+| 42 | 93% | **4.04 m** | 7.72 m | **3.19 m** | 6.80 m |
+| 7 | 12% | 22.51 m | 3.08 m | **2140 m (filter blow-up)** | 3.06 m |
+| 123 | 74% | 13.29 m | 13.07 m | 12.41 m | 12.54 m |
+
+One seed improved substantially, one was unchanged, one got much worse. That is
+the finding, and the tempting summary - "visual odometry helps when it can see" -
+is contradicted by seed 123, which had 74% of its frames usable and improved by
+nothing measurable (13.29 against 13.07 m). Availability is not sufficient.
+
+### This comparison is confounded, and the confound is ours
+
+The right-hand columns come from the previously-banked run, which predates two
+other changes on this branch: the costmap height-span fix and the wheel_slip
+crash fix. Rover behaviour did change - seed 123 logged **21 stuck events against
+the baseline's 5**, and travelled 159.9 m against 102.5 m for a shorter goal. So
+some of the difference in that table is not visual odometry at all, and no
+attribution above should be treated as settled until the same build is run with
+`--no-visual-odometry`, which is what that flag was added for.
+
+### What VO measures, where it is trusted, and where it is not
+
+Against ground truth over 130 real frame pairs, and confirmed live in the running
+sim:
+
+| | offline | live |
+|---|---|---|
+| **`vy` (the fused channel)** | **+0.000 +- 0.018 m/s** | +0.001 +- 0.020 m/s |
+| `vx` (published, not fused) | -0.060 +- 0.053 m/s | -0.067 +- 0.050 m/s |
+
+Only `vy` is fused. That is the term a differential-drive model asserts is zero by
+construction and an IMU cannot observe - the whole reason the package exists - and
+the per-estimate sigma the node derives from its own reprojection residual (0.020)
+matches the measured spread almost exactly. `vx` is biased low - 35% in
+straight-line driving, 18% turning, 9% in one live cruise sample - against gated
+wheel odometry's ~1%, so fusing it would corrupt a term the existing sensors
+already handle well. The asymmetry is itself informative: `vy` is unbiased under
+exactly the conditions that bias `vx`, which is what a translation-only
+Lucas-Kanade tracker would do when driving forward makes near-ground texture
+*expand* between frames while sliding sideways does not.
+
+### Three defects that only real imagery could have found
+
+The first live run refused **100%** of its frame pairs. None of these were visible
+in synthetic testing, and all three are now fixed:
+
+1. **Corners were being detected in the sky.** The strongest contrast in a lunar
+   scene is the skyline, and sky has no range: 25 corners found, 8 with usable
+   depth, against an inlier floor of 20. The detector is now masked to pixels that
+   have depth.
+2. **The onboard image is dim and flat** - values 10-124, standard deviation 9.8 -
+   and Shi-Tomasi scores corners *relative* to the frame's strongest, so a raw
+   frame yielded 25 corners against a 400 budget. CLAHE now runs first.
+3. **PnP sometimes returns a confident, wildly wrong pose.** 4% of estimates were
+   catastrophic, up to 46 m/s for a 0.2 m/s rover, and they identify themselves:
+   median reprojection RMS **87 px** against **0.67 px** for the other 96%. Those
+   4% alone move the mean velocity error from 0.05 m/s to 1.1 m/s.
+
+A fourth, found by the acceptance run itself: **seed 7 went blind for three
+quarters of its run** - 2759 consecutive refusals. `min_depth_m` was 0.4 m while
+this camera's median view is 0.214 m, so close quarters left almost nothing
+searchable (4.2% of the image against 13.4% at 0.15 m). Lowered, with no measured
+accuracy cost. Whether that cures it is **not established**: no fully-blind frame
+exists in the captured set to test against, so mask coverage is now logged per run
+and the next run is the test.
+
+### The seed 7 blow-up, and what is not yet known about it
+
+Seed 7's EKF diverged to 2140 m, believing it had travelled 6.6 km against a true
+72.4 m. The filter tracked normally (3-8 m) for 2180 s and then ran away in a
+single 10 s step while the rover sat still.
+
+It is tempting to blame the new sensor, and the timing does not support it: VO's
+last valid estimate was ~6500 s of wall clock before the blow-up, so throughout
+that window it published nothing but ignore-covariance placeholders. The rover was
+not tipped either (max pitch 17 deg). **This is unexplained, and is recorded as
+unexplained** rather than pinned on the most recent change. A `max_speed_mps`
+guard now refuses any VO estimate above 1 m/s - the rover cruises at 0.2 - but
+that is a guard against a class of failure already seen offline, not a fix for a
+diagnosed one.
+
+### Honest expectation, set before the run and worth keeping
+
+Visual odometry is a **relative** sensor. It is not the oracle that produced 3/3:
+that handed the filter absolute position and drove divergence to 0.00 m, which
+nothing onboard can do. VO slows drift rather than bounding it, and published
+planetary-rover VO runs 1-2% of distance - over these ~110 m traverses, 1-2 m
+against a 1.5 m bar. Seed 42 landed at 3.1% of distance travelled. Closing the
+rest needs either a better front end than translation-only Lucas-Kanade, or
+something that bounds drift rather than slowing it.
