@@ -2714,8 +2714,17 @@ a new package: RGB-D visual odometry publishing body-frame velocity on `/vo/odom
 fused by the EKF as `odom1`, from a depth camera added alongside the existing RGB
 one (same link, same intrinsics, so pixel (u,v) is the same ray in each).
 
-**The result, judged on ground truth, oracle off: still 0/3.** The honest table,
-against the previously-banked unaided numbers:
+**The result, judged on ground truth, oracle off: still 0/3.**
+
+> **CORRECTION - read the controlled comparison at the end of this file first.**
+> The table immediately below compares against the *previously banked* unaided
+> numbers, which came from an older build. A same-build comparison run afterwards
+> shows that the apparent improvement on seed 42 was **not** visual odometry's
+> doing, and that VO in fact made every seed worse. The section is kept as written
+> because the reasoning it records - and the confound it flagged but did not wait
+> for - is the point.
+
+The honest table, against the previously-banked unaided numbers:
 
 | seed | VO frames usable | true error, VO | true error, no VO | divergence, VO | divergence, no VO |
 |---|---|---|---|---|---|
@@ -2808,3 +2817,101 @@ planetary-rover VO runs 1-2% of distance - over these ~110 m traverses, 1-2 m
 against a 1.5 m bar. Seed 42 landed at 3.1% of distance travelled. Closing the
 rest needs either a better front end than translation-only Lucas-Kanade, or
 something that bounds drift rather than slowing it.
+
+## The controlled comparison: visual odometry makes this rover's localization worse
+
+Every VO number above was measured against a baseline from an *older* build. That
+was flagged at the time as a confound and it turned out to be the whole story. Run
+properly - same build, same seeds, same goals, oracle off, the only difference
+being whether `visual_odometry` is on:
+
+| seed | EKF divergence, no VO | with VO | true error, no VO | with VO |
+|---|---|---|---|---|
+| 42 | **0.40 m** | 1.40 m | **1.50 m - PASS** | 2.40 m |
+| 7 | **0.70 m** | 24.74 m | **1.70 m** | 25.60 m |
+| 123 | **6.10 m** | 15.19 m | **7.00 m** | 15.90 m |
+| | | | **1 / 3** | **0 / 3** |
+
+**Visual odometry made localization worse on all three seeds - by 3.5x, 35x and
+2.5x.** There is no seed on which it helped. The earlier conclusion in this file,
+that VO halved seed 42's error, was wrong: seed 42 improved from the banked 7.72 m
+because of the costmap height-span fix and the wheel_slip crash fix, and VO then
+degraded that result from 0.40 m of drift to 1.40 m.
+
+The lesson is not subtle and is worth keeping: **a new component measured against
+an old baseline will take credit for every other change made since.** The confound
+was noticed and written down before the run, and the result was still reported as
+though the improvement were real. Waiting for the controlled arm cost one extra
+run and inverted the finding.
+
+`visual_odometry` is now **default off**, and the launch prints a warning when it
+is turned on. The package is kept, with its tests and its measurements, because
+the diagnosis is specific and the failure is fixable - not because it currently
+earns its place.
+
+### What is actually wrong with it, as far as the evidence goes
+
+VO's *lateral velocity* is unbiased and well-characterized in isolation: +0.000 +-
+0.018 m/s against ground truth over 130 real frame pairs, with a derived sigma of
+0.020 that matches. Yet fusing that same channel degrades the filter. So the
+per-estimate accuracy statistic is not capturing what goes wrong in a run, and two
+signatures are visible in the logs:
+
+- **Seed 7 loses its depth mask.** Median mask coverage 36%, dipping to 3%, with
+  44 frames refused for "no usable depth anywhere". A near-empty mask leaves the
+  surviving features clustered in a narrow sliver of image, which is a badly
+  conditioned PnP - it can return a self-consistent pose, passing both the inlier
+  count and the reprojection check, whose translation is badly biased. Its
+  divergence grew steadily and almost entirely along **y**, the one axis VO feeds,
+  at about 0.055 m/s sustained - three times the measured noise and far below the
+  1 m/s sanity guard.
+- **Seed 123 does not fit that explanation**, and this was checked rather than
+  assumed. It has the *best* coverage of the three (median 68%, minimum 36%) and
+  79% frame validity, and still degraded 2.5x. Its distinguishing signature is 187
+  "PnP found no consensus" against seed 42's 2. That is a different failure, and
+  it is not diagnosed.
+
+The natural next test is a conditioning gate on the *spatial spread* of the
+inliers rather than their count, since spread is the quantity that actually
+determines whether a PnP solution is well posed and mask coverage is only a proxy
+for it. That is a hypothesis, not a diagnosis - seed 123 is unexplained, and
+saying so is more useful than a tidy story that the next run would falsify.
+
+## Where M4 actually stands now, and what is blocking it
+
+The unaided stack on this build is **1/3**, up from the banked 0/3, and none of
+that improvement is visual odometry:
+
+| seed | true error | EKF divergence | drift as % of distance | verdict |
+|---|---|---|---|---|
+| 42 | 1.50 m | 0.40 m | 0.4% | **PASS** |
+| 7 | 1.70 m | 0.70 m | 0.7% | FAIL by 0.20 m |
+| 123 | 7.00 m | 6.10 m | 5.4% | FAIL |
+
+The credit belongs to the costmap height-span fix (which had the costmap running a
+16 deg lethal-slope threshold against the 20 deg configured) and the wheel_slip
+out-of-order-timestamp fix.
+
+**The binding constraint has moved off localization.** On seeds 42 and 7 the drift
+is now 0.4-0.7 m over ~105 m - 0.4-0.7% of distance, comfortably inside M4's
+budget - and the arrival error is almost entirely the rover's own stopping
+tolerance:
+
+    seed 42:  0.40 drift + 1.0 tolerance = 1.40   measured 1.50
+    seed 7:   0.70 drift + 1.0 tolerance = 1.70   measured 1.70
+
+`pure_pursuit_node`'s `goal_tolerance_m` is **1.0 m**, so the rover stops a metre
+short of where it believes the goal is, consuming two thirds of a 1.5 m bar before
+it has drifted at all. Seed 7 fails by 0.20 m for that reason alone.
+
+Tightening it is a legitimate control change rather than a measurement fudge - the
+harness judges distance from the commanded goal either way, and stopping closer is
+straightforwardly better navigation - but it is not free: pure pursuit can circle
+or oscillate near a goal it cannot quite reach, which is presumably why the
+tolerance is where it is. **It needs its own measured run, not a guess**, and it is
+the single highest-value change available.
+
+Seed 123 remains genuinely drift-limited at 6.1 m and would not pass on tolerance
+alone. It is also the seed that struggles most with the terrain - 14 stuck events
+against seed 42's 6 - so its extra drift is plausibly earned during recovery
+maneuvers rather than during driving.
