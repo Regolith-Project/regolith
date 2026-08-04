@@ -83,8 +83,19 @@ def _load_manifest(seed: int) -> dict:
 
     output_dir = default_output_dir(seed)
     manifest_path = output_dir / "manifest.json"
-    if not manifest_path.exists():
-        generate_world(TerrainConfig(seed=seed), output_dir, start_paused=False)
+    # ALWAYS regenerate, not just when the file is missing. hello_moon.launch.py
+    # calls generate_world unconditionally on every launch, so anything else here
+    # validates the goal against a different world from the one the rover will
+    # actually drive. Generation is deterministic from the seed, so this costs a
+    # few seconds and buys exact agreement.
+    #
+    # Reusing a cached manifest has now gone wrong twice. First it made an offline
+    # goal check meaningless (worlds months out of date - see PROGRESS.md "A stale
+    # world cache makes offline analysis lie"), and the "regenerate before
+    # measuring" fix recorded there never reached this function. Then it aborted a
+    # multi-hour acceptance run outright: seeds 7 and 123 still held manifests
+    # written before the heightmap z-span fix, so load_heightmap refused them.
+    generate_world(TerrainConfig(seed=seed), output_dir, start_paused=False)
     return json.loads(manifest_path.read_text())
 
 
