@@ -8,12 +8,12 @@ component reuse log.
 
 | Milestone | Status |
 |---|---|
-| M0 — Environment verified | Done |
-| M1 — Procedural lunar terrain | Done |
-| M2 — Rover spawns and drives (teleop) | Done |
-| M3 — Localization | **Done** — the originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4 — Autonomous navigation | **Not met: 0/3, and the reason is measured.** True error is 3.1-13.1 m, and on every seed it equals the EKF's drift plus the stopping tolerance - the rover arrives exactly where it believes the goal is. Recovery works (26/26 wedges escaped), zero flips, no intervention. The **same build with a 0.5 m / 1 Hz absolute position reference passes 3/3 at 1.48 m** (an experiment, not a milestone result), so planning, control and recovery all meet the bar - what is missing is any exteroceptive observation of position. ~10% of the rover's motion is lateral slip that neither wheel odometry nor an IMU can represent. **M4's 1.5 m bar is not achievable within the PoC's declared sensor scope**; see "M4, final" below |
-| M5 — Demo polish and packaging | Substantially done (see notes) |
+| M0: Environment verified | Done |
+| M1: Procedural lunar terrain | Done |
+| M2: Rover spawns and drives (teleop) | Done |
+| M3: Localization | **Done**. The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
+| M4: Autonomous navigation | **Not met: 0/3, and the reason is measured.** True error is 3.1-13.1 m, and on every seed it equals the EKF's drift plus the stopping tolerance - the rover arrives exactly where it believes the goal is. Recovery works (26/26 wedges escaped), zero flips, no intervention. The **same build with a 0.5 m / 1 Hz absolute position reference passes 3/3 at 1.48 m** (an experiment, not a milestone result), so planning, control and recovery all meet the bar - what is missing is any exteroceptive observation of position. ~10% of the rover's motion is lateral slip that neither wheel odometry nor an IMU can represent. **M4's 1.5 m bar is not achievable within the PoC's declared sensor scope**; see "M4, final" below |
+| M5: Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
 
@@ -21,14 +21,14 @@ component reuse log.
   upstream Autoware's `.repos`-driven pattern) rather than importing the full
   `autowarefoundation/autoware` git history. It holds `regolith.repos`
   (pins `regolith.universe`), top-level docs, and `scripts/`. All package
-  source — including `regolith_bringup` — lives in `regolith.universe` under
+  source, including `regolith_bringup`, lives in `regolith.universe` under
   `planetary/`, per the plan's own package table. Rationale: keeps demo
   packages, their launch files, and their cross-package dependencies in one
   repo, matching how autoware.universe/autoware_launch actually work upstream.
 - Six placeholder packages that predated the milestone plan
   (`regolith_bringup`, `regolith_interfaces`, `regolith_localisation`,
-  `regolith_navigation`, `regolith_perception`, `regolith_simulation` — empty
-  `package.xml` stubs, no code) were removed from `regolith`'s `src/` for the
+  `regolith_navigation`, `regolith_perception`, `regolith_simulation`, empty
+  `package.xml` stubs with no code) were removed from `regolith`'s `src/` for the
   reason above. Their layering concept is preserved as prose in
   `docs/architecture.md`.
 - `regolith.universe` created as a genuine GitHub fork of
@@ -61,25 +61,25 @@ component reuse log.
 ## Environment
 
 - Host: Windows 11, WSL2 Ubuntu 22.04.5 LTS. Hybrid AMD/NVIDIA laptop GPU
-  (AMD Radeon integrated + NVIDIA GeForce RTX 3050 Laptop GPU discrete) — WSLg's
+  (AMD Radeon integrated + NVIDIA GeForce RTX 3050 Laptop GPU discrete). WSLg's
   D3D12 renderer defaults to the AMD adapter. Fixed by exporting
   `MESA_D3D12_DEFAULT_ADAPTER_NAME=NVIDIA` (added permanently to `~/.bashrc`),
   per the plan's WSL2 rendering fallback notes.
-- RAM: 13 GB total — below the plan's 32 GB comfort threshold. Using
+- RAM: 13 GB total, below the plan's 32 GB comfort threshold. Using
   `colcon build --parallel-workers 2` / `MAKEFLAGS=-j2` per the plan's
   fallback guidance rather than changing `.wslconfig`.
 
 ## M0 acceptance results
 
 - `glxinfo -B` (with the adapter override): `Device: D3D12 (NVIDIA GeForce
-  RTX 3050 Laptop GPU)` — confirmed NVIDIA, not llvmpipe.
+  RTX 3050 Laptop GPU)`, confirming NVIDIA rather than llvmpipe.
 - `gz sim shapes.sdf`: loads the Ogre2 GUI render engine, no errors/warnings
   beyond benign DART collision-geometry notices; screenshot confirms a
-  correctly shaded, GPU-rendered 3D scene (not black) — see
+  correctly shaded, GPU-rendered 3D scene (not black); see
   `docs/media/m0_gz_sim_gpu_render.png`. GUI process ran at ~125% CPU while
   rendering, consistent with active interactive rendering (Gazebo has no
   built-in FPS counter to log a number directly).
-- ROS 2: `ros2 topic list` and a `demo_nodes_cpp talker` → `ros2 topic echo`
+- ROS 2: `ros2 topic list` and a `demo_nodes_cpp talker` -> `ros2 topic echo`
   round-trip both worked (`/chatter`, `/parameter_events`, `/rosout` present;
   received `data: 'Hello World: 26'`).
 - Installed: `ros-humble-desktop` (includes RViz2), `gz-harmonic` (Gazebo Sim
@@ -93,7 +93,7 @@ component reuse log.
 - `ros2 launch regolith_bringup terrain_only.launch.py seed:=42` generates
   the world (heightmap, PBR textures, 4 rock mesh variants, 130 scattered
   rocks, manifest) and opens it in Gazebo. Screenshot:
-  `docs/media/m1_lunar_terrain_seed42.png` — craters, rock scatter, long
+  `docs/media/m1_lunar_terrain_seed42.png`: craters, rock scatter, long
   shadows from a 12° sun elevation, near-black sky all present.
 - Determinism verified: two runs with `--seed 42` produced byte-identical
   `heightmap.png`; `--seed 7` produced a different heightmap, as expected.
@@ -112,7 +112,7 @@ component reuse log.
   an `OpaqueFunction` (no shelling out / stdout-parsing needed) and hands the
   resulting world path to `ros_gz_sim`'s `gz_sim.launch.py`.
 - `regolith.universe`'s existing ~500 MB / hundreds-of-packages tree was left
-  untouched for this milestone — built with
+  untouched for this milestone, built with
   `colcon build --packages-select regolith_terrain_gen regolith_bringup`,
   so `rosdep install --from-paths src` failures on car-specific packages
   missing `tier4_*`/CUDA rosdep keys don't block M1. The `COLCON_IGNORE`
@@ -137,8 +137,8 @@ component reuse log.
   `/camera/image`, `/camera/camera_info`, `/joint_states`, `/tf` all publish;
   RViz shows the robot model, TF frames, and a live camera feed
   (`docs/media/m2_rviz_camera_tf.png`).
-- Stability tuning: widened track (0.36→0.46 m), lowered chassis height
-  (0.14→0.11 m), increased wheel friction (μ 1.0→1.4), and capped
+- Stability tuning: widened track (0.36->0.46 m), lowered chassis height
+  (0.14->0.11 m), increased wheel friction (μ 1.0->1.4), and capped
   `max_angular_velocity` at 0.3 rad/s (initially 1.2, then 0.6 - still
   flipped once under combined fast-forward+fast-turn before this final cut).
 
@@ -297,14 +297,14 @@ rewriting history; read the later section for the current status.**
   the API against the *source* repo (outside the token's scope). Forked
   manually via the GitHub web UI instead.
 - `pkill -f "gz sim"` (and similar) can match the invoking shell's own
-  command line, since it literally contains the pattern text — killing the
+  command line, since it literally contains the pattern text, killing the
   shell running the command before it can report anything. Use anchored
   patterns (`pkill -f "^gz sim"`) or `pgrep`/PID-based kills instead.
-- Initial SDF had `<gravity>` nested inside `<physics>` — sdformat warns and
+- Initial SDF had `<gravity>` nested inside `<physics>`: sdformat warns and
   silently ignores it there; gravity must be a direct child of `<world>`.
 - Bowl-shaped craters viewed from a steep top-down angle with off-axis
   lighting read as domes to the human eye (verified against the raw
-  heightmap data — the crater profile was always a genuine depression). This
+  heightmap data, where the crater profile was always a genuine depression). This
   is the well-known "crater/dome" perceptual illusion seen in real lunar/Mars
   orbital imagery. Fixed by choosing a shallower camera pitch and a sun
   azimuth roughly aligned with the camera's viewing direction, rather than
@@ -331,7 +331,7 @@ rewriting history; read the later section for the current status.**
     many `<collision>` elements on one link, removing rocks, removing rock
     *collision* specifically, changing gravity magnitude, disabling
     `allow_auto_disable`, adding an 8 s `TimerAction` delay before spawning,
-    switching the ROS↔GZ `/pose` bridge from bidirectional to one-way,
+    switching the ROS<->GZ `/pose` bridge from bidirectional to one-way,
     replicating the launch file's `GZ_SIM_SYSTEM_PLUGIN_PATH` env var
     manually. None of these were the actual bug; each seemed to "fix" or
     "reproduce" the symptom in some isolated test only because the tests
@@ -581,7 +581,7 @@ re-read line-by-line), not just taken on trust.
 - **`rover.rviz`**: added Costmap, PlannedPath, and an "EKF Estimate"
   Odometry display (kept raw wheel odometry too, disabled by default so it
   doesn't visually compete with the fused estimate), an explicit Tools list
-  including "2D Goal Pose" → `/goal_pose`, and pulled the default view back
+  including "2D Goal Pose" -> `/goal_pose`, and pulled the default view back
   from `Distance: 4` to `12` so the whole local costmap is visible instead
   of just the chassis.
 - **`scripts/demo.sh` / `scripts/setup.sh`**: added upfront checks for ROS 2
@@ -923,7 +923,7 @@ matter more than raw obstacle counts.
   this wasn't the root cause.
 - **Root cause, found by testing the actual shipped tour route**: for seed
   42 with `tour_mission.py`'s fixed 5 waypoints
-  (`(0,0)→(12,8)→(18,-4)→(4,-14)→(-10,-6)→(0,0)`), only 1 of the 5 legs'
+  (`(0,0)->(12,8)->(18,-4)->(4,-14)->(-10,-6)->(0,0)`), only 1 of the 5 legs'
   straight lines crossed any lethal cell at all - the other 4 were
   completely clear. A broader random sample (200 random 10-20 m pairs, 200
   random 60-100 m pairs, well clear of the world edge) put the baseline
@@ -931,8 +931,8 @@ matter more than raw obstacle counts.
   had real obstacles fairly often, but this specific fixed waypoint set
   landed in the unlucky clear majority four times over, which is what
   produced the "basically straight" impression in practice.
-- **Fix**: raised `crater_count` 60→100, `rock_count` 130→190, and lowered
-  `spawn_zone_radius_m` 12.0→9.0 in `regolith_terrain_gen/config.py`.
+- **Fix**: raised `crater_count` 60->100, `rock_count` 130->190, and lowered
+  `spawn_zone_radius_m` 12.0->9.0 in `regolith_terrain_gen/config.py`.
   Values were chosen by measuring straight-line-blocked fraction and A*
   reachability together (not eyeballed) across seeds 7, 42, and 123: a more
   aggressive density increase (crater_count=150, rock_count=260) pushed the
@@ -944,7 +944,7 @@ matter more than raw obstacle counts.
   keeping genuine (non-goal-on-obstacle) A* failures at 0-1 per 24 sampled
   goals - the same order as baseline, not meaningfully worse.
 - **Live-verified after regenerating and relaunching** (seed 42): the
-  previously-completely-clear tour leg 1 (`(0,0)→(12,8)`, 14.1 m) now
+  previously-completely-clear tour leg 1 (`(0,0)->(12,8)`, 14.1 m) now
   produces a genuinely curved path - 1.47 m maximum perpendicular deviation
   from the straight line, not the ~0 m it had before. A farther (~74 m)
   goal still resolves to a valid 109-waypoint path, confirming A*
