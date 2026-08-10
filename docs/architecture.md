@@ -109,6 +109,15 @@ narrows this to prove the pipeline end-to-end before broadening it:
   known a priori), not from onboard perception. Sensor-derived costmaps are
   the explicit next milestone after this PoC — the rover still genuinely
   plans and navigates, it just starts from a map instead of building one.
+- **The ground is drawn from a mesh, not from the heightmap.** The same
+  surface ships twice: as `heightmap.png` for the costmap, and as
+  `terrain.obj` for Gazebo's visual. A `<heightmap>` visual is rendered by
+  Ogre-Next's Terra, whose distance LOD point-samples the terrain coarser the
+  further it is from the camera — so distant ground gets drawn below where
+  the data puts it, and the boulders standing on it hang visibly in the air
+  while every geometry test passes. A `<mesh>` has no LOD. See
+  `terrain_mesh.py`, and `test_rendered_terrain_seats_rocks.py` for the
+  screenshot-based regression test that can actually see a rendering fault.
 - Lunar gravity (1.62 m/s²) is modeled; wheel friction/damping is tuned for
   controllability rather than strict physical accuracy.
 

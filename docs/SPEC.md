@@ -58,7 +58,7 @@ Two repos, mirroring upstream Autoware's own meta-repo/universe split:
 | `regolith_vehicle_interface` | Python (ament_python) | Pure-pursuit trajectory follower — path → `cmd_vel`, goal arrival, stall/deviation detection |
 | `regolith_costmap` | Python (ament_python) | Heightmap → `OccupancyGrid` traversability costmap |
 | `regolith_planner` | Python (ament_python) | Cost-aware A* global planner, costmap → `Path` |
-| `regolith_bringup` | ament_cmake (launch/config only) | All launch files, EKF config, mission scripts, flip-recovery node |
+| `regolith_bringup` | ament_cmake (launch/config only) | All launch files, EKF config, mission scripts, flip-recovery node, start/goal markers |
 
 No C++ in the new code — everything planetary is Python, deliberately kept
 boring and readable (per `PLAN.md` §8's working agreements).
@@ -108,12 +108,14 @@ attitude exceeds a flip threshold (see §6).
 | Topic | Type | Publisher | Consumer(s) |
 |---|---|---|---|
 | `/costmap` | `nav_msgs/OccupancyGrid` | `regolith_costmap` (latched, republished 1 Hz) | `regolith_planner`, `pure_pursuit_node` |
-| `/goal_pose` | `geometry_msgs/PoseStamped` | RViz "2D Goal Pose" or `tour_mission.py` | `regolith_planner` |
+| `/goal_pose` | `geometry_msgs/PoseStamped` | RViz "2D Goal Pose" or `tour_mission.py` | `regolith_planner`, `mission_markers_node.py` |
 | `/planned_path` | `nav_msgs/Path` | `regolith_planner` | `pure_pursuit_node`, RViz |
 | `/odometry/filtered` | `nav_msgs/Odometry` | `ekf_node` | `regolith_planner`, `pure_pursuit_node`, RViz |
 | `/ground_truth/pose` | `geometry_msgs/PoseStamped` | Gazebo pose-publisher plugin | `flip_recovery_node`, RViz (comparison only, never fed into EKF) |
 | `/cmd_vel` | `geometry_msgs/Twist` | `pure_pursuit_node` (normal) / `flip_recovery_node` (during recovery) | Gazebo DiffDrive plugin |
-| `/goal_reached` | `std_msgs/Bool` | `pure_pursuit_node` | `tour_mission.py` |
+| `/goal_reached` | `std_msgs/Bool` | `pure_pursuit_node` | `tour_mission.py`, `mission_markers_node.py` |
+| `/mission_waypoints` | `nav_msgs/Path` | `tour_mission.py` (latched, once) | `mission_markers_node.py` |
+| `/mission_markers` | `visualization_msgs/MarkerArray` | `mission_markers_node.py` (latched) | RViz |
 | `/odom`, `/imu` | raw, zero-covariance | Gazebo bridge | `sensor_covariance_relay.py` only |
 | `/odom/with_covariance`, `/imu/with_covariance` | covariance-filled | `sensor_covariance_relay.py` | `ekf_node` |
 
@@ -130,7 +132,14 @@ slope (`config.py`: `TerrainConfig` dataclass holds every tunable —
 `crater_count=60`, sizes 2–40 m, `rock_count=130` across 4 low-poly
 variants, sun at 12° elevation / 235° azimuth). Outputs, per seed, to
 `~/.cache/regolith/worlds/seed_<N>/`:
-- 16-bit heightmap PNG
+- 16-bit heightmap PNG — the elevation source `regolith_costmap` plans
+  against. Note it is *not* what Gazebo draws: see below.
+- `terrain.obj` — the ground as an explicit triangle mesh in world
+  coordinates, which is the visual Gazebo renders. A `<heightmap>` visual
+  goes through Ogre-Next's Terra and is point-sampled coarser with distance,
+  so distant ground is drawn below where the data puts it and the rocks
+  standing on it visibly hang in the air. A `<mesh>` has no level of detail.
+  See `terrain_mesh.py` and PROGRESS.md's "Floating rocks, round four".
 - Gazebo SDF world (generated from a template)
 - A JSON **manifest**: crater positions/radii, rock positions/scale, spawn
   zone — the same manifest both the Gazebo world and `regolith_costmap`
@@ -213,12 +222,20 @@ All the glue:
 - `config/ekf.yaml` — see §5.
 - `scripts/sensor_covariance_relay.py` — see §5, bug #1/#2 fixes.
 - `scripts/flip_recovery_node.py` — see §6.
-- `scripts/tour_mission.py` — scripted 5-waypoint loop
-  (`(12,8)→(18,-4)→(4,-14)→(-10,-6)→(0,0)`), advances on `/goal_reached`,
+- `scripts/tour_mission.py` — 5-waypoint loop, advancing on `/goal_reached`,
   90 s per-waypoint timeout, 10 s start delay. Deliberately short legs
   (~10–20 m), **not** the full 60–100 m single-goal distance used in the M4
   acceptance check — chosen so the unattended demo doesn't gamble on the
   terrain-collision flip risk documented in §7.
+
+  The waypoints are **derived from the live `/costmap`**, not hardcoded
+  (`regolith_planner/tour.py`): each one has a clear cell neighbourhood, each
+  leg is confirmed with the same `plan_path` A* the planner node runs, and
+  legs are preferred whose straight line is blocked so the rover has to route
+  around something. Deterministic from `seed`. The previous hardcoded list
+  was fine when chosen and stopped being drivable when the terrain changed —
+  on seeds 42/7/123 it left 2–3 of 5 legs unplannable. See `PROGRESS.md`,
+  "The tour picks its own waypoints".
 
 ---
 

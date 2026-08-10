@@ -614,10 +614,10 @@ re-read line-by-line), not just taken on trust.
   M4's physics-collision flip root causes were left untouched, per the
   brief for this pass - only failure *visibility* around them was in scope,
   not the underlying physics/estimation fixes themselves.
-- **Cleanup note for future sessions**: the review agent's own standalone
+- **Cleanup note for future sessions**: this pass's own standalone
   verification runs (testing the flip-detection node in isolation) left
-  several orphaned ROS node processes running well after it reported
-  everything killed - `pkill -f "^gz sim"`/`"^ros2 launch ..."` doesn't
+  several orphaned ROS node processes running well after the teardown
+  reported everything killed - `pkill -f "^gz sim"`/`"^ros2 launch ..."` doesn't
   catch child nodes that outlive their parent launch process. Found via
   `ps aux` showing three duplicate full node sets from different launch
   times all still running and publishing on the same topics simultaneously.
@@ -1001,7 +1001,7 @@ diagnosis below is log archaeology, not a re-observed live failure**.
   publishing their own) produced a burst of "Detected jump back in time /
   Resetting RViz" and "Moved backwards in time" warnings in `rviz2`,
   `ekf_node`, and `robot_state_publisher`'s logs early in session 2 - this
-  is almost certainly the "GUI showing nothing coherent" the user saw.
+  is almost certainly the "GUI showing nothing coherent" observed at the time.
   `pure_pursuit_node`'s deviation/replan logic - which had **no retry cap or
   give-up condition** - looped "Deviated X m - stopping and replanning"
   **49,928 times** over the ~9 hour run, consistent with alternating between
@@ -1389,7 +1389,7 @@ surfaces that didn't line up.
 
 ## The rover is STILL underground - gz heightmap min/max normalization (the real cause)
 
-The user came back: the rover was *still* visibly below the surface after the two
+Reported again: the rover was *still* visibly below the surface after the two
 fixes above. Both prior "fixes" were real improvements but neither addressed the
 actual mechanism, and the "underground" section above is **wrong on one important
 point** (see the normalization bullet below). Corrected here rather than edited in
@@ -2915,3 +2915,412 @@ Seed 123 remains genuinely drift-limited at 6.1 m and would not pass on toleranc
 alone. It is also the seed that struggles most with the terrain - 14 stuck events
 against seed 42's 6 - so its extra drift is plausibly earned during recovery
 maneuvers rather than during driving.
+
+## Floating rocks, round four: the placement was right, the renderer was wrong
+
+Reported a fourth time, with the fair question of why there is a test for this and it
+keeps passing. There is, and it did, and it was not lying: **the rocks were seated
+correctly and the ground was being drawn somewhere else.**
+
+![before and after](docs/media/floating_rocks_heightmap_vs_mesh.png)
+
+### Why every test passed
+
+Rounds two and three ended with `test_rock_seating_against_rendered_png.py`, which
+reads the shipped `heightmap.png` and rock OBJs off disk and measures the gap under
+every boulder. It was green, and it was *right* - all 190 rocks are bedded 3-14 cm into
+the surface those files describe, on every seed.
+
+It could not see this bug for a reason no amount of care in a geometry test would fix:
+**the defect is in the render path, and geometry tests do not render.** The previous
+round already suspected this and named `Ogre::TerraWorkspaceListener` in the installed
+`libgz-rendering8-ogre2.so`, but stopped short of demonstrating it. This round did.
+
+### The mechanism, measured
+
+A `<heightmap>` visual in gz-sim 8 is drawn by Ogre-Next's **Terra**, a GPU terrain
+system with distance-based LOD: a terrain cell far from the camera is built by
+point-sampling the heightmap at a stride that grows with range, interpolating only
+between the posts it kept. Rocks are ordinary meshes and take no part in that, so they
+keep their exact placement while the ground beneath them is drawn from a coarser sample
+of itself.
+
+Reconstructing the ground the way Terra does - every Nth post, bilinear between - and
+re-measuring the gap under all 190 rocks:
+
+| stride | post spacing | seed 42 | seed 7 | seed 123 | worst gap |
+|---|---|---|---|---|---|
+| 1 | 0.39 m | 0/190 | 0/190 | 0/190 | seated |
+| 8 | 3.12 m | 0/190 | 0/190 | 0/190 | seated |
+| 16 | 6.25 m | 5/190 | 2/190 | 3/190 | +0.08 m |
+| 32 | 12.50 m | 25/190 | 26/190 | 29/190 | +0.47 m |
+| 64 | 25.00 m | 38/190 | 63/190 | 64/190 | **+1.12 m** |
+
+That is a third of the rock field lifting off, by up to 0.8x a boulder's own diameter,
+with nothing wrong in any file. It also explains the one loose end from last round -
+that a distance series through the *onboard* camera at 10-90 m did not reproduce a
+growing gap. Those ranges are all inside Terra's fine LOD rings; the effect lives at the
+horizon, which is exactly where the GUI screenshots showed it and the onboard camera
+never looked.
+
+### The fix: the ground is a mesh now
+
+`<heightmap>` was the only thing in the world drawn through Terra, and it was being used
+purely as a visual - collision has been a box grid since M2, because gz-physics
+implements neither heightmap nor mesh collision in this install. So the visual is now a
+`<mesh>`: `terrain_mesh.py` exports the same surface as `terrain.obj` in world
+coordinates, and `worldgen.py` points the visual at it. **A `<mesh>` has no level of
+detail in this stack** - it is drawn as authored at every range - so the class of bug is
+removed rather than tuned around.
+
+Three things fall out of it beyond the fix itself:
+
+- **The drawn surface and the tested surface are now the same artefact.** A mesh is
+  explicit triangles in absolute metres, so there is no encoding, no min/max stretch and
+  no axis convention left between what ships and what gz draws. The transpose bug from
+  round two is not possible against a mesh.
+- **`elevation_lookup` now evaluates the mesh triangles.** Everything that seats an
+  object on the ground goes through it, so it has to *be* the drawn surface. Its two
+  predecessors were each a different surface from the drawn one, and each showed up as
+  floating rocks: first the nearest heightmap post, then a bilinear sample of all posts.
+- **It is cheaper.** Measured interleaved in one session, GUI up, seed 42:
+  `<heightmap>` RTF 0.340 / 0.374 (mean **0.357**), `<mesh>` 0.405 / 0.398 (mean
+  **0.401**) - about +12%. A 33k-triangle static mesh costs less than Terra's per-frame
+  quadtree work. Physics is untouched: same collision boxes, same rock ellipsoids.
+
+`heightmap.png` is still generated and still ships - `regolith_costmap` reads it as its
+elevation source - it is simply no longer what gets drawn. `test_heightmap_orientation.py`
+still pins its transpose and z encoding, now for the costmap's sake rather than the
+renderer's.
+
+Mesh resolution is `terrain_mesh_stride = 4`, i.e. 129x129 posts at 1.56 m, 33k
+triangles, a 2.8 MB OBJ. Full resolution is not needed: the drawn surface is
+piecewise-planar over the 40x40 collision cells (12 posts each), so stride 4 still lands
+a vertex on every cell boundary. The stride table above is what sizes it - stride 4 is a
+4x margin on the first stride that lifts a rock at all.
+
+### The test that can actually see it
+
+`test_rendered_terrain_seats_rocks.py` screenshots the real Gazebo GUI - the only render
+path the bug reports have ever been about - and grades pixels.
+
+The criterion needs no model of the terrain: the terrain silhouette is the upper
+envelope of the ground, so scanning a column of the frame downwards, sky can give way to
+ground exactly once. A column reading sky, object, sky, ground has something standing
+clear of the horizon with daylight under it. The sky is the world's flat
+`<background_color>`, which renders as one exact RGB value (25, 25, 39) with no gradient
+and no dithering, so the sky mask is an equality test and not a threshold - which is
+what makes this measurable rather than eyeballed.
+
+Same seed, same pose, 1200 px wide:
+
+| | columns with a detached boulder | widest sky gap |
+|---|---|---|
+| `<heightmap>` visual | **111** / 1200 | 18 px |
+| `<mesh>` visual | **0** / 1200 | 0 px |
+
+Seeds 7 and 123 are also 0 columns in the real GUI. And per the rule this package keeps
+re-learning, the check is shown to be able to fail: a second test lifts every rock 0.5 m
+in the SDF gz is about to load and requires the detector to go red.
+
+Two things to know about it. It needs a GPU, a display and ~25 s per launch, so it is
+marked `@pytest.mark.render` and **skips** when it cannot run - a skipped render test
+means the floating-rocks regression is uncovered for that run, because nothing else in
+the suite can see a rendering fault. And the pose matters: the opening GUI camera sits
+7 m from the rover looking down at it and never sees the horizon, so it cannot show this
+bug at all. The probe stands near a corner and looks across the world's full diagonal.
+Distance is the entire mechanism.
+
+Suite: 42/42 (40 geometry + 2 render).
+
+### Honest residue
+
+- **The 2-3 px residue.** On the shipped mesh world the raw detector still finds 7
+  columns with 2-3 px "gaps" before the size thresholds are applied. Those are
+  antialiasing on a boulder's own silhouette edge, not floats - they sit against 111
+  columns and 18 px gaps for a genuinely floating field, and the thresholds
+  (`MIN_OBJECT_PX = 3`, `MIN_SKY_GAP_PX = 4`) are set in that gap rather than tuned to
+  make a number come out. Worth knowing they exist rather than discovering them later.
+- **Terra's exact LOD schedule was not read out of the renderer.** The stride table is a
+  reconstruction of what a distance-LOD does to this surface, and it predicts the right
+  magnitude and the right distance dependence. The direct evidence is the before/after
+  screenshot pair: same world, same camera, one line of SDF changed, 111 columns -> 0.
+  That is what closes it, not the model.
+- **Not investigated:** the eye-level sensor-camera frames from last round that came out
+  with the near ground missing and 100% background below the horizon. That was recorded
+  as unexplained, it is consistent with a terrain LOD tree built around a different
+  camera, and it should be re-checked now that Terra is out of the picture - but it was
+  not re-checked in this round.
+- Headless server-side camera sensors **segfault** in this environment right now
+  (`gz sim -s -r` with a `<camera>` and `<save>`, and the same on the stock
+  `camera_sensor.sdf`), which is why the new test drives the GUI. Not chased - the GUI
+  is the better oracle here anyway.
+
+## Start and goal flags in both windows
+
+Asked for a way to see where the rover started and where it is going, in Gazebo and in
+RViz. `mission_markers_node.py` (new, `regolith_bringup`) puts the same three things in
+both views, on the `markers:=true` launch arg (default on):
+
+![start and goal flags](docs/media/mission_flags.png)
+
+- **START**, green, at the manifest's spawn point.
+- **Each planned waypoint**, amber and numbered, if the running mission publishes its
+  route. `tour_mission.py` now latches its 5 waypoints on `/mission_waypoints` so the
+  whole loop is visible from the start instead of appearing one leg at a time.
+- **The active goal**, red and taller, following whatever was last seen on `/goal_pose`.
+  This is the only marker an ad-hoc goal gets - RViz's "2D Goal Pose" tool and the M4
+  harness both publish a goal with no route behind it.
+
+RViz gets the same set as a labelled `MarkerArray` on `/mission_markers` (latched, so it
+survives RViz starting late), where a marker can be recoloured live: pending amber,
+`G3 ACTIVE` red, `G3 done` blue once `/goal_reached` fires.
+
+**The flags have no `<collision>`.** On a rover whose headline known issue is wedging
+itself on boulders, a decoration it can wedge itself on would be a new failure mode
+invented by a debugging aid. A test asserts the absence rather than trusting it.
+
+### Which frame, and why it is worth knowing
+
+Goals are published in `odom`; the Gazebo flags stand in the world frame. The two share
+an origin at the spawn point, so a flag marks the goal's true world position - while the
+rover's *estimate* of where it is drifts (M4 measured 4.3 m after one wedging event). So
+a rover parked visibly short of a flag while announcing the goal reached is not a
+misplaced flag; it is the localisation error, drawn to scale. Placing the flags this way
+round makes that visible instead of hiding it, which is why they are not simply drawn
+wherever the EKF currently believes the goal to be.
+
+### Two things this turned up
+
+- **The RViz config opened with every display switched off.** rviz2 loads a display
+  whose entry omits `Enabled:` but leaves its checkbox clear, and `rover.rviz` omitted it
+  on all nine. The 3D view was blank and every box unticked - which is exactly the
+  "incidental, not investigated" observation recorded at the end of the third
+  floating-rocks round. It was this, and it is fixed: every display now carries an
+  explicit `Enabled:`, and the default view was widened from 12 m to 45 m because the
+  tour's waypoints reach ~18 m out and sat outside the opening frame.
+- **The tour's fixed waypoints land on lethal costmap cells.** Measured directly against
+  `build_costmap` at the shipped settings: **seed 42 waypoint 1, seed 7 waypoint 2, seed
+  123 waypoints 2 and 3.** The planner refuses them ("Goal cell (138, 143) is lethal -
+  pick another goal") and the leg is skipped after the 90 s timeout. The waypoint list
+  is a hardcoded constant chosen before res40 and before rock collision started working,
+  so this is fallout from the terrain getting harder, not from the markers. **Not
+  fixed** - a correct fix picks waypoints per seed against that seed's costmap, which is
+  a mission-design change that needs its own validation, not a tweak to five numbers.
+  The flags make it obvious rather than leaving it as an unexplained stall.
+
+### Verified
+
+Launched `hello_moon.launch.py mission:=tour seed:=42` and read back the running world:
+all 6 flags present in `gz model --list` (start plus 5 waypoints), the active flag
+created and then moved by `set_pose` on subsequent goals, and both windows screenshotted
+above. `regolith_bringup` suite 30/30.
+
+One bug worth recording because the failure was silent: the first version placed flags
+the moment the waypoint list arrived, which is ~20 s before gz will accept an entity -
+the create calls were rejected, nothing logged it, and only the active flag (requested
+later) ever appeared. Placement is now a pending queue retried on a 2 s timer, and a
+flag that is still being refused after 15 attempts says so in the log.
+
+## The tour picks its own waypoints, from the costmap it will be planned on
+
+The previous section recorded that the scripted tour's five hardcoded waypoints had
+drifted onto lethal costmap cells and left the demo sitting still. Fixed properly: the
+route is now **derived from the live `/costmap`** by `regolith_planner/tour.py`, and
+`tour_mission.py` no longer contains any coordinates at all.
+
+The hardcoded list was not careless - it was correct when it was written. It stopped
+being correct when the terrain went to res40 and rock collision started working, and
+nothing re-examined it, because nothing could: a constant has no way to notice that the
+world moved underneath it.
+
+### What the old route was actually doing
+
+Measured against `build_costmap` at the shipped settings (1.0 m cells, 0.3 m rover
+radius, 20 deg lethal slope), with legs judged by the same `plan_path` A* the planner
+node runs:
+
+| seed | route | waypoints on lethal cells | legs plannable | legs needing avoidance |
+|---|---|---|---|---|
+| 42 | old | 1 | **3/5** | 2/5 |
+| 42 | new | 0 | **5/5** | 5/5 |
+| 7 | old | 1 | **3/5** | 2/5 |
+| 7 | new | 0 | **5/5** | 5/5 |
+| 123 | old | 2 | **2/5** | 4/5 |
+| 123 | new | 0 | **5/5** | 4/5 |
+
+Two of five legs plannable means most of an unattended demo was the rover standing still
+waiting out a 90 s timeout on a goal the planner had already refused.
+
+### How a leg is chosen
+
+Rejection sampling in a 10-20 m annulus around the previous waypoint, deterministic from
+the seed, keeping the first candidate that survives, cheapest test first:
+
+- **Plannable.** The cell *and its eight neighbours* must be non-lethal - `planner_node`
+  snaps a goal to a cell centre, so a clear cell in a lethal neighbourhood is not
+  reliably plannable - and then `plan_path` must actually find a route to it. That is
+  the planner itself, not a proxy for it: a flood fill answers "connected", which is a
+  weaker question than the one that matters.
+- **Worth driving.** The straight line from the previous waypoint has to cross something
+  lethal, or the leg is a drive across open regolith that exercises no avoidance at all.
+  This is the property the old list was *trying* to have - `config.py`'s terrain-density
+  note records the shipped route crossing an obstacle on only 1 of 5 legs.
+- **A tour, not a wander.** Legs stay in the 10-20 m band (short legs are a deliberate
+  flip-risk choice, see `tour_mission.py`), waypoints keep 8 m from each other, and
+  nothing goes beyond 30 m from spawn.
+
+### Two things worth knowing about the design
+
+- **It subscribes to `/costmap` rather than rebuilding it.** Rebuilding from the manifest
+  would mean a second copy of the resolution, rover radius and slope threshold that
+  `hello_moon.launch.py` passes to `costmap_node`, and any drift between the two copies
+  would validate the tour against a costmap that is not the one in play. This project
+  has been bitten repeatedly by exactly that shape of bug - two things agreeing with each
+  other through a convention neither of them shares with reality - so the route is drawn
+  on the same grid object the planner will use, by construction.
+- **Relaxations are reported, never absorbed.** If no candidate leg has a blocked
+  straight line, or none leaves the rover within one leg of home, the requirement is
+  given up in a fixed order and the node logs exactly what was surrendered. A tour that
+  exercises no avoidance must not look like one that does. Seed 2 needs this (2 of its
+  legs cross open ground and say so); seeds 42, 7, 123 and 99 need none of it.
+
+`MAX_RANGE_M = 30` exists because of a measured failure, not a hunch: without it, four
+legs of up to 20 m walked seed 2's route 50+ m out, no single leg could bring it home,
+and the tour ended with a 37.6 m final leg - well outside the band the short-leg design
+exists to stay inside.
+
+### Tests
+
+`regolith_planner/test/test_tour.py` (10 tests) pins the behaviour on synthetic grids
+whose answer is known by construction. `regolith_bringup/test/test_tour_route_is_drivable.py`
+is the one that would have caught the original defect: it generates terrain from scratch
+for seeds 42/7/123, builds the real costmap, and asserts every waypoint is plannable and
+every leg has a path. It also **guards the guard** - a final test asserts the old
+hardcoded waypoints still land on lethal cells, so if these checks ever stop being able
+to fail, that test goes red instead of the suite quietly passing.
+
+Suites: `regolith_planner` 16/16, `regolith_bringup` 43/43.
+
+One thing the flags caught about themselves, once the route started returning to spawn
+by construction: `mission_flag_wp_5` and `mission_flag_start` sat at the same point with
+identical geometry and z-fought, so the green START flag rendered amber in Gazebo -
+whichever banner won was arbitrary. A waypoint that coincides with the start no longer
+gets its own flag, and RViz labels that one marker `START / FINISH`.
+
+### The live run, and what it exposed next
+
+Launched `hello_moon.launch.py mission:=tour seed:=42` on the finished route. The route
+half worked exactly as designed and the drive found the next problem.
+
+**Route: confirmed.** `(14.7, 11.2) -> (17.7, -0.7) -> (5.1, 14.4) -> (-4.1, 18.8) ->
+(0, 0)`, identical across three separate launches. The planner accepted waypoint 1 -
+the goal it used to refuse outright on this seed - and planned a 20-cell path to it.
+Zero lethal rejections in the whole log, against one on the first goal previously.
+
+**Drive: waypoint 1 timed out.** The rover wedged three times in a boulder cluster ~8 m
+along the leg. Each time the stuck detector fired (once on onboard wheel slip, twice on
+ground truth), marked a keep-out zone, and the escape maneuver freed it - **3/3 escapes
+succeeded**, moving 0.52, 1.25 and 1.82 m - but not fast enough to reach the goal inside
+the 90 s per-waypoint budget.
+
+That is not the route being wrong, and it is not new: wedging on rocky terrain is this
+project's headline known issue. But the route selection *shares* the blame, and
+measuring it turned up something worth recording.
+
+**Every leg is one costmap cell wide at its tightest.** Path clearance measured over the
+chosen routes, seeds 42/7/123, as the minimum distance from any path cell to the nearest
+lethal cell: **13 of 15 legs pinch to 0.78 m - exactly one cell.** The costmap inflates
+obstacles by the 0.3 m rover radius, so a single free cell is passable *on paper*. The
+chassis is 0.4 m plus wheels and it skid-steers, which needs to slew inside the gap it
+is threading. That is how a "plannable" leg wedges a rover three times.
+
+Selecting for legs whose straight line is blocked - which is what makes a leg worth
+driving - actively steers into this. So candidates that pass every hard requirement are
+now **pooled (8) and the one with the widest pinch point wins**, rather than taking the
+first that passes. Measured across seeds 42/7/123/1/2/3/99, legs pinching to a single
+cell drop from **27/35 to 17/35**, and seed 3's tour goes to 0/5. It costs ~0.15 s at
+startup and it does not solve the problem: the *tightest* leg of the tour is still
+0.78 m on 6 of the 7 seeds. At this cell size and rock density, a 10-20 m leg that
+crosses an obstacle almost always has a one-cell throat somewhere.
+
+**The lever that would actually fix it, untried and deliberately not guessed at:** the
+costmap's `rover_radius_m` is 0.3 m against a rover roughly 0.5 m across the wheels. A
+larger inflation would stop the planner offering throats the rover cannot thread. It is
+a one-parameter change and it is *not* free - it makes goals unreachable that are
+currently reachable, and it would move the M4 acceptance numbers - so it needs its own
+measured run rather than being folded into this one.
+
+All seven seeds re-validated after the pooling change: 5 waypoints, none lethal, every
+leg plannable, longest leg <= 19.9 m, all returning to spawn.
+
+## Retraction: the inflation lever does nothing, and the stall is not an obstacle
+
+The previous section named the costmap's `rover_radius_m` as "the lever that would
+actually fix" the wedging that timed out the tour's first leg. **That is wrong, and it
+is wrong twice over.** Measuring it before turning it is what showed that.
+
+### The parameter cannot change anything
+
+```
+inflation_cells = max(1, int(round(rover_radius_m / actual_resolution_m)))
+```
+
+At the shipped 0.781 m/cell, **every `rover_radius_m` from 0 to 0.78 m gives the same
+single cell of inflation.** 0.30 and 0.35 and 0.50 are the same number. Nothing below
+1.17 m moves it off 1 cell. The knob is not connected to anything in its plausible
+range.
+
+### And it is already generous, not tight
+
+The rover's footprint, from `regolith_rover_description`, is 0.46 m wheel separation +
+0.06 m wheel width = **0.52 m wide**, and 0.28 m wheelbase + 2 x 0.09 m wheel radius =
+**0.46 m long**. For a skid-steer machine that turns in place the number that matters is
+the circumscribed radius, **0.347 m**. The map inflates by 0.78 m - more than twice
+that. The previous section's "roughly 0.5 m across the wheels" was the rover's *width*
+being read as if it were a radius. Under-inflation was never the problem.
+
+### What the stall actually was
+
+All three wedge points, measured against the terrain that produced them:
+
+| | wedge 1 | wedge 2 | wedge 3 |
+|---|---|---|---|
+| position | (6.20, 6.20) | (6.42, 5.49) | (5.16, 5.57) |
+| distance from spawn | 8.77 m | 8.45 m | 7.59 m |
+| costmap cost (lethal = 100) | **8** | **8** | **8** |
+| nearest rock | 6.73 m | 6.73 m | 6.73 m |
+| nearest collision-box seam | 1.61 m | 1.39 m | 2.04 m |
+
+Every one of them is **inside the 9 m spawn zone**, which the generator keeps clear of
+rocks and craters by construction. Cost 8 out of 100 is benign, gentle ground. None is
+near a collision-box seam (cells are 4.69 m; all three are mid-cell).
+
+And the wheel-slip detector says what the rover was doing:
+
+> over the last 15.0 s the wheels claim **2.76 m and 0.00 rad of turning**; the gyro saw
+> 0.00 rad (101% of it) and the attitude spanned **0.18 deg**
+
+Driving **straight**, on **flat, obstacle-free ground**, wheels turning, body not
+moving. That is not a boulder, not a tight corridor, and not a tight-turn friction lock
+either - the previously recorded stall mode was specifically *tight skid-steer turns*,
+and there is no turning here at all. It is a traction failure on benign terrain, and it
+is **not root-caused**. Recorded as an open question with its evidence rather than
+guessed at.
+
+This also means the corridor-width pooling added in the previous section did not fix
+this stall and was never going to. It stays because it is an improvement on its own
+terms (one-cell pinches 27/35 -> 17/35 across seven seeds), but it is not the answer to
+that leg timing out, and the previous section should not be read as claiming it is.
+
+### The one real defect this turned up
+
+`round` on a safety margin spends the margin. At the shipped resolution it happens to
+give the right answer, but at a 0.25 m costmap a 0.30 m rover got **one 0.25 m cell** -
+a planner routing a corner of the machine through a boulder. Changed to `ceil`, which is
+what a clearance margin means. Verified a no-op at the shipped settings on seeds
+42/7/123 (round and ceil both give 1 cell), so **every number recorded in this document
+stands unchanged** - and `test_inflation_covers_the_rover.py` now pins that: the margin
+covers the radius at every resolution, the fix is a no-op at the shipped one, and the
+parameter's inertness across its plausible range is asserted rather than left to be
+rediscovered. `regolith_costmap` suite 52/52.

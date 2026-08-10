@@ -4,9 +4,8 @@
 /install/
 /log/
 
-# local tooling / internal execution brief, not part of the published project
+# internal planning notes, not part of the published project
 # (PROGRESS.md and ARCHITECTURE.md are tracked deliverables, not excluded)
-.claude/
 PLAN.md
 
 # Python bytecode from running scripts/ directly

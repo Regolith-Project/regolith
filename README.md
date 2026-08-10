@@ -117,7 +117,7 @@ cd regolith
 ./scripts/setup.sh
 
 # Launch the full demo: terrain generation, rover spawn, localisation,
-# navigation, and a scripted 5-waypoint tour
+# navigation, and a 5-waypoint tour chosen from the terrain's own costmap
 ./scripts/demo.sh
 ```
 
