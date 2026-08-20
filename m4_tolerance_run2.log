@@ -1,0 +1,125 @@
+=== goal_tolerance_m experiment -> m4_tolerance_run2 ===
+seeds: 42 7 123   tolerances: 1.00 0.35
+Tue Aug 18 11:35:54 AM BST 2026
+
+=== seed 42, goal_tolerance_m=1.00 - 11:35:54 ===
+Results -> m4_tolerance_run2/seed42_tol1.00
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=100
+[seed 42] FAIL_FALSE_ARRIVAL - ground truth 5.7 m from the goal after 133.9 m travelled, EKF divergence 5.2 m, 8 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+    42   FAIL_FALSE_ARRIVAL      5.7m     133.9m     5.2m      8      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 42: claimed arrival at 5.7 m true error
+=== seed 42, tolerance 1.00 finished (12:44:11) ===
+
+=== seed 42, goal_tolerance_m=0.35 - 12:44:21 ===
+Results -> m4_tolerance_run2/seed42_tol0.35
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=12
+[seed 42] FAIL_FALSE_ARRIVAL - ground truth 7.8 m from the goal after 99.2 m travelled, EKF divergence 7.5 m, 5 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+    42   FAIL_FALSE_ARRIVAL      7.8m      99.2m     7.5m      5      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 42: claimed arrival at 7.8 m true error
+=== seed 42, tolerance 0.35 finished (13:40:59) ===
+
+=== seed 7, goal_tolerance_m=1.00 - 13:41:09 ===
+Results -> m4_tolerance_run2/seed7_tol1.00
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=84
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.5 m from the goal after 103.9 m travelled, EKF divergence 0.6 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7   FAIL_FALSE_ARRIVAL      1.5m     103.9m     0.6m      7      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.5 m true error
+=== seed 7, tolerance 1.00 finished (14:39:59) ===
+
+=== seed 7, goal_tolerance_m=0.35 - 14:40:12 ===
+Results -> m4_tolerance_run2/seed7_tol0.35
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=22
+[seed 7] PASS - ground truth 1.5 m from the goal after 103.2 m travelled, EKF divergence 0.6 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7                 PASS      1.5m     103.2m     0.6m      7      0
+=== seed 7, tolerance 0.35 finished (15:41:16) ===
+
+=== seed 123, goal_tolerance_m=1.00 - 15:41:26 ===
+Results -> m4_tolerance_run2/seed123_tol1.00
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=52
+[seed 123] ABORT_WALL_CLOCK_CAP - ground truth 60.3 m from the goal after 5.8 m travelled, EKF divergence 0.2 m, 2 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+   123 ABORT_WALL_CLOCK_CAP     60.3m       5.8m     0.2m      2      0
+=== seed 123, tolerance 1.00 finished (18:56:36) ===
+
+=== seed 123, goal_tolerance_m=0.35 - 18:56:46 ===
+Results -> m4_tolerance_run2/seed123_tol0.35
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=43
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 10.8 m from the goal after 94.6 m travelled, EKF divergence 10.5 m, 9 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+   123   FAIL_FALSE_ARRIVAL     10.8m      94.6m    10.5m      9      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 10.8 m true error
+=== seed 123, tolerance 0.35 finished (19:51:17) ===
+
+=== all runs finished - Tue Aug 18 07:51:27 PM BST 2026 ===
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "gt_error_m": 10.769231004225098,
+    "divergence_m": 10.471593066821432,
+    "verdict": "ABORT_WALL_CLOCK_CAP",
+    "gt_error_m": 60.26643144645402,
+    "divergence_m": 0.154529302058066,
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "gt_error_m": 7.761371404840388,
+    "divergence_m": 7.4691108582564185,
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "gt_error_m": 5.691478504937548,
+    "divergence_m": 5.200797801715548,
+    "verdict": "PASS",
+    "gt_error_m": 1.4717073667506868,
+    "divergence_m": 0.6220881467295777,
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "gt_error_m": 1.5256483811707893,
+    "divergence_m": 0.5564806967977547,

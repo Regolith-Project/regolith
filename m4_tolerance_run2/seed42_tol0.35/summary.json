@@ -1,0 +1,50 @@
+[
+  {
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "goal": [
+      -84.52,
+      -13.39
+    ],
+    "gt_final": [
+      -77.29170146980329,
+      -10.563237462709303
+    ],
+    "ekf_final": [
+      -84.28626013141377,
+      -13.183116494690303
+    ],
+    "gt_error_m": 7.761371404840388,
+    "divergence_m": 7.4691108582564185,
+    "gt_travelled_m": 99.16691773114893,
+    "ekf_travelled_m": 101.50295869859488,
+    "max_roll_deg": 6.342267050484628,
+    "max_pitch_deg": 16.055937716038102,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": true,
+    "goal_reached_gt_error_m": 7.782632338276699,
+    "wall_time_s": 3105.649761212,
+    "sim_time_s": 761.6800000000001,
+    "seed": 42,
+    "goal_validation": {
+      "goal": [
+        -84.52,
+        -13.39
+      ],
+      "cell": [
+        110,
+        19
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 85.57407609784636
+    },
+    "straight_line_m": 85.57407609784636,
+    "stuck_events": 5,
+    "flip_events": 0,
+    "log": "m4_tolerance_run2/seed42_tol0.35/seed_42_launch.log",
+    "trace": "m4_tolerance_run2/seed42_tol0.35/seed_42_trace.csv",
+    "started": "2026-08-18 12:44:22"
+  }
+]

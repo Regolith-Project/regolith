@@ -1,0 +1,50 @@
+[
+  {
+    "verdict": "PASS",
+    "goal": [
+      -42.57,
+      -59.25
+    ],
+    "gt_final": [
+      -41.74061007915008,
+      -58.034255399954084
+    ],
+    "ekf_final": [
+      -41.98180518419476,
+      -58.60768245163889
+    ],
+    "gt_error_m": 1.4717073667506868,
+    "divergence_m": 0.6220881467295777,
+    "gt_travelled_m": 103.22146257220209,
+    "ekf_travelled_m": 97.94125131739608,
+    "max_roll_deg": 7.209300829862254,
+    "max_pitch_deg": 12.770178321151384,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": false,
+    "goal_reached_gt_error_m": null,
+    "wall_time_s": 3295.808162648,
+    "sim_time_s": 682.4200000000001,
+    "seed": 7,
+    "goal_validation": {
+      "goal": [
+        -42.57,
+        -59.25
+      ],
+      "cell": [
+        52,
+        73
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 72.95729846972131
+    },
+    "straight_line_m": 72.95729846972131,
+    "stuck_events": 7,
+    "flip_events": 0,
+    "log": "m4_tolerance_run2/seed7_tol0.35/seed_7_launch.log",
+    "trace": "m4_tolerance_run2/seed7_tol0.35/seed_7_trace.csv",
+    "started": "2026-08-18 14:40:12"
+  }
+]

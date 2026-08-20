@@ -1,0 +1,60 @@
+=== replicates -> m4_replicates (3 per cell) ===
+Tue Aug 18 07:52:16 PM BST 2026
+
+=== seed 123, tol 1.00, rep 1 - 19:52:16 ===
+Results -> m4_replicates/seed123_tol1.00_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=8
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 11.2 m from the goal after 94.1 m travelled, EKF divergence 10.3 m, 9 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+   123   FAIL_FALSE_ARRIVAL     11.2m      94.1m    10.3m      9      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 11.2 m true error
+=== finished 20:43:02 ===
+
+=== seed 7, tol 1.00, rep 2 - 20:43:12 ===
+Results -> m4_replicates/seed7_tol1.00_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=67
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.6 m from the goal after 103.1 m travelled, EKF divergence 0.6 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7   FAIL_FALSE_ARRIVAL      1.6m     103.1m     0.6m      7      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.6 m true error
+=== finished 21:25:19 ===
+
+=== seed 7, tol 0.35, rep 2 - 21:25:29 ===
+Results -> m4_replicates/seed7_tol0.35_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=47
+[seed 7] PASS - ground truth 1.5 m from the goal after 103.3 m travelled, EKF divergence 0.7 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7                 PASS      1.5m     103.3m     0.7m      7      0
+=== finished 22:06:52 ===
+
+=== seed 7, tol 1.00, rep 3 - 22:07:02 ===
+Results -> m4_replicates/seed7_tol1.00_rep3
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=81

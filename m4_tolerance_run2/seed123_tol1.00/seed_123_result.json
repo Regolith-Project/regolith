@@ -1,0 +1,27 @@
+{
+  "verdict": "ABORT_WALL_CLOCK_CAP",
+  "goal": [
+    -53.01,
+    -32.34
+  ],
+  "gt_final": [
+    -2.9014758856423786,
+    1.1440046943459685
+  ],
+  "ekf_final": [
+    -2.7667261739043862,
+    1.219647409666619
+  ],
+  "gt_error_m": 60.26643144645402,
+  "divergence_m": 0.154529302058066,
+  "gt_travelled_m": 5.832071143725748,
+  "ekf_travelled_m": 5.629371011525417,
+  "max_roll_deg": 1.281569497165553,
+  "max_pitch_deg": 2.1346298095735,
+  "path_planned": true,
+  "goal_publishes": 2,
+  "goal_reached_published": false,
+  "goal_reached_gt_error_m": null,
+  "wall_time_s": 10800.189967976,
+  "sim_time_s": 55.4
+}

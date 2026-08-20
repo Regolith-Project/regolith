@@ -1,0 +1,35 @@
+{
+  "verdict": "ABORT_INTERRUPTED",
+  "goal": [
+    -42.57,
+    -59.25
+  ],
+  "gt_final": [
+    -12.719597463459012,
+    -47.955958021155745
+  ],
+  "ekf_final": [
+    -13.290810373349553,
+    -48.32133855489302
+  ],
+  "gt_error_m": 31.915543482971255,
+  "divergence_m": 0.6780760450419655,
+  "gt_travelled_m": 64.90559593560018,
+  "ekf_travelled_m": 61.21886659247274,
+  "sim_time_s": 409.44,
+  "verdict_gt_error_m": null,
+  "stopped_gt_error_m": 31.915543482971255,
+  "stopped_gt_pos": [
+    -12.719597463459012,
+    -47.955958021155745
+  ],
+  "settled_reason": "interrupted",
+  "settle_sim_s": null,
+  "max_roll_deg": 4.19471937254115,
+  "max_pitch_deg": 7.423567235402153,
+  "path_planned": true,
+  "goal_publishes": 2,
+  "goal_reached_published": false,
+  "goal_reached_gt_error_m": null,
+  "wall_time_s": 1760.2758725620006
+}

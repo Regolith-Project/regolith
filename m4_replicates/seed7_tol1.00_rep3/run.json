@@ -1,0 +1,16 @@
+{
+  "started": "2026-08-18 22:07:02",
+  "seeds": [
+    7
+  ],
+  "arrival_bar_m": 1.5,
+  "goal_tolerance_m": 1.0,
+  "sim_timeout_s": 1800.0,
+  "sensor_suite": "wheel odometry + IMU",
+  "localization_oracle": false,
+  "milestone_result": true,
+  "git": {
+    "regolith": "aec4964-dirty",
+    "regolith.universe": "5968d029d-dirty"
+  }
+}

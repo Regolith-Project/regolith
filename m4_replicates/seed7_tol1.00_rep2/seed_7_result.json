@@ -1,0 +1,35 @@
+{
+  "verdict": "FAIL_FALSE_ARRIVAL",
+  "goal": [
+    -42.57,
+    -59.25
+  ],
+  "gt_final": [
+    -41.60918505569667,
+    -58.03214190696804
+  ],
+  "ekf_final": [
+    -41.91495022963237,
+    -58.53452650506132
+  ],
+  "gt_error_m": 1.551239405108072,
+  "divergence_m": 0.5881178674324328,
+  "gt_travelled_m": 103.09432669693379,
+  "ekf_travelled_m": 97.81002661323879,
+  "sim_time_s": 681.54,
+  "verdict_gt_error_m": 1.551239405108072,
+  "stopped_gt_error_m": 1.551239405108072,
+  "stopped_gt_pos": [
+    -41.60918505569667,
+    -58.03214190696804
+  ],
+  "settled_reason": "verdict is terminal",
+  "settle_sim_s": 0.0,
+  "max_roll_deg": 5.272313765904841,
+  "max_pitch_deg": 14.751619771379488,
+  "path_planned": true,
+  "goal_publishes": 2,
+  "goal_reached_published": true,
+  "goal_reached_gt_error_m": 1.5698773875180325,
+  "wall_time_s": 2520.006888172
+}

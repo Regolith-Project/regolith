@@ -1,0 +1,27 @@
+{
+  "verdict": "FAIL_FALSE_ARRIVAL",
+  "goal": [
+    -42.57,
+    -59.25
+  ],
+  "gt_final": [
+    -41.52583553285526,
+    -58.1376495388047
+  ],
+  "ekf_final": [
+    -41.91528975136117,
+    -58.5351368689128
+  ],
+  "gt_error_m": 1.5256483811707893,
+  "divergence_m": 0.5564806967977547,
+  "gt_travelled_m": 103.91838272215136,
+  "ekf_travelled_m": 98.5058775130812,
+  "max_roll_deg": 5.256437436740693,
+  "max_pitch_deg": 17.9577489230634,
+  "path_planned": true,
+  "goal_publishes": 2,
+  "goal_reached_published": true,
+  "goal_reached_gt_error_m": 1.5387754157966784,
+  "wall_time_s": 3228.8487916290005,
+  "sim_time_s": 683.16
+}
