@@ -10,7 +10,7 @@ Thank you for your interest in contributing to Regolith! We're building open-sou
 
 ### Suggesting Features
 - Open an issue tagged `enhancement`
-- Describe the use case — what problem does this solve for rover autonomy?
+- Describe the use case - what problem does this solve for rover autonomy?
 
 ### Code Contributions
 1. Fork the repository
@@ -20,7 +20,7 @@ Thank you for your interest in contributing to Regolith! We're building open-sou
 5. Submit a Pull Request with a clear description
 
 ### Documentation
-Documentation improvements are always welcome — from fixing typos to writing tutorials.
+Documentation improvements are always welcome - from fixing typos to writing tutorials.
 
 ## Development Setup
 
@@ -43,4 +43,4 @@ By contributing, you agree that your contributions will be licensed under the Ap
 
 ## Questions?
 
-Open an issue or reach out — we're happy to help you get started.
+Open an issue or reach out - we're happy to help you get started.

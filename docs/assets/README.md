@@ -2,7 +2,7 @@
 
 Place the Regolith logo files here:
 
-- `regolith_logo_slogan.png` — logo with "Open-Source Rover Autonomy" tagline (used in README)
-- `nlnet_banner.png` — NLnet / NGI Zero funding acknowledgement banner
+- `regolith_logo_slogan.png` - logo with "Open-Source Rover Autonomy" tagline (used in README)
 
-These are referenced by the main README.md.
+This file is referenced by the main README.md and is **not currently present**,
+so the README's header image does not render on GitHub.

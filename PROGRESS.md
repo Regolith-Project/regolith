@@ -11,8 +11,8 @@ component reuse log.
 | M0: Environment verified | Done |
 | M1: Procedural lunar terrain | Done |
 | M2: Rover spawns and drives (teleop) | Done |
-| M3: Localization | **Done**. The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4%, within the <5% target |
-| M4: Autonomous navigation | **Not met: 0/3, and the reason is measured.** True error is 3.1-13.1 m, and on every seed it equals the EKF's drift plus the stopping tolerance - the rover arrives exactly where it believes the goal is. Recovery works (26/26 wedges escaped), zero flips, no intervention. The **same build with a 0.5 m / 1 Hz absolute position reference passes 3/3 at 1.48 m** (an experiment, not a milestone result), so planning, control and recovery all meet the bar - what is missing is any exteroceptive observation of position. ~10% of the rover's motion is lateral slip that neither wheel odometry nor an IMU can represent. **M4's 1.5 m bar is not achievable within the PoC's declared sensor scope**; see "M4, final" below |
+| M3: Localisation | **Done, on isolated legs.** The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4% on isolated wheel-odom+IMU+EKF legs, within the <5% target. In full autonomous runs it is 0.4-0.7% of distance on the two well-behaved seeds and 5-11% on seed 123, and it varies by an order of magnitude between repeats of the same seed - see "The stopping tolerance, measured" below |
+| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. In the latest matched campaign (nine recorded runs, one build, same three goals): seed 7 passes at 1.46-1.47 m with `goal_tolerance_m` tightened to 0.35 m and fails at 1.53-1.55 m with the shipped 1.0 m (2 matched pairs out of 2); seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal; seed 123 is drift-limited at 10.3-10.5 m. **Run-to-run drift variance is an order of magnitude larger than the stopping tolerance is worth**, so both "1/3" and "0/3" are single-sample statements. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" below |
 | M5: Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -34,7 +34,7 @@ component reuse log.
 - `regolith.universe` created as a genuine GitHub fork of
   `autowarefoundation/autoware_universe` (fork relationship + full history on
   `main` preserved; only `main` branch copied, not every upstream branch/tag).
-- **M3 localization uses `robot_localization`'s `ekf_node`, not Autoware's
+- **M3 localisation uses `robot_localization`'s `ekf_node`, not Autoware's
   `ekf_localizer`**: the plan asked to check `ekf_localizer` first. It isn't
   present anywhere in this fork's checked-out `autoware_universe` tree at all
   (not under `localization/`, not referenced in any `.repos` file) - it's
@@ -100,7 +100,7 @@ component reuse log.
 - New package `regolith_terrain_gen` (`planetary/regolith_terrain_gen` in
   `regolith.universe`): fBm base (value noise, no external noise library) +
   power-law crater field (60 craters, 2-40 m diameters, bowl+rim profile) +
-  1.5° regional slope, normalized to a 10 m height range on a 513x513
+  1.5° regional slope, normalised to a 10 m height range on a 513x513
   heightmap over a 200x200 m world. 130 rocks (4 low-poly icosphere-derived
   variants) scattered outside a 12 m spawn-zone keep-out, seated on the
   actual terrain elevation at their position. Everything needed for M4's
@@ -146,7 +146,7 @@ component reuse log.
 
 **Status: infrastructure complete and working; the <5% drift target is not
 reliably met.** Recording this honestly rather than as a clean pass, per the
-plan's own framing that drift is expected and worth visualizing, not hidden.
+plan's own framing that drift is expected and worth visualising, not hidden.
 
 - New `regolith_bringup/launch/localization_demo.launch.py`,
   `config/ekf.yaml`, and `scripts/sensor_covariance_relay.py`: fuses wheel
@@ -184,11 +184,11 @@ plan's own framing that drift is expected and worth visualizing, not hidden.
      noise-free here).
 - After fix 3 was in place, yaw tracking is excellent: EKF yaw matched
   ground truth to 4+ decimal places in every test run, including after
-  sustained combined forward+turn maneuvers.
+  sustained combined forward+turn manoeuvres.
 - Position tracking improved enormously from the pre-fix state (which was
   wrong by 60-190%, including one run where the estimate ended up hundreds
   of metres from a ground truth a few metres away) but still shows
-  20-45% position drift relative to distance traveled across several test
+  20-45% position drift relative to distance travelled across several test
   runs at moderate speed (0.2-0.35 m/s) with gentle turning, well above the
   plan's <5% target. Isolated causes, in descending order of confidence:
   - **Genuine, speed-dependent wheel slip**: at 0.1 m/s pure-straight
@@ -199,7 +199,7 @@ plan's own framing that drift is expected and worth visualizing, not hidden.
     friction coefficients, so wheel slip under acceleration is a real,
     physically-motivated effect here, not obviously a bug - though it may
     be exaggerated by this PoC's simplified friction/contact model.
-  - **An unresolved residual EKF integration behavior**: in one clean
+  - **An unresolved residual EKF integration behaviour**: in one clean
     straight-line test after all three fixes above, wheel odometry itself
     overshot ground truth (as expected from the slip effect), but the
     EKF's fused position *undershot* by a similar margin in the opposite
@@ -208,10 +208,10 @@ plan's own framing that drift is expected and worth visualizing, not hidden.
     within this milestone's time budget; flagged for follow-up rather than
     chased further as an increasingly expensive debugging session.
   - One test run also showed the rover itself flip mid-drive during a
-    150-second sustained aggressive maneuver (ground truth orientation
+    150-second sustained aggressive manoeuvre (ground truth orientation
     showed a real ~180° roll) - that run's huge apparent "drift" is a
     consequence of the two_d_mode EKF producing garbage yaw once the robot
-    actually isn't upright, not a localization bug; it's the M2 stability
+    actually isn't upright, not a localisation bug; it's the M2 stability
     envelope being exceeded, not an M3 finding.
 - RViz shows RobotModel, TF, live Camera feed, and Odometry with no errors
   (`docs/media/m3_rviz_localization.png`); `/ground_truth/pose` and
@@ -261,7 +261,7 @@ rewriting history; read the later section for the current status.**
   recovery fired and re-planned correctly when progress stalled. Multiple
   such partial runs completed without incident.
 - **Not achieved**: the rover flipped (real ~90-180° roll, confirmed via
-  ground-truth orientation, not an estimation artifact) partway through
+  ground-truth orientation, not an estimation artefact) partway through
   three separate longer-goal test attempts, always coincident with a
   terrain-collision-box boundary crossing (z-height jumped at the same
   moment). This reproduced across three different mitigation attempts:
@@ -269,7 +269,7 @@ rewriting history; read the later section for the current status.**
   collision resolution from 24 to 64 cells/axis (which also cratered the
   physics real-time factor to ~0.09, making full 60-100 m test runs
   impractically slow to even observe), and adding a rotate-in-place-first
-  behavior for large heading errors. None fully eliminated it. This is
+  behaviour for large heading errors. None fully eliminated it. This is
   believed to be a genuine consequence of the box-grid terrain collision
   approximation's step discontinuities (see heightmap.py's
   `build_terrain_collision_boxes_sdf` - itself downstream of the confirmed
@@ -342,7 +342,7 @@ rewriting history; read the later section for the current status.**
     terrain elevation at the spawn point. `build_terrain_collision_boxes_sdf`
     sizes each box to the average heightmap value in its footprint - at
     `grid_resolution=1` (one box for the whole world, an early attempt) that
-    average can easily be several meters for a given seed, and even at finer
+    average can easily be several metres for a given seed, and even at finer
     resolutions the local elevation right at the nominal "origin" spawn
     point depends on the regional slope/base terrain for that seed. Spawning
     at a Z below the actual box surface means the rover starts *embedded in
@@ -432,7 +432,7 @@ rewriting history; read the later section for the current status.**
 - Cinematic auto-follow camera: investigated whether gz-sim 8's GUI could be
   scripted to automatically track the rover (for a hands-off recording).
   Found no clean, scriptable follow-camera mechanism in this install within
-  the time available - the GUI's "Follow" behavior is a manual right-click
+  the time available - the GUI's "Follow" behaviour is a manual right-click
   action on the model in the scene tree. Documented as a manual step in the
   README rather than building a custom camera-follow plugin, which would be
   a disproportionate amount of new code for a cosmetic recording aid.
@@ -455,7 +455,7 @@ rewriting history; read the later section for the current status.**
     60s capture were byte-identical, then genuinely started changing around
     frame ~500). A second short capture, run right after the first one had
     "warmed up," froze again from frame 0 - pointing to gz-sim's render loop
-    deprioritizing sensor rendering when it has no actively-viewed GUI
+    deprioritising sensor rendering when it has no actively-viewed GUI
     viewport driving it, consistent with the x11grab finding above.
   - **Fix**: gz-sim ships a server-side `gz-sim-camera-video-recorder-system`
     plugin (`gz::sim::systems::CameraVideoRecorder`, found via
@@ -558,7 +558,7 @@ re-read line-by-line), not just taken on trust.
   bounds-checks before calling in), but the module is safer standalone.
 - **`planner_node.py`**: replaced one vague "goal may be unreachable or in
   a lethal cell" warning with three specific ones - goal cell is lethal,
-  start cell is lethal (flagged as possibly localization drift into an
+  start cell is lethal (flagged as possibly localisation drift into an
   inflated obstacle), or genuinely no path exists - to make a failed replan
   actually diagnosable from the log.
 - **`costmap_node.py`**: a missing/corrupt `manifest.json` or a
@@ -632,7 +632,7 @@ terrain-collision-box boundary crossing) was root-caused and fixed, rather
 than left as a documented limitation. Previous sessions had already tried
 reducing follower speed/turn aggressiveness, raising box-grid resolution from
 24 to 64 cells/axis (which tanked physics real-time-factor to ~0.09), and a
-rotate-in-place-before-driving behavior - none eliminated it. This pass
+rotate-in-place-before-driving behaviour - none eliminated it. This pass
 actually measured the collision geometry instead of continuing to tune
 follower parameters around it.
 
@@ -648,7 +648,7 @@ follower parameters around it.
   sudden horizontal contact normal that rolls the chassis. Critically, the
   flip hotspot used to reproduce this fix (-9, 44.8 on seed 42) sits on
   near-flat terrain (1.7° slope), not a crater rim - confirming this was a
-  collision-geometry artifact, not primarily a "steep/rough terrain" problem,
+  collision-geometry artefact, not primarily a "steep/rough terrain" problem,
   which is why earlier follower-side mitigations (slow down on high-cost
   cells) never fully fixed it.
 - **Fix part 1 - prevention, tilted + smoothed slabs**: each box is now
@@ -663,7 +663,7 @@ follower parameters around it.
   a separable `[1,2,1]` blur of the cell-average heights (`smoothing_passes`,
   default 3) applied *before* tilting, removing the curvature term so
   neighboring slab tops very nearly meet. At 3 passes: max lip 1.11 m -> 0.10
-  m, boundaries exceeding wheel radius 31% -> 0%, generalizing across seeds
+  m, boundaries exceeding wheel radius 31% -> 0%, generalising across seeds
   7/123/2024 (0.84-1.01 m -> 0.07-0.13 m). Uses the *same* 576 boxes as
   before, so this is free on real-time-factor - unlike the earlier
   resolution-increase attempt, which bought smoothness by brute-force box
@@ -754,7 +754,7 @@ verify that fix. **Result: pass, 3/3.**
 - **One honest caveat on the "within 1.5 m" figure**: `pure_pursuit_node`'s
   own arrival check (the thing that actually publishes `/goal_reached`)
   measures distance to the *planned path's last waypoint*, which is the
-  goal snapped to the nearest costmap cell center (0.781 m/cell on this
+  goal snapped to the nearest costmap cell centre (0.781 m/cell on this
   256x256 grid over a 200 m world - see `planner_node.py`'s
   `_grid_to_world`), not the raw clicked/published coordinate. That's a
   reasonable, already-existing design choice (the planner only ever reasons
@@ -768,7 +768,7 @@ verify that fix. **Result: pass, 3/3.**
   check (against the grid-snapped waypoint) was satisfied in all three
   cases (that's what triggered `/goal_reached`), and the grid-snap offset
   alone accounts for up to `0.781 * sqrt(2) / 2 ≈ 0.55 m` of the gap, but a
-  tighter arrival behavior (e.g. a final small-radius approach independent
+  tighter arrival behaviour (e.g. a final small-radius approach independent
   of the grid) would be a legitimate follow-up if exact-coordinate arrival
   ever matters more than it does for this PoC.
 - **New launch arg**: `headless:=true` on `hello_moon.launch.py` (default
@@ -813,12 +813,12 @@ investigating it surfaced a second, previously-undocumented failure mode.
   spin/slip climbing each cliff, which is what the original test measured as
   "genuine, speed-dependent wheel slip under lunar gravity." At 0.1 m/s the
   wheel climbs quasi-statically, hence that test's 0% figure - the speed
-  dependence was a seam-crossing artifact, not a steady-state traction
+  dependence was a seam-crossing artefact, not a steady-state traction
   effect. The smoothing fix that resolved rover flips removed those seams as
   a side effect, and with them, apparently, most of the drift.
 - **Re-measured on current terrain** (seed 42, straight-line and turning
   runs driven directly via `/cmd_vel`, autonomy stack idle, so these numbers
-  are the localization pipeline in isolation): straight-line drift is
+  are the localisation pipeline in isolation): straight-line drift is
   **0.0%** at both ~4 m and ~16 m. A full **53 m** straight-line leg (chosen
   via a manifest clearance scan so it doesn't cross any rock/crater) gave
   **0.17-0.20%** EKF-vs-ground-truth drift end to end, computed correctly as
@@ -842,16 +842,16 @@ investigating it surfaced a second, previously-undocumented failure mode.
 - **A second, unrelated failure mode found along the way: an intermittent
   wheels-locked-but-upright stall in tight turns.** While re-running the
   turning tests above, the rover once froze solid - zero further change in
-  *both* ground-truth position and yaw - mid-maneuver, at a location
+  *both* ground-truth position and yaw - mid-manoeuvre, at a location
   verified (via the terrain manifest) to have 17.8 m of clearance from the
   nearest rock or crater, on smooth (~1.9° local slope) ground, with
   `/cmd_vel` still commanding a steady 0.3 m/s + 0.15 rad/s turn the entire
   time. Attitude stayed upright throughout (roll/pitch ~0°), so this is
   invisible to `flip_recovery_node`'s 60° flip detector - it is a distinct
   mobility failure, not a flip, and (since wheel odometry froze in lockstep
-  with ground truth) it contributes ~0 to the localization drift numbers
+  with ground truth) it contributes ~0 to the localisation drift numbers
   above; it's a "the rover stops making progress" bug, not a "the rover
-  mislocalizes" bug.
+  mislocalises" bug.
   - Root cause (moderate-high confidence on the mechanism; the exact dartsim
     internals weren't instrumented directly): a skid-steer wheel in a tight
     turn must scrub laterally against the ground, and lunar gravity gives a
@@ -860,14 +860,14 @@ investigating it surfaced a second, previously-undocumented failure mode.
     The physics engine's contact solver appears to occasionally collapse to
     an all-static solution where the commanded wheel joint velocity is
     infeasible against that narrow cone, and the wheels simply stop
-    rotating. Confirmed *not* a terrain-collision-geometry artifact: the
+    rotating. Confirmed *not* a terrain-collision-geometry artefact: the
     exact stall coordinates were checked against the reconstructed collision
     mesh and sit mid-slab, nowhere near a seam. Confirmed genuinely
-    reproducible but rare: repeated attempts at the same maneuver, same
+    reproducible but rare: repeated attempts at the same manoeuvre, same
     location, mostly complete a full loop cleanly; one attempt out of
     several produced a full freeze, one other showed a brief "near-miss" dip
     in commanded-vs-actual speed before self-recovering. A follow-up stress
-    test (20 further repeats of similar tight-turn maneuvers, across two
+    test (20 further repeats of similar tight-turn manoeuvres, across two
     sessions) reproduced zero further hard freezes, consistent with this
     being a low-probability event (plausibly well under 10%, not the ~25%
     a small initial sample suggested) rather than something that reliably
@@ -910,7 +910,7 @@ investigating it surfaced a second, previously-undocumented failure mode.
 
 User feedback: the rover "doesn't really need to turn left and right, goes
 more or less straight line." Investigated with real data rather than just
-tuning by feel, since the actual costmap-lethality behavior turned out to
+tuning by feel, since the actual costmap-lethality behaviour turned out to
 matter more than raw obstacle counts.
 
 - **First checked whether craters even register as obstacles at all** (the
@@ -1180,7 +1180,7 @@ Attempted to observe `flip_recovery_node.py`'s stuck detector (`_check_stuck`/
 `_recover_stuck`) fire on its own against a genuinely-occurring stall, as
 opposed to the unit-test and manually-observed-lock validation already on
 record above. **Result: not caught. Zero `STUCK RECOVERY` events across 92
-tight-turn maneuvers and ~38 minutes of active driving.** Recording this
+tight-turn manoeuvres and ~38 minutes of active driving.** Recording this
 honestly rather than implying a catch that didn't happen, per this project's
 convention.
 
@@ -1210,7 +1210,7 @@ convention.
 - **Time accounting**: active driving ran 15:22:39-16:01:05 (38 min 26 s
   across the 92 bursts), inside a total session (launch start to process
   cleanup) of about 40 minutes - somewhat under the suggested 45-60 minute
-  window but well over 2x the suggested 30-40 maneuver count, and the earlier
+  window but well over 2x the suggested 30-40 manoeuvre count, and the earlier
   batches already showed no sign of the failure becoming easier to trigger
   with variation, so the session was called there rather than padding wall
   time for its own sake.
@@ -1222,7 +1222,7 @@ convention.
   sessions with zero natural stalls) is consistent with that revised, low
   estimate - it does not newly falsify the original discovery (which remains
   on record above with its own evidence: the frozen ground-truth position/yaw
-  at 17.8 m clearance, confirmed not a terrain-collision artifact), it just
+  at 17.8 m clearance, confirmed not a terrain-collision artefact), it just
   continues to demonstrate the failure is now rare enough that on-demand
   reproduction, let alone catching the *detector* fire on one, is a
   significant time investment.
@@ -1263,7 +1263,7 @@ turn worth recording honestly rather than editing out.
   is now fully self-contained) but **retested after the change and the rover
   still didn't visibly appear** - proving the scene-broadcast race was never the
   actual cause. The original "fresh client shows it, old one doesn't" comparison
-  was almost certainly a JPEG-compression artifact or a stray dust-particle
+  was almost certainly a JPEG-compression artefact or a stray dust-particle
   sprite mistaken for the rover, not a real signal - a caution for next time to
   verify a tiny (sub-5px) blob against a second, independent method before
   trusting it as evidence.
@@ -1345,54 +1345,54 @@ surfaces that didn't line up.
   returns `(raw_heightmap, visual_heightmap, craters, elevation_lookup)` - the raw
   fine terrain is kept only to derive the collision surface from; `visual_heightmap`
   (saved as the PNG) and `elevation_lookup` (used for rock placement and the
-  spawn-point manifest elevation) both come from the synthesized, collision-matched
+  spawn-point manifest elevation) both come from the synthesised, collision-matched
   surface. This also fixes rock placement for free - rocks were already positioned
   via `elevation_lookup`, so they now automatically sit on the same ground the rover
   does, no separate change needed.
-- **A normalization gotcha caught before it shipped**: `save_heightmap_png` used to
-  normalize the PNG by the array's own max height. That was harmless for the raw
+- **A normalisation gotcha caught before it shipped**: `save_heightmap_png` used to
+  normalise the PNG by the array's own max height. That was harmless for the raw
   heightmap (already forced to max out at exactly `height_range_m` during
   generation) but would have silently reintroduced the same mismatch through the
-  back door for the new synthesized surface, whose peak is generally *below*
-  `height_range_m` (smoothing shaves off spikes) - self-normalizing would have
+  back door for the new synthesised surface, whose peak is generally *below*
+  `height_range_m` (smoothing shaves off spikes) - self-normalising would have
   rescaled it back up to fill the full range, distorting it relative to the
-  un-rescaled collision boxes. Fixed by normalizing against the fixed
+  un-rescaled collision boxes. Fixed by normalising against the fixed
   `cfg.height_range_m` instead (now an explicit parameter).
 - **cfg fields, not scattered keyword defaults**: `collision_grid_resolution`
   (24), `collision_overlap_frac` (0.12), and `collision_smoothing_passes` (3) moved
   from keyword defaults on `build_terrain_collision_boxes_sdf` onto `TerrainConfig`,
-  so the collision-box builder and the visual synthesizer are structurally
+  so the collision-box builder and the visual synthesiser are structurally
   guaranteed to use identical values rather than relying on two call sites' defaults
   happening to match.
 - **Verified two ways**: (1) numerically, re-running the same gap measurement
   against the fixed code across the same 5 seeds - max absolute gap dropped from
-  tens of centimeters to **under 1.8 cm** in every case (the residual is just
+  tens of centimetres to **under 1.8 cm** in every case (the residual is just
   nearest-cell-lookup rounding in the measurement harness itself, not a real
   discrepancy); (2) live, relaunching seed 42 headless end-to-end with no errors -
   `/ground_truth/pose`'s settled `z` (5.302 m) now matches
   `manifest.json`'s `spawn_zone.elevation_m` (5.247 m) plus the rover's fixed
-  wheel-bottom-to-`base_link` offset (0.055 m) to within a millimeter.
+  wheel-bottom-to-`base_link` offset (0.055 m) to within a millimetre.
 - **Incidental bug found and fixed along the way, unrelated to the main fix**:
   `craters.py`'s spawn-zone keep-out (`place_craters`) excluded a crater's *bowl*
   radius from the spawn zone, but `apply_craters` actually sculpts a raised rim out
   to 1.6x that radius (the rim gaussian's tail). A large crater could satisfy the
-  keep-out on its center while its rim still poked into the "guaranteed clear"
+  keep-out on its centre while its rim still poked into the "guaranteed clear"
   spawn zone. No seed tested actually hit this (seed 42 had zero offending craters),
   so it wasn't the cause of the reported bug, but the exclusion math itself was
   wrong for any seed that could place one there - fixed by excluding
   `radius * 1.6` instead of `radius`.
 - **Left alone**: the collision grid still doesn't cover the outermost <3 m strip
-  at the +x/+y world edge (a pre-existing artifact of cropping the heightmap to a
+  at the +x/+y world edge (a pre-existing artefact of cropping the heightmap to a
   multiple of the block size) - noted in the new synthesis function's docstring
   rather than fixed, since it's well outside the ~9 m spawn zone / normal driving
   area and unrelated to this bug.
 
-## The rover is STILL underground - gz heightmap min/max normalization (the real cause)
+## The rover is STILL underground - gz heightmap min/max normalisation (the real cause)
 
 Reported again: the rover was *still* visibly below the surface after the two
 fixes above. Both prior "fixes" were real improvements but neither addressed the
 actual mechanism, and the "underground" section above is **wrong on one important
-point** (see the normalization bullet below). Corrected here rather than edited in
+point** (see the normalisation bullet below). Corrected here rather than edited in
 place.
 
 - **What the two prior sections got right, and where they stopped short.** The
@@ -1402,7 +1402,7 @@ place.
   vs `_collision_top_z`) and against `/ground_truth/pose` - it never checked what
   **gz-sim actually draws from the PNG**. That was the blind spot: the PNG is not
   the surface gz renders.
-- **Real root cause: gz-sim min/max-normalizes the heightmap image.** gz-sim's
+- **Real root cause: gz-sim min/max-normalises the heightmap image.** gz-sim's
   ogre2 `<heightmap>` does **not** map `pixel/65535 -> height * <size>.z` linearly.
   It stretches whatever pixel range the PNG actually contains to fill the full
   `<size>.z`: the image's lowest pixel is drawn at `<pos>.z`, its highest at
@@ -1414,13 +1414,13 @@ place.
   intended 5.247 m to ~5.4-5.5 m while the collision boxes stayed at 5.247 m, so the
   rover - correctly resting on the collision surface - rendered sunk ~0.2-0.25 m into
   the visibly-drawn ground.
-- **The prior section's normalization bullet was backwards.** It says
-  `save_heightmap_png` was fixed to normalize by the fixed `height_range_m` "instead
+- **The prior section's normalisation bullet was backwards.** It says
+  `save_heightmap_png` was fixed to normalise by the fixed `height_range_m` "instead
   of the array's own max" to avoid "rescaling it back up to fill the full range."
   That reasoning assumes gz decodes the PNG *linearly* - it doesn't. Filling the full
   range is exactly what was needed; refusing to is what left gz to do the rescaling,
-  uncontrolled. Both the old array-max normalization *and* the fixed-`height_range_m`
-  normalization produced a partial-range PNG (min pixel != 0), so both were broken by
+  uncontrolled. Both the old array-max normalisation *and* the fixed-`height_range_m`
+  normalisation produced a partial-range PNG (min pixel != 0), so both were broken by
   gz's min/max stretch; the change between them didn't touch the actual bug.
 - **How this was pinned down (evidence, not theory):**
   - Rendered the scene server-side from a scripted camera sensor (the GUI's Qt/Wayland
@@ -1429,7 +1429,7 @@ place.
     plain RGB camera + `ros_gz_bridge` -> PNG was the working path).
   - **Calibration**: rendered two synthetic ramp heightmaps that share the same value
     *span* but different absolute values (centre 0.5 vs 0.3). They rendered
-    **pixel-identical** - only possible if gz normalizes by the image's own span, not
+    **pixel-identical** - only possible if gz normalises by the image's own span, not
     by absolute pixel value. (A flat/constant heightmap renders degenerately and a
     heightmap with no `<texture>` block crashes the ogre2 fragment-shader compile on
     this WSLg GL3Plus stack - both are incidental gotchas, worked around.)
@@ -1439,8 +1439,8 @@ place.
     actual rover confirmed it (fully buried at its 5.30 m rest pose, only the chassis
     slab poking out at 5.6 m, cleanly on top only by ~6.0 m).
 - **The fix** (`heightmap.py`, `worldgen.py`, `generate.py`): stop fighting gz's
-  normalization - feed it. `save_heightmap_png` now writes a **full-range** PNG
-  (min/max-normalized to `[0, 65535]`) and returns the real-world `(z_min, z_span)`
+  normalisation - feed it. `save_heightmap_png` now writes a **full-range** PNG
+  (min/max-normalised to `[0, 65535]`) and returns the real-world `(z_min, z_span)`
   that full range corresponds to. `worldgen.build_world_sdf` puts those straight into
   the heightmap element: `<pos> z = z_min`, `<size> z = z_span` (instead of `0` and
   the fixed `height_range_m`). gz's decode then reproduces the exact absolute surface:
@@ -1454,7 +1454,7 @@ place.
   1. New regression test `test_rendered_png_decodes_back_to_absolute_surface` (seeds
      42/123/7/1/2): saves the PNG, decodes it the way gz does (`z_min +
      pixel/65535 * z_span`) and asserts it matches `visual_heightmap` to within 16-bit
-     quantization (~1.3e-4 m). This is the check the prior tests never made. Full suite
+     quantisation (~1.3e-4 m). This is the check the prior tests never made. Full suite
      now **11/11 pass** (the 6 pre-existing checks still pass - collision math untouched).
   2. Live render, same server-side-camera method: baked the rover into the regenerated
      seed-42 world, let physics settle it (base_link z = 5.302 m, identical to before -
@@ -1469,7 +1469,7 @@ place.
   (0.25 m segments, dim low-sun lighting), so "5.48 -> 5.25" is "clearly moved down by
   ~0.2 m to sit on the collision surface", not a sub-cm claim - the sub-cm guarantee
   comes from the decode being exact algebra (verified by the unit test), not from the
-  pixel measurement. I did **not** fully pin gz's exact normalization constants (the
+  pixel measurement. I did **not** fully pin gz's exact normalisation constants (the
   measured pre-fix 5.48 m is a touch higher than a pure image-min/max model predicts
   ~5.27 m, plausibly gz filtering/mip-mapping the extreme crater-floor/rim pixels);
   the fix sidesteps this because a full-range PNG decodes to the true surface under
@@ -1551,7 +1551,7 @@ That was wrong, it is retracted in full, and the corrected measurements are give
 ### 1. Rocks floated - a fixed offset applied to a variable mesh
 
 `scatter_rocks` placed each rock's model ORIGIN at `elevation_lookup(x, y) - 0.12 *
-scale`, assuming that buried it. Rock meshes are normalized by their bounding RADIUS,
+scale`, assuming that buried it. Rock meshes are normalised by their bounding RADIUS,
 but `displace_rock`'s anisotropic stretch leaves each variant's lowest vertex anywhere
 from **0.51 to 1.00 units** below its origin. Measured across 12 variants, every rock
 therefore hovered **0.39-0.88 x scale** above the surface - up to **~2.1 m of clear air
@@ -1989,7 +1989,7 @@ events accumulated that error until the rover believed it had arrived while stan
 36 m away.
 
 One consequence worth flagging against M3's own acceptance bar: a single stuck event put
-localization error at **9.0% of distance travelled** (4.29 m over 47.6 m), against M3's
+localisation error at **9.0% of distance travelled** (4.29 m over 47.6 m), against M3's
 <5% target and the 0-4% currently recorded there. M3's figures were measured on clean
 runs with no stall, so they are not wrong - but they do not describe a run like this one.
 
@@ -2127,7 +2127,7 @@ Not attempted yet, and listed in the order that matters:
 2. **Recovery has to actually recover.** 64 stuck events across three runs, zero of them
    resolved by the 1.0 s straight-line override, which then retries on a ~31 s backoff
    indefinitely. It is a detector with a no-op attached.
-3. **A stall must not corrupt localization.** Wheel odometry integrates while the wheels
+3. **A stall must not corrupt localisation.** Wheel odometry integrates while the wheels
    spin against a pinned chassis, and nothing in the stack ever observes absolute
    position, so the error is permanent. The stuck detector already knows the rover is not
    moving - that same signal should stop odometry being trusted.
@@ -2176,7 +2176,7 @@ recoveries. Pushing forward into the boulder the rover is wedged against is the 
 direction, and after the nudge `pure_pursuit` steered straight back onto the same path
 into the same rock, so the event repeated on a ~31 s metronome for the rest of the run.
 
-It is now an escalating escape maneuver in `flip_recovery_node.py`: **reverse** (back out
+It is now an escalating escape manoeuvre in `flip_recovery_node.py`: **reverse** (back out
 along the way it came in, which is by construction obstacle-free), **turn in place** with
 the direction alternating per attempt, then **mark the obstacle and replan**. Consecutive
 events inside a 120 s window escalate the reverse and turn durations, because a wedge that
@@ -2194,7 +2194,7 @@ Three supporting changes were needed for that to mean anything:
   outright, which strands the rover exactly when a keep-out zone has just been marked
   around it - the rover is standing next to the hazard it reported. It now plans from the
   nearest non-lethal cell within 5 cells and says so.
-- **`pure_pursuit` is muted during a maneuver, and its replan budget is restored when the
+- **`pure_pursuit` is muted during a manoeuvre, and its replan budget is restored when the
   costmap changes.** Publishing at 30 Hz against its 10 Hz is *not* the same as having
   control: roughly a quarter of the commands gz-sim executed during the old override were
   still pure_pursuit's forward commands, fighting the recovery. There is now an explicit
@@ -2202,17 +2202,17 @@ Three supporting changes were needed for that to mean anything:
   approaches the planner could newly route around; a genuinely changed costmap now
   restores the budget, since the retry is not the attempt that already failed.
 
-The node also reports, per event, whether the maneuver actually moved the rover
+The node also reports, per event, whether the manoeuvre actually moved the rover
 ("FREED" / "STILL WEDGED" with the ground-truth distance moved, and a running
 freed/fired tally). "Recovery fired" will not be mistaken for "recovery worked" again.
 
-### 3. A stall must not corrupt localization - and the first two designs were wrong
+### 3. A stall must not corrupt localisation - and the first two designs were wrong
 
 New node `wheel_slip_node.py` sits between gz and the covariance relay, republishing
 `/odom` as `/odom/gated` with a zero-velocity update (ZUPT) substituted while it judges
 the wheels to be slipping in place. Detection uses **onboard signals only** - wheel
 odometry and the IMU. It deliberately does not use `/ground_truth/pose`, even though the
-stuck detector does: a localization fix that consulted the answer key would make M4's
+stuck detector does: a localisation fix that consulted the answer key would make M4's
 numbers meaningless. `scripts/calibrate_slip_detector.py` scores the detector against a
 recorded run, using ground truth only as the label.
 
@@ -2251,10 +2251,10 @@ final detector gets **3665/3665 slipping windows and 0/6962 false positives**.
 **A correction to how those labels were computed.** The first version of this table
 labelled each window by ground-truth *endpoint displacement*. That is wrong: the wheels
 claim a path integral, so the answer key has to be one too. The difference is not
-academic - an escape maneuver reverses and then drives forward, netting almost no
+academic - an escape manoeuvre reverses and then drives forward, netting almost no
 displacement while the body genuinely moved over a metre, so displacement-labelling files
-every recovery maneuver under "slipping". It reported the rotation test as cleanly
-separating on the pre-fix recording (which contained no working maneuvers) and as
+every recovery manoeuvre under "slipping". It reported the rotation test as cleanly
+separating on the pre-fix recording (which contained no working manoeuvres) and as
 overlapping on the post-fix one (which is full of them). The numbers above are the
 path-length ones; the conclusion survived the correction, but the margin is tighter than
 first written (0.133 -> 0.157, not 0.124 -> 0.169).
@@ -2298,10 +2298,10 @@ timed itself with `time.monotonic()` - wall clock - while every velocity it comm
 simulated time, and this world runs at a measured **0.28x real time**. So the "1.0 s at
 0.20 m/s" nudge was 0.28 s of rover time, about **6 cm** of travel. That does not excuse
 the design (pushing forward into the obstacle is still the wrong direction), but it does
-change the conclusion drawn from "64 firings, 0 recoveries": part of that was a maneuver
-that barely happened. The escape maneuver now specifies durations in sim time and converts
+change the conclusion drawn from "64 firings, 0 recoveries": part of that was a manoeuvre
+that barely happened. The escape manoeuvre now specifies durations in sim time and converts
 them to wall-clock sleeps using a real-time factor measured in the node's own timer
-callback - it cannot read the clock during the maneuver, because it is blocking its own
+callback - it cannot read the clock during the manoeuvre, because it is blocking its own
 executor, which is exactly how the units got mixed up in the first place.
 
 **A leftover `gz sim` starved the ROS clock of a fresh launch.** The first verification
@@ -2356,11 +2356,11 @@ behaviours are now regression-tested (`test_quiet_wheels_do_not_release_the_gate
 
 Worth noting what this cost and what it did not: throughout the flicker the "phantom
 distance kept out of the EKF" counter stayed at 0.93 m, i.e. the gate was toggling over
-wheels that were claiming nothing, so the localization impact was nil - it was a log and
+wheels that were claiming nothing, so the localisation impact was nil - it was a log and
 correctness problem, not a measurement-corrupting one. It was still worth restarting the
 acceptance for, because "slip episodes" as a reported column has to mean episodes.
 
-## Verification: the recovery works, the localization is 3x better, and M4 still fails
+## Verification: the recovery works, the localisation is 3x better, and M4 still fails
 
 Three seeds, the same goals as the recorded 0/3 baseline, judged on
 `/ground_truth/pose` by `scripts/m4_acceptance.py`. **0/3 against M4's 1.5 m bar** - but
@@ -2378,9 +2378,9 @@ down roughly 3x, and no run ended pinned against a rock.
 
 ### What is fixed, and by how much
 
-- **Recovery recovers. 25 escape maneuvers across the three runs, 25 freed the rover**,
-  measured as ground-truth motion during the maneuver (0.49-2.37 m each). The previous
-  recovery was 0 for 64. Nothing was "still wedged" after a maneuver in any run.
+- **Recovery recovers. 25 escape manoeuvres across the three runs, 25 freed the rover**,
+  measured as ground-truth motion during the manoeuvre (0.49-2.37 m each). The previous
+  recovery was 0 for 64. Nothing was "still wedged" after a manoeuvre in any run.
 - **Both triggers fire, and the onboard one earns its place.** 17 events were caught by
   the ground-truth detector and **8 by the onboard wheel-slip detector** - the creeping
   wedges that are too fast to count as "not moving" and which the ground-truth trigger
@@ -2436,7 +2436,7 @@ sensor suite on this terrain**, and that is a scoping conclusion, not a bug to c
 
 The secondary failure is time, not accuracy: seeds 42 and 7 timed out at 3600 s while
 still moving (107 m and 121 m travelled on 85-90 m straight lines), because each wedge
-costs a maneuver plus a replan and the rover spends minutes at a time working through
+costs a manoeuvre plus a replan and the rover spends minutes at a time working through
 rock clusters. Both were closing on their goals when the clock ran out.
 
 ### Limits of this verification
@@ -2462,15 +2462,15 @@ rock clusters. Both were closing on their goals when the clock ran out.
   regression check. The same hazard applies to the user-facing `--goals` when the *first*
   goal has a negative x, and is now documented in its help text.
 - **Stuck events were double-counted.** `STUCK RECOVERY #N` appears twice per event - once
-  for the maneuver and once for its result - so the first run reported 22 events where
-  there were 11. The pattern is now anchored on the maneuver line. The table above uses
+  for the manoeuvre and once for its result - so the first run reported 22 events where
+  there were 11. The pattern is now anchored on the manoeuvre line. The table above uses
   corrected counts.
 
-## The localization-oracle ablation: testing the diagnosis instead of believing it
+## The localisation-oracle ablation: testing the diagnosis instead of believing it
 
 The verification above concluded that lateral slip - unobservable to a wheel+IMU stack -
 was what stood between this rover and M4. That is a falsifiable claim, so it was tested
-rather than left as an explanation: **if localization is the only thing missing, then
+rather than left as an explanation: **if localisation is the only thing missing, then
 handing the estimator an absolute position reference should make the acceptance pass,
 with no change to planning, control or recovery.**
 
@@ -2490,13 +2490,13 @@ may be obtained with it on.
 | 123 | FAIL_TIMEOUT | 23.9 m | 0.0 m | 12 | 0 |
 
 Divergence collapses from 4.8-10.0 m to **0.000-0.006 m**, confirming the oracle is
-actually being fused, and the diagnosis holds: with localization removed as a variable,
+actually being fused, and the diagnosis holds: with localisation removed as a variable,
 two of three seeds drive the whole 85-90 m traverse and stop within 1.7 m of their goals.
 
 ### And the ablation immediately found a bug that no amount of staring would have
 
 Seeds 42 and 7 both stopped at **exactly 1.70 m**. Two independent seeds landing on the
-same number is a systematic artifact, not noise - and it is this: `pure_pursuit_node`
+same number is a systematic artefact, not noise - and it is this: `pure_pursuit_node`
 measured arrival as `norm(path[-1] - position)`, and `path[-1]` is a costmap **cell
 centre**, because the planner snaps both ends of its path to the grid. At this world's
 0.78 m cells that is up to ~0.55 m from the goal actually commanded (0.42 m on seed 42's
@@ -2514,7 +2514,7 @@ loosened bar. The rover still has to get within 1.5 m of the goal it was given.
 
 ### Seed 123 exposes a second, unrelated constraint: time, and whose time
 
-Seed 123 timed out with perfect localization, 23.9 m short, after 12 wedges. That is not
+Seed 123 timed out with perfect localisation, 23.9 m short, after 12 wedges. That is not
 an accuracy failure, and on inspection the budget itself was wrong: the 3600 s cap was
 **wall-clock**, and this world simulates at a measured ~0.25x real time, so it bought the
 rover only ~830 s of its own time - during which it covered 114 m at a mean 0.129 m/s
@@ -2528,10 +2528,10 @@ explicitly not a rover failure. Both times are recorded per run.
 ### A metric that was under-reporting its own success
 
 The oracle run logged several "STUCK RECOVERY #N result: moved 0.00 m - STILL WEDGED"
-for maneuvers that the acceptance harness's independent trace shows moving the rover
-~1.9 m. Cause: the result was checked on the first timer tick after the maneuver, ~2 ms
-later, and `/ground_truth/pose` messages queue up during the blocking maneuver - so the
-timer could win the executor race and measure against a pose from *before* the maneuver.
+for manoeuvres that the acceptance harness's independent trace shows moving the rover
+~1.9 m. Cause: the result was checked on the first timer tick after the manoeuvre, ~2 ms
+later, and `/ground_truth/pose` messages queue up during the blocking manoeuvre - so the
+timer could win the executor race and measure against a pose from *before* the manoeuvre.
 Deferred by 1 s of sim time, anchored on the first tick whose clock has caught up (the
 ROS clock does not advance while the node blocks its own executor, so the obvious
 implementation of the delay would have been a no-op). Log-only - it never affected rover
@@ -2554,7 +2554,7 @@ cluster that had trapped it in both previous runs; it still arrived.
 
 This is the experiment's conclusion, and it is worth stating exactly:
 
-> With localization accurate, **the planner, the follower, the recovery and the keep-out
+> With localisation accurate, **the planner, the follower, the recovery and the keep-out
 > zones are sufficient to meet M4's bar on all three acceptance seeds.** Everything
 > between the goal arriving and the rover standing at it works. What M4 is missing is a
 > sensor.
@@ -2674,7 +2674,7 @@ The configured 20 deg threshold was really running at **16.3-16.9 deg**.
 
 On every seed the changed-cell count equals the drop in lethal cells exactly, so **not
 one cell became lethal that wasn't before** - the change is a strict relaxation. That
-matches the original characterization of the error as conservative: it over-flagged
+matches the original characterisation of the error as conservative: it over-flagged
 traversable ground and never under-flagged untraversable ground, which is why it survived
 a whole milestone without ever presenting as a failure.
 
@@ -2683,7 +2683,7 @@ a whole milestone without ever presenting as a failure.
 It does not reopen or change M4. The banked 0/3 was taken before this fix, so those
 numbers describe a costmap that flagged 0.4-0.8% more of the world lethal than the
 current build does. That is worth stating rather than glossing, but it is not a reason to
-re-run: **M4 fails by 3.1-13.1 m of localization drift**, and the mechanism is pinned to
+re-run: **M4 fails by 3.1-13.1 m of localisation drift**, and the mechanism is pinned to
 the centimetre (true error = EKF divergence + stopping tolerance, on all three seeds).
 Freeing 0.4-0.8% of cells does not move a number that is set by where the rover thinks it
 is. M4 remains 0/3, blocked on the sensor decision, unchanged by this.
@@ -2702,7 +2702,7 @@ where fixture-based tests only ever assert what the test file believes the gener
 `test_heightmap_orientation.py`'s round-trip check got stronger for free - it compared
 against a rescale to `height_range_m` because that was what the loader did; it now
 compares cell-for-cell against the true surface in absolute metres, with only 16-bit
-quantization between them.
+quantisation between them.
 
 80 tests pass across the planetary packages.
 
@@ -2818,7 +2818,7 @@ against a 1.5 m bar. Seed 42 landed at 3.1% of distance travelled. Closing the
 rest needs either a better front end than translation-only Lucas-Kanade, or
 something that bounds drift rather than slowing it.
 
-## The controlled comparison: visual odometry makes this rover's localization worse
+## The controlled comparison: visual odometry makes this rover's localisation worse
 
 Every VO number above was measured against a baseline from an *older* build. That
 was flagged at the time as a confound and it turned out to be the whole story. Run
@@ -2832,7 +2832,7 @@ being whether `visual_odometry` is on:
 | 123 | **6.10 m** | 15.19 m | **7.00 m** | 15.90 m |
 | | | | **1 / 3** | **0 / 3** |
 
-**Visual odometry made localization worse on all three seeds - by 3.5x, 35x and
+**Visual odometry made localisation worse on all three seeds - by 3.5x, 35x and
 2.5x.** There is no seed on which it helped. The earlier conclusion in this file,
 that VO halved seed 42's error, was wrong: seed 42 improved from the banked 7.72 m
 because of the costmap height-span fix and the wheel_slip crash fix, and VO then
@@ -2851,7 +2851,7 @@ earns its place.
 
 ### What is actually wrong with it, as far as the evidence goes
 
-VO's *lateral velocity* is unbiased and well-characterized in isolation: +0.000 +-
+VO's *lateral velocity* is unbiased and well-characterised in isolation: +0.000 +-
 0.018 m/s against ground truth over 130 real frame pairs, with a derived sigma of
 0.020 that matches. Yet fusing that same channel degrades the filter. So the
 per-estimate accuracy statistic is not capturing what goes wrong in a run, and two
@@ -2892,7 +2892,7 @@ The credit belongs to the costmap height-span fix (which had the costmap running
 16 deg lethal-slope threshold against the 20 deg configured) and the wheel_slip
 out-of-order-timestamp fix.
 
-**The binding constraint has moved off localization.** On seeds 42 and 7 the drift
+**The binding constraint has moved off localisation.** On seeds 42 and 7 the drift
 is now 0.4-0.7 m over ~105 m - 0.4-0.7% of distance, comfortably inside M4's
 budget - and the arrival error is almost entirely the rover's own stopping
 tolerance:
@@ -2914,7 +2914,7 @@ the single highest-value change available.
 Seed 123 remains genuinely drift-limited at 6.1 m and would not pass on tolerance
 alone. It is also the seed that struggles most with the terrain - 14 stuck events
 against seed 42's 6 - so its extra drift is plausibly earned during recovery
-maneuvers rather than during driving.
+manoeuvres rather than during driving.
 
 ## Floating rocks, round four: the placement was right, the renderer was wrong
 
@@ -3220,7 +3220,7 @@ Zero lethal rejections in the whole log, against one on the first goal previousl
 
 **Drive: waypoint 1 timed out.** The rover wedged three times in a boulder cluster ~8 m
 along the leg. Each time the stuck detector fired (once on onboard wheel slip, twice on
-ground truth), marked a keep-out zone, and the escape maneuver freed it - **3/3 escapes
+ground truth), marked a keep-out zone, and the escape manoeuvre freed it - **3/3 escapes
 succeeded**, moving 0.52, 1.25 and 1.82 m - but not fast enough to reach the goal inside
 the 90 s per-waypoint budget.
 
@@ -3324,3 +3324,171 @@ stands unchanged** - and `test_inflation_covers_the_rover.py` now pins that: the
 covers the radius at every resolution, the fix is a no-op at the shipped one, and the
 parameter's inertness across its plausible range is asserted rather than left to be
 rediscovered. `regolith_costmap` suite 52/52.
+
+## The stopping tolerance, measured - and why one run per cell is not a measurement
+
+The previous section named `pure_pursuit_node`'s `goal_tolerance_m` as the single
+highest-value change available: at 1.0 m the rover stops a metre short of where it
+believes the goal is, spending two thirds of M4's 1.5 m bar before it has drifted at
+all, and seed 7 was failing by 0.20 m for that reason alone. It also said the change
+needed its own measured run rather than a guess. This is that run, and it produced two
+findings: the tolerance does what it was predicted to do, and the number it was
+predicted against is not stable enough to have justified the prediction.
+
+Everything below is uncommitted work sitting in the tree at the time of writing:
+`scripts/goal_tolerance_experiment.sh`, `scripts/m4_replicates.sh`,
+`scripts/test_settle_detector.py`, changes to `scripts/m4_acceptance.py`,
+`pure_pursuit_node.py` and `hello_moon.launch.py`, and the raw results under
+`m4_tolerance_run2/` and `m4_replicates/`.
+
+### Making the tight tolerance safe before measuring it
+
+The reason the tolerance was generous is real: a pure pursuit follower told to stop
+closer than it can steer will orbit its goal, or stop-and-spin on a bearing that swings
+as fast as it turns, and never terminate. So the follower was given a bounded terminal
+phase rather than being trusted with a smaller number.
+
+`TerminalApproach` (in `pure_pursuit_node.py`, pure state, no ROS and no clock of its
+own) tracks the closest approach achieved inside a 3.0 m radius and ends the approach on
+whichever comes first:
+
+- `distance <= goal_tolerance_m` - ARRIVED, the ordinary case;
+- receded 0.5 m past the closest approach - CLOSEST_APPROACH;
+- no improvement worth 0.05 m for 15 s - CLOSEST_APPROACH.
+
+The last two mean "this is as close as you are going to get". They stop the rover at its
+best achieved distance instead of circling, which is a worse arrival than ARRIVED, is
+logged as a warning, and can never be worse than the old 1.0 m stop would have been,
+because it can only fire after the rover has already been closer than it now is. The
+approach is reset when a new goal arrives, when the recovery node takes `/cmd_vel`, and
+when the follower replans, so a rover carried away by an escape manoeuvre is not judged
+against a closest approach it made before being carried.
+
+`test_terminal_approach.py` pins both directions: that it always terminates (orbit,
+asymptotic creep that never arrives, estimator jitter at a standstill, and an
+adversarial worst case bounded by `(radius - tolerance) / improvement` patience windows)
+and that it never terminates early (straight creep, 0.02 m/s crawl, being pushed away
+and coming back). 10 tests, green; the whole `regolith_vehicle_interface` suite is 14/14.
+
+**In the runs, the fallback never fired.** Across all ten launches, every stop was a
+genuine ARRIVED and `Stopping at closest approach` appears zero times in any log. The
+circling failure the loose tolerance was guarding against did not appear at 0.35 m on
+these three seeds. That is evidence the guard was not needed here, not evidence it was
+unnecessary - it is 3 seeds, and the guard costs nothing.
+
+### The runs
+
+Both arms from the same build, back to back, interleaved by seed, with the goals and
+terrain fixed by the seed. Every run records both repos' HEADs in `run.json`
+(`regolith` aec4964-dirty, `regolith.universe` 5968d029d-dirty, identical for all ten),
+because the last comparison this project ran against banked numbers credited visual
+odometry with gains that belonged to two unrelated fixes.
+
+| run | tol | verdict | true error | stopped at | divergence | travelled | wedges |
+|---|---|---|---|---|---|---|---|
+| seed 42 | 1.00 | FAIL | 5.69 m | 5.69 m | 5.20 m | 133.9 m | 8/8 |
+| seed 42 | 0.35 | FAIL | 7.76 m | 7.76 m | 7.47 m | 99.2 m | 5/5 |
+| seed 7 | 1.00 | FAIL | 1.53 m | 1.53 m | 0.56 m | 103.9 m | 7/7 |
+| seed 7 | 0.35 | **PASS** | 1.47 m | not observed | 0.62 m | 103.2 m | 7/7 |
+| seed 7 rep 2 | 1.00 | FAIL | 1.55 m | 1.55 m | 0.59 m | 103.1 m | 7/7 |
+| seed 7 rep 2 | 0.35 | **PASS** | 1.46 m | **1.00 m** | 0.67 m | 103.3 m | 7/7 |
+| seed 123 | 1.00 | ABORT | - | - | - | 5.8 m | 2/2 |
+| seed 123 | 0.35 | FAIL | 10.77 m | 10.77 m | 10.47 m | 94.6 m | 9/9 |
+| seed 123 rep 1 | 1.00 | FAIL | 11.23 m | 11.23 m | 10.29 m | 94.1 m | 9/9 |
+| seed 7 rep 3 | 1.00 | INTERRUPTED | - | - | 0.68 m | 64.9 m | 5/5 |
+
+61 wedges and 61 escapes across the nine runs that produced a summary, plus 5 of 5 more
+in the interrupted tenth. Zero flips anywhere. Each completed run costs 41 to 62 minutes
+of wall clock for 11 to 15 minutes of rover time; the campaign is about ten hours of
+machine time, three of them lost to the dead simulator described below.
+
+### Seed 7: the tolerance does exactly what it was predicted to do
+
+Seed 7 is the seed where the tolerance is decisive, because its drift is small (0.56-0.67 m)
+and its arrival error sits on the bar. Both matched pairs flip:
+
+    goal_tolerance_m = 1.00   stops at 1.53 m and 1.55 m   FAIL, FAIL
+    goal_tolerance_m = 0.35   stops at 1.00 m (measured)   PASS, PASS
+
+The second replicate is the one that shows the mechanism rather than just the verdict:
+the rover crossed the 1.5 m bar at 1.46 m still driving, kept going, and declared arrival
+at **1.00 m**. Against 1.55 m in the matched control, that is 0.55 m of arrival error
+bought by a one-parameter change, close to the 0.65 m predicted, with no new sensor and
+no change to the estimator. The predicted saving does not appear in the headline `true
+error` column (1.55 vs 1.46 m) because that column is measured at the moment the verdict
+is decided, which for a PASS is the first crossing of the bar. The saving is real and it
+is in the `stopped at` column.
+
+**The shipped default is still 1.0 m.** Two matched pairs on one seed is enough to
+justify the change, not enough to make it without saying so; changing a default that
+moves an acceptance number deserves the replicate campaign below being finished first.
+
+### Seed 42: the finding that matters more
+
+Seed 42's EKF divergence, same build, same seed, same goal, same 100 m drive:
+
+| run | divergence | true error | verdict |
+|---|---|---|---|
+| banked in the section above | 0.40 m | 1.50 m | PASS |
+| tolerance arm, 1.00 m | 5.20 m | 5.69 m | FAIL |
+| tolerance arm, 0.35 m | 7.47 m | 7.76 m | FAIL |
+
+(An older build, before the costmap height-span and wheel_slip timestamp fixes, gave
+6.80 m on this seed.)
+
+**The seed fixes the terrain and the goal. It does not fix the outcome.** Run-to-run
+spread on seed 42 is an order of magnitude larger than the 0.55-0.65 m the stopping
+tolerance is worth. A single run per cell cannot see an effect that small, and the
+banked "1/3 unaided" is one sample of a quantity that varies from 0.40 m to 7.47 m. On
+this campaign the same build measured 0/3 at the shipped tolerance and 1/3 at 0.35 m,
+and neither number should be quoted as if it were the system's success rate.
+
+This is the same shape of error as the visual odometry confound, one level up: there the
+mistake was comparing arms from different builds, here it would be treating one draw
+from a wide distribution as the distribution. The travelled distances say the same thing
+less directly - seed 42 drove 133.9 m in one arm and 99.2 m in the other to the same
+goal, so the two runs were not doing the same thing after the first wedge.
+
+Seed 123 stays drift-limited: 10.29 and 10.47 m of divergence, 9 wedges per run, no
+stopping tolerance can close that.
+
+### Two harness defects the campaign exposed, both fixed
+
+**A PASS that never stopped.** The seed 7 / 0.35 m run passed at 1.47 m without ever
+publishing `/goal_reached`: the watcher decided the verdict on the first ground-truth
+sample inside the bar and exited while the rover was still driving. The run that existed
+to measure a stopping distance never observed a stop. `SettleDetector` now keeps watching
+after a PASS until the rover is actually at rest (0.05 m of movement, a 10 s quiet window,
+all in simulated seconds because this world runs at ~0.25x real time), and records
+`stopped_gt_error_m` alongside the verdict-time error. Every headline field still means
+exactly what it meant before, so runs recorded either side of the change stay comparable.
+It is tested directly, without a simulator, in `scripts/test_settle_detector.py` (8 tests,
+green), because the settle path only ever executes on a PASS - a bug there costs precisely
+the runs worth having, an hour at a time.
+
+Honest caveat on ordering: the detector was added mid-campaign, after the first seed 7 /
+0.35 m run and before the replicates, which is why that row reads `not observed`. It only
+adds observation after the verdict is decided, so it cannot have moved a verdict.
+
+**A dead simulator burning three hours.** Seed 123's 1.00 m arm died 3.5 minutes in - the
+launch log stops mid-operation, no error, no surviving process, cause not established. Sim
+time stopped advancing, so the watcher's sim-time budget could never expire, and it spent
+2 h 50 min faithfully logging a rover that was no longer being simulated before the
+wall-clock cap ended it. `m4_acceptance.py` now polls the launch alongside the watcher and
+returns `ABORT_LAUNCH_DIED`, which is a retryable infrastructure failure and explicitly not
+a rover failure. The lost cell was re-run as `m4_replicates/seed123_tol1.00_rep1`.
+
+### What this does not establish
+
+- **The replicate campaign is unfinished.** Seed 7 has two matched pairs; seeds 42 and 123
+  have one run per arm. `m4_replicates/seed7_tol1.00_rep3` was interrupted at 64.9 m of a
+  103 m drive and is not a result. Nothing here supports a distribution, only the claim
+  that the distribution is wide.
+- **Nothing was re-run for the numbers in earlier sections.** The 18/20 wedge escapes and
+  the 102-133 m traverse figures in "M4, final" are from the older build, and the oracle
+  3/3 comparison is too. They are not interchangeable with the numbers above.
+- **The traction stall recorded in the previous section is still not root-caused**, and it
+  is a plausible contributor to the run-to-run spread: seed 42 took 8 wedges in one arm and
+  5 in the other, and drift is earned during recovery as much as during driving.
+- The `goal_tolerance_m` default is unchanged at 1.0 m, and `visual_odometry` is unchanged
+  at off.
