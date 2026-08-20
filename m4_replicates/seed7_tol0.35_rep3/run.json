@@ -1,10 +1,10 @@
 {
-  "started": "2026-08-20 15:05:32",
+  "started": "2026-08-20 15:51:27",
   "seeds": [
     7
   ],
   "arrival_bar_m": 1.5,
-  "goal_tolerance_m": 1.0,
+  "goal_tolerance_m": 0.35,
   "sim_timeout_s": 1800.0,
   "sensor_suite": "wheel odometry + IMU",
   "localization_oracle": false,

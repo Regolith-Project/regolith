@@ -58,3 +58,90 @@ Results -> m4_replicates/seed7_tol1.00_rep3
 === seed 7 ===
 [seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
 [seed 7] launch is on ROS_DOMAIN_ID=81
+=== replicates -> m4_replicates (2 per cell) ===
+Thu Aug 20 03:04:38 PM BST 2026
+--- seed 123 tol 1.00 rep 1: done, skipping ---
+--- seed 7 tol 1.00 rep 2: done, skipping ---
+--- seed 7 tol 0.35 rep 2: done, skipping ---
+
+=== seed 7, tol 1.00, rep 3 - 15:04:38 ===
+Results -> m4_replicates/seed7_tol1.00_rep3
+
+=== seed 7 ===
+Traceback (most recent call last):
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 922, in <module>
+    sys.exit(main())
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 874, in main
+    result = run_seed(seed, goal, args, out_dir)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 681, in run_seed
+    report = validate_goal(seed, goal_xy) if goal_xy else pick_goal(seed, args.min_m, args.max_m)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 222, in pick_goal
+    report = validate_goal(seed, goal)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 171, in validate_goal
+    lethal, resolution_m, origin_x, origin_y = _costmap_for(seed)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 151, in _costmap_for
+    from regolith_costmap.costmap_node import build_costmap, load_heightmap
+ModuleNotFoundError: No module named 'regolith_costmap'
+=== finished 15:04:39 ===
+
+=== seed 7, tol 0.35, rep 3 - 15:04:49 ===
+Results -> m4_replicates/seed7_tol0.35_rep3
+
+=== seed 7 ===
+Traceback (most recent call last):
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 922, in <module>
+    sys.exit(main())
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 874, in main
+    result = run_seed(seed, goal, args, out_dir)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 681, in run_seed
+    report = validate_goal(seed, goal_xy) if goal_xy else pick_goal(seed, args.min_m, args.max_m)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 222, in pick_goal
+    report = validate_goal(seed, goal)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 171, in validate_goal
+    lethal, resolution_m, origin_x, origin_y = _costmap_for(seed)
+  File "/home/balazs/regolith/scripts/m4_acceptance.py", line 151, in _costmap_for
+    from regolith_costmap.costmap_node import build_costmap, load_heightmap
+ModuleNotFoundError: No module named 'regolith_costmap'
+=== finished 15:04:49 ===
+
+=== replicates finished - Thu Aug 20 03:04:59 PM BST 2026 ===
+=== replicates -> m4_replicates (2 per cell) ===
+Thu Aug 20 03:05:32 PM BST 2026
+--- seed 123 tol 1.00 rep 1: done, skipping ---
+--- seed 7 tol 1.00 rep 2: done, skipping ---
+--- seed 7 tol 0.35 rep 2: done, skipping ---
+
+=== seed 7, tol 1.00, rep 3 - 15:05:32 ===
+Results -> m4_replicates/seed7_tol1.00_rep3
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=71
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.6 m from the goal after 102.5 m travelled, EKF divergence 0.6 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 1.00 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7   FAIL_FALSE_ARRIVAL      1.6m     102.5m     0.6m      7      0
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.6 m true error
+=== finished 15:51:17 ===
+
+=== seed 7, tol 0.35, rep 3 - 15:51:27 ===
+Results -> m4_replicates/seed7_tol0.35_rep3
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=24
+[seed 7] PASS - ground truth 1.5 m from the goal after 103.3 m travelled, EKF divergence 0.8 m, 7 stuck events, 0 flips
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips
+     7                 PASS      1.5m     103.3m     0.8m      7      0
+=== finished 16:41:31 ===
+
+=== replicates finished - Thu Aug 20 04:41:41 PM BST 2026 ===
