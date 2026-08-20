@@ -70,6 +70,52 @@ STUCK_FREED_RE = re.compile(r"STUCK RECOVERY #(\d+) result: .* - FREED")
 FLIP_RE = re.compile(r"SIMULATED RECOVERY #(\d+)")
 SLIP_RE = re.compile(r"WHEEL SLIP #(\d+): over the last")
 
+# Settle phase: how the watcher decides the rover has come to rest after a
+# verdict, so it can record where it actually STOPPED and not just where it
+# first crossed the bar. All in simulated seconds - this world runs at ~0.25x
+# real time and a wall-clock quiet window would be four times shorter than it
+# reads.
+SETTLE_MOVE_M = 0.05          # movement below this is noise, not driving
+SETTLE_QUIET_SIM_S = 10.0     # still for this long = stopped
+SETTLE_BUDGET_SIM_S = 120.0   # give up waiting; record where it is
+
+
+class SettleDetector:
+    """Decides when the rover has come to rest after a verdict.
+
+    Split out of the watcher, and given no clock and no ROS handle, so it can be
+    tested without standing up a simulator - the logic only ever executes on a
+    PASS, which is precisely the run nobody can afford to lose to a typo.
+
+    Returns a reason string once settled, None while still waiting. Every
+    branch terminates: the settle budget is checked against sim time, and the
+    wall-clock cap against real time, so a simulator that dies mid-settle (sim
+    time frozen) still ends the wait.
+    """
+
+    def __init__(self, verdict_sim_s: float, gt_xy, sim_timeout_s: float, wall_timeout_s: float):
+        self.verdict_sim_s = verdict_sim_s
+        self.sim_timeout_s = sim_timeout_s
+        self.wall_timeout_s = wall_timeout_s
+        self._ref_xy = gt_xy
+        self._ref_s = verdict_sim_s
+
+    def update(self, gt_xy, sim_s: float, wall_s: float, declared_arrival: bool):
+        if declared_arrival:
+            return "rover declared arrival"
+        if gt_xy is not None:
+            if self._ref_xy is None or math.dist(gt_xy, self._ref_xy) > SETTLE_MOVE_M:
+                self._ref_xy, self._ref_s = gt_xy, sim_s
+            elif sim_s - self._ref_s > SETTLE_QUIET_SIM_S:
+                return "rover stopped moving"
+        if sim_s - self.verdict_sim_s > SETTLE_BUDGET_SIM_S:
+            return "settle budget spent"
+        if sim_s > self.sim_timeout_s:
+            return "run budget spent"
+        if wall_s > self.wall_timeout_s:
+            return "wall clock cap"
+        return None
+
 
 # --------------------------------------------------------------------------
 # Goal selection and validation (driver side, no ROS needed)
@@ -221,6 +267,18 @@ def run_watcher(args) -> int:
             self.first_gt_at = None
             self.path_seen = False
             self.verdict = None
+            # A verdict is decided the moment ground truth first crosses the bar,
+            # which is NOT where the rover ends up: it is usually still driving.
+            # A seed 7 run passed at 1.47 m without ever publishing /goal_reached,
+            # so the run that was supposed to measure the stopping tolerance
+            # never observed the stop. "Passed through the bar" and "stopped
+            # inside it" are different claims and are now recorded separately.
+            self.verdict_gt_error_m = None
+            self.verdict_sim_s = None
+            self.settled_reason = None
+            self.stopped_gt_error_m = None
+            self._verdict_snapshot = None
+            self._settle = None
             self.started = time.monotonic()
             self._goal_publishes = 0
             self._trace = trace_path.open("w", buffering=1)
@@ -382,6 +440,10 @@ def run_watcher(args) -> int:
                     self._goal_publishes += 1
                 return
 
+            if self.verdict is not None:
+                self._settle_tick(elapsed)
+                return
+
             error = self.gt_error()
             if error <= args.tolerance_m:
                 self.verdict = "PASS"
@@ -400,26 +462,88 @@ def run_watcher(args) -> int:
             elif elapsed > args.timeout_s:
                 self.verdict = "ABORT_WALL_CLOCK_CAP"
 
+            if self.verdict is not None:
+                self.verdict_gt_error_m = self.gt_error()
+                self.verdict_sim_s = self.sim_elapsed()
+                self._settle = SettleDetector(
+                    verdict_sim_s=self.sim_elapsed(),
+                    gt_xy=self.gt,
+                    sim_timeout_s=args.sim_timeout_s,
+                    wall_timeout_s=args.timeout_s,
+                )
+                # Every headline field keeps meaning "at the moment of the
+                # verdict", exactly as it did when the watcher exited there.
+                # Runs recorded before the settle phase existed stay comparable
+                # with runs recorded after it - which is the whole point of
+                # having a control arm.
+                self._verdict_snapshot = {
+                    "gt_final": list(self.gt) if self.gt else None,
+                    "ekf_final": list(self.ekf) if self.ekf else None,
+                    "gt_error_m": self.gt_error(),
+                    "divergence_m": self.divergence(),
+                    "gt_travelled_m": self.gt_travelled,
+                    "ekf_travelled_m": self.ekf_travelled,
+                    "sim_time_s": self.sim_elapsed(),
+                }
+                # Only a PASS still has something to observe. Every other verdict
+                # is already a stopped rover (FAIL_FALSE_ARRIVAL fires on the
+                # rover's own arrival claim) or an expired budget.
+                if self.verdict != "PASS" or self.goal_reached_at is not None:
+                    self.settled_reason = "verdict is terminal"
+                    self.stopped_gt_error_m = self.gt_error()
+
+        def _settle_tick(self, elapsed):
+            """After a PASS, keep watching until the rover actually stops, and
+            record where."""
+            if self.settled_reason is not None:
+                return
+            self.settled_reason = self._settle.update(
+                gt_xy=self.gt,
+                sim_s=self.sim_elapsed(),
+                wall_s=elapsed,
+                declared_arrival=self.goal_reached_at is not None,
+            )
+            if self.settled_reason is not None:
+                self.stopped_gt_error_m = self.gt_error()
+
     rclpy.init()
     node = Watcher()
     try:
-        while rclpy.ok() and node.verdict is None:
+        while rclpy.ok() and (node.verdict is None or node.settled_reason is None):
             rclpy.spin_once(node, timeout_sec=0.5)
     except (KeyboardInterrupt, rclpy.executors.ExternalShutdownException):
         # Ctrl-C, or the driver tearing the run down. Still write the result
         # file below: a partial record of where the rover actually got to is
         # worth more than a stack trace and no data.
         node.verdict = node.verdict or "ABORT_INTERRUPTED"
+        node.settled_reason = node.settled_reason or "interrupted"
+        node.stopped_gt_error_m = node.gt_error()
 
-    result = {
-        "verdict": node.verdict,
-        "goal": list(goal_xy),
+    # Headline fields are the verdict-time state (see the snapshot's comment);
+    # they fall back to the live values when no verdict was ever reached.
+    snapshot = node._verdict_snapshot or {
         "gt_final": list(node.gt) if node.gt else None,
         "ekf_final": list(node.ekf) if node.ekf else None,
         "gt_error_m": node.gt_error(),
         "divergence_m": node.divergence(),
         "gt_travelled_m": node.gt_travelled,
         "ekf_travelled_m": node.ekf_travelled,
+        "sim_time_s": node.sim_elapsed(),
+    }
+    result = {
+        "verdict": node.verdict,
+        "goal": list(goal_xy),
+        **snapshot,
+        # Where the rover was when the verdict was decided - the first crossing
+        # of the bar for a PASS - and where it actually came to rest. A run that
+        # passes THROUGH the bar at 1.5 m and drives on has met M4's wording and
+        # not its intent, and only the second number can tell you which happened.
+        "verdict_gt_error_m": node.verdict_gt_error_m,
+        "stopped_gt_error_m": node.stopped_gt_error_m,
+        "stopped_gt_pos": list(node.gt) if node.gt else None,
+        "settled_reason": node.settled_reason,
+        "settle_sim_s": (node.sim_elapsed() - node.verdict_sim_s)
+                        if node.verdict_sim_s is not None else None,
         "max_roll_deg": math.degrees(node.max_roll),
         "max_pitch_deg": math.degrees(node.max_pitch),
         "path_planned": node.path_seen,
@@ -427,7 +551,6 @@ def run_watcher(args) -> int:
         "goal_reached_published": node.goal_reached_at is not None,
         "goal_reached_gt_error_m": node.goal_reached_at[0] if node.goal_reached_at else None,
         "wall_time_s": time.monotonic() - node.started,
-        "sim_time_s": node.sim_elapsed(),
     }
     result_path.write_text(json.dumps(result, indent=2))
     node.destroy_node()
@@ -444,7 +567,7 @@ def run_watcher(args) -> int:
 
 
 def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
-            visual_odometry: bool = True):
+            visual_odometry: bool = False, goal_tolerance_m: float = 1.0):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
@@ -452,7 +575,8 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
         "exec ros2 launch regolith_bringup hello_moon.launch.py "
         f"seed:={seed} headless:=true rviz:=false "
         f"localization_oracle:={'true' if oracle else 'false'} "
-        f"visual_odometry:={'true' if visual_odometry else 'false'}"
+        f"visual_odometry:={'true' if visual_odometry else 'false'} "
+        f"goal_tolerance_m:={goal_tolerance_m}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -516,6 +640,43 @@ def _kill_tree(proc) -> None:
     subprocess.run(["pkill", "-KILL", "-f", "gz[ ]sim.*worlds/seed_"], check=False)
 
 
+def _git_head(path: Path) -> str:
+    """Which build produced these numbers. Two repos, and the one holding all the
+    package code is gitignored by the other, so a single hash would be the wrong
+    one - see PROGRESS.md on that trap."""
+    try:
+        out = subprocess.run(["git", "-C", str(path), "rev-parse", "--short", "HEAD"],
+                             capture_output=True, text=True, check=False)
+        head = out.stdout.strip() or "unknown"
+        dirty = subprocess.run(["git", "-C", str(path), "status", "--porcelain"],
+                               capture_output=True, text=True, check=False).stdout.strip()
+        return head + ("-dirty" if dirty else "")
+    except OSError:
+        return "unknown"
+
+
+def _run_metadata(args) -> dict:
+    """Written before the first seed starts, so a result directory says what it
+    was measuring even when it is the only thing that survives. Every comparison
+    this project has got wrong was an arm compared against numbers whose build
+    and settings nobody had written down."""
+    return {
+        "started": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "seeds": args.seeds,
+        "arrival_bar_m": args.tolerance_m,
+        "goal_tolerance_m": args.goal_tolerance_m,
+        "sim_timeout_s": args.sim_timeout_s,
+        "sensor_suite": "wheel odometry + IMU + visual odometry" if args.visual_odometry
+                        else "wheel odometry + IMU",
+        "localization_oracle": args.localization_oracle,
+        "milestone_result": not args.localization_oracle,
+        "git": {
+            "regolith": _git_head(REPO_ROOT),
+            "regolith.universe": _git_head(REPO_ROOT / "src" / "regolith.universe"),
+        },
+    }
+
+
 def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     report = validate_goal(seed, goal_xy) if goal_xy else pick_goal(seed, args.min_m, args.max_m)
     goal_xy = tuple(report["goal"])
@@ -537,7 +698,8 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     counters = {"stuck": 0, "flips": 0}
 
     proc, domain = _launch(seed, log_path, counters, oracle=args.localization_oracle,
-                           visual_odometry=not args.no_visual_odometry)
+                           visual_odometry=args.visual_odometry,
+                           goal_tolerance_m=args.goal_tolerance_m)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -564,7 +726,34 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
             f"--tolerance-m {args.tolerance_m} --graph-timeout-s {args.graph_timeout_s}"
             + (f" --signals-csv {signals_path}" if args.record_signals else "")
         )
-        watcher = subprocess.run(["bash", "-c", watch_cmd], cwd=REPO_ROOT, env=env)
+        # Poll the LAUNCH alongside the watcher, rather than just blocking on the
+        # watcher. If the simulator dies mid-run, sim time stops advancing, so
+        # the watcher's sim-time budget can never expire and it sits on a frozen
+        # world until the wall-clock cap - three hours, on the default. That is
+        # not hypothetical: a seed 123 launch died 3.5 minutes in - the log
+        # stops mid-operation with no error and no surviving process, cause not
+        # established - and the watcher spent the next 2 h 50 min faithfully
+        # logging a rover that was no longer being simulated.
+        #
+        # A dead simulator is not a rover failure and must not be recorded as
+        # one: it is ABORT_LAUNCH_DIED, which the caller may retry.
+        watcher = subprocess.Popen(["bash", "-c", watch_cmd], cwd=REPO_ROOT, env=env)
+        launch_died_at = None
+        while watcher.poll() is None:
+            time.sleep(5.0)
+            if proc.poll() is not None:
+                if launch_died_at is None:
+                    launch_died_at = time.monotonic()
+                    print(f"[seed {seed}] launch exited ({proc.returncode}) - "
+                          "giving the watcher 30 s to finish, then aborting", flush=True)
+                elif time.monotonic() - launch_died_at > 30.0:
+                    watcher.terminate()
+                    try:
+                        watcher.wait(timeout=30)
+                    except subprocess.TimeoutExpired:
+                        watcher.kill()
+                    return {"seed": seed, "verdict": "ABORT_LAUNCH_DIED",
+                            "launch_returncode": proc.returncode, "log": str(log_path)}
         if watcher.returncode != 0 or not result_path.exists():
             return {"seed": seed, "verdict": "ABORT_WATCHER_FAILED", "log": str(log_path)}
     finally:
@@ -624,9 +813,29 @@ def main() -> int:
     )
     parser.add_argument(
         "--no-visual-odometry", action="store_true",
-        help="run on wheel odometry + IMU alone, the sensor suite that scored 0/3. Kept so "
-             "that baseline stays reproducible from the same build rather than surviving "
-             "only as a number in PROGRESS.md - the VO result means nothing without it."
+        help="run on wheel odometry + IMU alone. This is now the DEFAULT and the flag is a "
+             "no-op, kept so the invocations recorded in PROGRESS.md still mean what they "
+             "said when they were run."
+    )
+    parser.add_argument(
+        "--visual-odometry", action="store_true",
+        help="EXPERIMENT ONLY: add RGB-D visual odometry to the EKF. This measured WORSE "
+             "than leaving it off on all three seeds in a same-build controlled comparison "
+             "(divergence 0.4->1.4, 0.7->24.7, 6.1->15.2 m, taking 1/3 to 0/3), which is "
+             "why hello_moon.launch.py defaults it off. This harness used to turn it ON "
+             "regardless, so an unflagged run silently measured a stack the project had "
+             "already rejected, against banked numbers from the unaided one - the exact "
+             "mismatched-arm error that produced the retraction in PROGRESS.md. The "
+             "default now follows the shipped configuration."
+    )
+    parser.add_argument(
+        "--goal-tolerance-m", type=float, default=1.0,
+        help="pure pursuit's stopping distance from the commanded goal. Note this is the "
+             "ROVER's setting, not the judge's: the run is still scored against "
+             "--tolerance-m from ground truth. At the shipped 1.0 m the stop alone spends "
+             "two thirds of a 1.5 m bar before any drift, so this is the lever the arrival "
+             "error is most sensitive to - pass the same value to both arms of a comparison "
+             "or the comparison means nothing"
     )
     parser.add_argument(
         "--record-signals", action="store_true",
@@ -656,6 +865,7 @@ def main() -> int:
     out_dir = Path(args.out) if args.out else REPO_ROOT / f"m4_acceptance_{time.strftime('%Y%m%d_%H%M%S')}"
     out_dir.mkdir(parents=True, exist_ok=True)
     print(f"Results -> {out_dir}", flush=True)
+    (out_dir / "run.json").write_text(json.dumps(_run_metadata(args), indent=2))
 
     results = []
     for seed, goal in zip(args.seeds, goals):
@@ -682,9 +892,11 @@ def main() -> int:
     # State the sensor suite on the result itself. The same harness now produces
     # three materially different numbers depending on it, and a table without this
     # line is not interpretable six months from now.
-    suite = "wheel odometry + IMU" if args.no_visual_odometry else "wheel odometry + IMU + visual odometry"
+    suite = "wheel odometry + IMU + visual odometry" if args.visual_odometry else "wheel odometry + IMU"
     print(f"\n=== M4 acceptance: {passes}/{len(results)} (judged on ground truth){mode} ===")
     print(f"    sensor suite: {suite}")
+    print(f"    rover stops within: {args.goal_tolerance_m:.2f} m of the commanded goal "
+          f"(bar is {args.tolerance_m:.2f} m)")
     print(f"{'seed':>6} {'verdict':>20} {'gt error':>9} {'travelled':>10} {'diverg':>8} {'stuck':>6} {'flips':>6}")
     for r in results:
         if "gt_error_m" in r:
