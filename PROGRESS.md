@@ -12,7 +12,7 @@ component reuse log.
 | M1: Procedural lunar terrain | Done |
 | M2: Rover spawns and drives (teleop) | Done |
 | M3: Localisation | **Done, on isolated legs.** The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4% on isolated wheel-odom+IMU+EKF legs, within the <5% target. In full autonomous runs it is 0.4-0.7% of distance on the two well-behaved seeds and 5-11% on seed 123, and it varies by an order of magnitude between repeats of the same seed - see "The stopping tolerance, measured" below |
-| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. In the latest matched campaign (nine recorded runs, one build, same three goals): seed 7 passes at 1.46-1.47 m with `goal_tolerance_m` tightened to 0.35 m and fails at 1.53-1.55 m with the shipped 1.0 m (2 matched pairs out of 2); seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal; seed 123 is drift-limited at 10.3-10.5 m. **Run-to-run drift variance is an order of magnitude larger than the stopping tolerance is worth**, so both "1/3" and "0/3" are single-sample statements. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" below |
+| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. Seed 7's tolerance response is now a finished measurement, n=3 both arms, same build, same goal: **0/3 at the shipped 1.0 m (1.53-1.60 m, every run over the 1.5 m bar) vs. 3/3 at 0.35 m (1.46-1.47 m)**, a clean non-overlapping split with zero orbiting-fallback firings across eleven completed runs - see "The replicate campaign, finished" below. `goal_tolerance_m`'s default is changed to **0.35 m** on that evidence. It does not fix M4 overall: seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal (still one run per arm, not replicated - tolerance is structurally irrelevant to a failure that large); seed 123 is drift-limited at 10.3-11.2 m. **Both seeds fail by margins no stopping tolerance can close**, and their drift distribution is still unmeasured - one run per arm remains one sample. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" and "The replicate campaign, finished" below |
 | M5: Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -3419,9 +3419,11 @@ error` column (1.55 vs 1.46 m) because that column is measured at the moment the
 is decided, which for a PASS is the first crossing of the bar. The saving is real and it
 is in the `stopped at` column.
 
-**The shipped default is still 1.0 m.** Two matched pairs on one seed is enough to
-justify the change, not enough to make it without saying so; changing a default that
-moves an acceptance number deserves the replicate campaign below being finished first.
+**At the time this section was written, the shipped default was still 1.0 m.** Two matched
+pairs on one seed was enough to justify the change, not enough to make it without saying
+so; changing a default that moves an acceptance number needed the replicate campaign
+finished first. It has since been finished (n=3 both arms, same clean split) and the
+default changed to 0.35 m - see "The replicate campaign, finished" below.
 
 ### Seed 42: the finding that matters more
 
@@ -3480,15 +3482,91 @@ a rover failure. The lost cell was re-run as `m4_replicates/seed123_tol1.00_rep1
 
 ### What this does not establish
 
-- **The replicate campaign is unfinished.** Seed 7 has two matched pairs; seeds 42 and 123
-  have one run per arm. `m4_replicates/seed7_tol1.00_rep3` was interrupted at 64.9 m of a
-  103 m drive and is not a result. Nothing here supports a distribution, only the claim
-  that the distribution is wide.
 - **Nothing was re-run for the numbers in earlier sections.** The 18/20 wedge escapes and
   the 102-133 m traverse figures in "M4, final" are from the older build, and the oracle
   3/3 comparison is too. They are not interchangeable with the numbers above.
 - **The traction stall recorded in the previous section is still not root-caused**, and it
   is a plausible contributor to the run-to-run spread: seed 42 took 8 wedges in one arm and
   5 in the other, and drift is earned during recovery as much as during driving.
-- The `goal_tolerance_m` default is unchanged at 1.0 m, and `visual_odometry` is unchanged
-  at off.
+- **Seeds 42 and 123 are still one run per arm.** The replicate campaign below closed the
+  gap for seed 7 (the seed where the tolerance is decisive) to n=3 both arms; it did not
+  add replicates for 42 or 123, deliberately - see why in "The replicate campaign,
+  finished" below. Their single-run numbers (5.69-7.76 m and 10.3-11.2 m) should still be
+  read as one draw from an unmeasured distribution, not a rate.
+
+## The replicate campaign, finished
+
+Seed 7 now has n=3 completed runs on both tolerance arms - the two cells that were
+`_rep2`/interrupted-`_rep3` above are done. `scripts/m4_replicates.sh m4_replicates 2` was
+resumed for exactly this (the `2` argument caps it at rep 3, i.e. n=3, rather than the
+script's own default of n=4). First two resume attempts failed instantly
+(`ModuleNotFoundError: regolith_costmap`) because the shell running the script hadn't
+sourced `install/setup.bash` - a fresh shell, unlike the interactive one the original
+campaign ran in. Once sourced, both remaining cells ran clean.
+
+`regolith.universe`'s HEAD had moved between the original campaign and this resume
+(`5968d029d` -> `280c0a178`, both clean) - checked directly, since this project has been
+burned once already by comparing arms across builds (the visual-odometry confound). The
+diff over that range touches `pure_pursuit_node.py` and `hello_moon.launch.py` only via
+`isort`/`black`/`flake8-ros` formatting passes - reordered imports, rewrapped docstrings,
+no line of actual logic changed - so the six runs below are a fair comparison against the
+first four.
+
+| run | tol | verdict | true error | stopped at | divergence | travelled |
+|---|---|---|---|---|---|---|
+| seed 7 rep 1 | 1.00 | FAIL | 1.53 m | 1.53 m (pre-SettleDetector) | 0.56 m | 103.9 m |
+| seed 7 rep 2 | 1.00 | FAIL | 1.55 m | 1.55 m | 0.59 m | 103.1 m |
+| seed 7 rep 3 | 1.00 | FAIL | 1.60 m | 1.60 m | 0.63 m | 102.5 m |
+| seed 7 rep 1 | 0.35 | PASS | 1.47 m | not observed (pre-SettleDetector) | 0.62 m | 103.2 m |
+| seed 7 rep 2 | 0.35 | PASS | 1.46 m | **1.00 m** | 0.67 m | 103.3 m |
+| seed 7 rep 3 | 0.35 | PASS | 1.46 m | **1.08 m** | 0.77 m | 103.3 m |
+
+**The separation is clean and does not overlap.** At 1.0 m: 0/3, every run 1.53-1.60 m,
+every run over the 1.5 m bar. At 0.35 m: 3/3, every run 1.46-1.47 m - the verdict error is
+almost flat across replicates, tighter than the FAIL arm's own spread. Where the settle
+detector actually caught the stop (2 of 3 runs; rep 1 predates it), the rover parked at
+1.00 m and 1.08 m, both comfortably clear of the bar. Divergence still drifts upward
+across reps on both arms (0.56 -> 0.63 m; 0.62 -> 0.77 m) - consistent with the
+already-flagged, not-yet-root-caused traction stall contributing variance run to run - but
+never by enough to cross a verdict on this seed at either tolerance.
+
+**Zero `CLOSEST_APPROACH` fallback firings, in any of the eleven completed runs across
+both campaigns** (`grep`-checked directly against every launch log, not inferred from
+verdicts). The orbiting failure `TerminalApproach` exists to bound never appeared at
+0.35 m on this seed. That is still evidence about seed 7 specifically, not a general
+guarantee - but it is now a three-for-three-observations claim instead of a one-off.
+
+**Seeds 42 and 123 were deliberately not replicated further**, per the reasoning already
+recorded in `scripts/m4_replicates.sh`'s own header: they fail by 5.69-11.2 m, an order of
+magnitude past `TerminalApproach`'s 3.0 m activation radius, so the tolerance value is
+structurally irrelevant to their outcome - and to the orbiting risk, since the rover never
+gets close enough on either seed for that logic to engage at all. Replicating them would
+measure the drift distribution, which is a real open question (see "What this does not
+establish" above) but a different one from the tolerance question this campaign was built
+to answer, and each run costs 40-60 minutes of wall clock this pass didn't spend on it.
+
+### Decision: `goal_tolerance_m` default changed to 0.35 m
+
+Changed in both places it is set - `pure_pursuit_node.py`'s `declare_parameter` default and
+`hello_moon.launch.py`'s `DeclareLaunchArgument` default - so a plain launch with no
+override now gets the tightened value.
+
+Reasoning:
+
+- On the one seed where the tolerance is decisive, three replicates on each arm produced a
+  clean, non-overlapping split (0/3 vs 3/3) rather than a single sample either side of the
+  bar. That is the standard the campaign was run to meet before changing a default that
+  moves an acceptance number.
+- The risk the old 1.0 m default was guarding against - a pure pursuit follower orbiting a
+  tolerance it cannot steer to - did not materialise once, across eleven completed runs at
+  0.35 m and 1.0 m combined, and `TerminalApproach` exists specifically to make that
+  failure mode bounded even if it had.
+- The change costs nothing on the seeds that don't benefit: 42 and 123 fail by margins the
+  stopping tolerance was never going to close, at either value, so tightening it does not
+  put those seeds at any documented risk - it only helps the seed close enough for the
+  0.55-0.65 m of stopping distance to matter.
+
+Caveat this decision does not paper over: it is one seed's tolerance response, measured
+well. It is not a claim about M4's overall pass rate, which is still gated on seed
+42/123's drift - a problem this change does not touch. See the milestone status line and
+"What this does not establish" above.
