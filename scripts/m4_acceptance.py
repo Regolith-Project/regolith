@@ -567,7 +567,8 @@ def run_watcher(args) -> int:
 
 
 def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
-            visual_odometry: bool = False, goal_tolerance_m: float = 1.0):
+            visual_odometry: bool = False, goal_tolerance_m: float = 1.0,
+            legacy_rigid_body_signature: bool = False):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
@@ -576,7 +577,8 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
         f"seed:={seed} headless:=true rviz:=false "
         f"localization_oracle:={'true' if oracle else 'false'} "
         f"visual_odometry:={'true' if visual_odometry else 'false'} "
-        f"goal_tolerance_m:={goal_tolerance_m}"
+        f"goal_tolerance_m:={goal_tolerance_m} "
+        f"legacy_rigid_body_signature:={'true' if legacy_rigid_body_signature else 'false'}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -601,6 +603,8 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
                 counters["stuck"] += 1
             if FLIP_RE.search(line):
                 counters["flips"] += 1
+            if SLIP_RE.search(line):
+                counters["slips"] += 1
         log_file.close()
 
     threading.Thread(target=pump, daemon=True).start()
@@ -665,6 +669,7 @@ def _run_metadata(args) -> dict:
         "seeds": args.seeds,
         "arrival_bar_m": args.tolerance_m,
         "goal_tolerance_m": args.goal_tolerance_m,
+        "legacy_rigid_body_signature": args.legacy_rigid_body_signature,
         "sim_timeout_s": args.sim_timeout_s,
         "sensor_suite": "wheel odometry + IMU + visual odometry" if args.visual_odometry
                         else "wheel odometry + IMU",
@@ -695,11 +700,12 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     trace_path = out_dir / f"seed_{seed}_trace.csv"
     signals_path = out_dir / f"seed_{seed}_signals.csv"
     result_path = out_dir / f"seed_{seed}_result.json"
-    counters = {"stuck": 0, "flips": 0}
+    counters = {"stuck": 0, "flips": 0, "slips": 0}
 
     proc, domain = _launch(seed, log_path, counters, oracle=args.localization_oracle,
                            visual_odometry=args.visual_odometry,
-                           goal_tolerance_m=args.goal_tolerance_m)
+                           goal_tolerance_m=args.goal_tolerance_m,
+                           legacy_rigid_body_signature=args.legacy_rigid_body_signature)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -767,6 +773,7 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
         straight_line_m=report["straight_line_m"],
         stuck_events=counters["stuck"],
         flip_events=counters["flips"],
+        slip_events=counters["slips"],
         log=str(log_path),
         trace=str(trace_path),
     )
@@ -842,6 +849,15 @@ def main() -> int:
         help="also log /odom, /imu and ground truth at 10 Hz per run - the raw material "
              "for judging a slip detector offline (~5 MB/hour/run)"
     )
+    parser.add_argument(
+        "--legacy-rigid-body-signature", action="store_true",
+        help="A/B LEVER ONLY, both arms otherwise identical: re-enable wheel_slip_node's "
+             "retired 'signature 2' (attitude-span + gyro-RMS rigid-body check), which "
+             "PROGRESS.md's 'Root-caused: the benign-ground traction stall was never a "
+             "stall' found false-positives on ordinary straight-line driving. Default off, "
+             "matching the shipped (fixed) behaviour - pass this flag for the 'before' arm "
+             "of a same-build comparison, same discipline as --goal-tolerance-m below."
+    )
     parser.add_argument("--watch", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--goal", help=argparse.SUPPRESS)
     parser.add_argument("--trace-csv", help=argparse.SUPPRESS)
@@ -881,7 +897,7 @@ def main() -> int:
                 f" - ground truth {result['gt_error_m']:.1f} m from the goal after "
                 f"{result['gt_travelled_m']:.1f} m travelled, EKF divergence "
                 f"{result['divergence_m']:.1f} m, {result['stuck_events']} stuck events, "
-                f"{result['flip_events']} flips"
+                f"{result['flip_events']} flips, {result['slip_events']} wheel-slip events"
                 if "gt_error_m" in result else ""
             ),
             flush=True,
@@ -897,13 +913,13 @@ def main() -> int:
     print(f"    sensor suite: {suite}")
     print(f"    rover stops within: {args.goal_tolerance_m:.2f} m of the commanded goal "
           f"(bar is {args.tolerance_m:.2f} m)")
-    print(f"{'seed':>6} {'verdict':>20} {'gt error':>9} {'travelled':>10} {'diverg':>8} {'stuck':>6} {'flips':>6}")
+    print(f"{'seed':>6} {'verdict':>20} {'gt error':>9} {'travelled':>10} {'diverg':>8} {'stuck':>6} {'flips':>6} {'slips':>6}")
     for r in results:
         if "gt_error_m" in r:
             print(
                 f"{r['seed']:>6} {r['verdict']:>20} {r['gt_error_m']:>8.1f}m "
                 f"{r['gt_travelled_m']:>9.1f}m {r['divergence_m']:>7.1f}m "
-                f"{r['stuck_events']:>6} {r['flip_events']:>6}"
+                f"{r['stuck_events']:>6} {r['flip_events']:>6} {r['slip_events']:>6}"
             )
         else:
             print(f"{r['seed']:>6} {r['verdict']:>20}")
