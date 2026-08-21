@@ -12,7 +12,7 @@ component reuse log.
 | M1: Procedural lunar terrain | Done |
 | M2: Rover spawns and drives (teleop) | Done |
 | M3: Localisation | **Done, on isolated legs.** The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4% on isolated wheel-odom+IMU+EKF legs, within the <5% target. In full autonomous runs it is 0.4-0.7% of distance on the two well-behaved seeds and 5-11% on seed 123, and it varies by an order of magnitude between repeats of the same seed - see "The stopping tolerance, measured" below |
-| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. Seed 7's tolerance response is now a finished measurement, n=3 both arms, same build, same goal: **0/3 at the shipped 1.0 m (1.53-1.60 m, every run over the 1.5 m bar) vs. 3/3 at 0.35 m (1.46-1.47 m)**, a clean non-overlapping split with zero orbiting-fallback firings across eleven completed runs - see "The replicate campaign, finished" below. `goal_tolerance_m`'s default is changed to **0.35 m** on that evidence. It does not fix M4 overall: seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal (still one run per arm, not replicated - tolerance is structurally irrelevant to a failure that large); seed 123 is drift-limited at 10.3-11.2 m. **Both seeds fail by margins no stopping tolerance can close**, and their drift distribution is still unmeasured - one run per arm remains one sample. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" and "The replicate campaign, finished" below |
+| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. Seed 7's tolerance response is now a finished measurement, n=3 both arms, same build, same goal: **0/3 at the shipped 1.0 m (1.53-1.60 m, every run over the 1.5 m bar) vs. 3/3 at 0.35 m (1.46-1.47 m)**, a clean non-overlapping split with zero orbiting-fallback firings across eleven completed runs - see "The replicate campaign, finished" below. `goal_tolerance_m`'s default is changed to **0.35 m** on that evidence. It does not fix M4 overall: seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal (still one run per arm, not replicated - tolerance is structurally irrelevant to a failure that large); seed 123 is drift-limited at 10.3-11.2 m. **Both seeds fail by margins no stopping tolerance can close**, and their drift distribution is still unmeasured - one run per arm remains one sample. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" and "The replicate campaign, finished" below. **A second, previously-flagged contributor to seed 42's variance is now root-caused and fixed**: `wheel_slip_node`'s "rigid body" false-positive (falsely declaring slip - and ZUPTing real distance out of the EKF - on ordinary dead-straight driving over smooth ground) is retired. A same-build A/B campaign (n=3/arm, seed 42) shows the fix cleanly, non-overlappingly reduces stuck-recovery events, ZUPT-suppressed distance, travelled distance and sim time - but does **not** move seed 42's pass rate or reliably reduce EKF divergence (3/3 vs 2/3 PASS, divergence ranges overlap heavily). Whatever actually drives seed 42's order-of-magnitude divergence spread is still unidentified. See "Root-caused: the benign-ground traction stall was never a stall" and the two sections following it |
 | M5: Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -3570,3 +3570,385 @@ Caveat this decision does not paper over: it is one seed's tolerance response, m
 well. It is not a claim about M4's overall pass rate, which is still gated on seed
 42/123's drift - a problem this change does not touch. See the milestone status line and
 "What this does not establish" above.
+
+## Root-caused: the benign-ground traction stall was never a stall
+
+The open item from two sections up - wheels claiming 2.76 m of turning while the body
+moved 0.00 m, on flat, obstacle-free ground, "not root-caused" - is closed. **The rover
+was never stuck.** The detector that reported it, `wheel_slip_node.py`'s `SlipDetector`,
+has a false-positive mode its own design docstring already described the *mechanism* of
+without noticing it applied twice: an IMU cannot tell constant velocity from rest
+(Galilean invariance), which the docstring uses to justify signature 1's 15 s window -
+but the same blindness sits inside signature 2 ("a rigidly still body"), which checks
+only attitude span and gyro RMS and has **no signal that observes translation at all**.
+A rover driving dead straight, at constant heading, across a patch of ground flat and
+uniform enough that its attitude genuinely does not change for 15 seconds, produces
+*exactly* the same IMU trace as a rover that is not moving. Both were fired at once
+before: never having been checked apart is the whole story.
+
+### Reproducing it clean
+
+`scripts/reproduce_traction_stall.py` drives a single fresh point-to-point goal -
+`mission:=none`, no tour, no prior wedge, no escape-maneuver history of any kind - from
+spawn (0, 0) toward (12, 12) on seed 42, whose straight line happens to cross the exact
+cell (22, 22) the original three tour-run wedges landed in (see the terrain measurement
+two sections up), logging ground-truth pose and wheel odom at 5 Hz for the entire drive.
+It reproduced on the first attempt:
+
+    WHEEL SLIP #1: over the last 15.0 s the wheels claim 2.76 m and 0.00 rad of turning;
+    the gyro saw 0.00 rad (103% of it) and the attitude spanned 0.28 deg. Feeding the EKF
+    a zero-velocity update instead of the wheels' claim.
+
+Numbers essentially identical to the original tour-run quote (2.76 m, 0.00 rad, ~101%,
+0.18 deg attitude span there vs 0.28 deg here) - on a totally independent run, different
+goal, different heading, zero shared history. That rules out the wedge/escape sequence
+as a precondition and points at the terrain patch and the detector instead.
+
+The full-resolution ground-truth trace (`traction_stall_repro/trace.csv`) for the exact
+15 s window the detector integrated - ending at the last sample before the recovery
+maneuver's reverse command takes over, sim time 35.60-50.63 s - settles it:
+
+    displacement from t=35.602 to t=50.625: 2.764 m over 15.02 s
+
+**2.764 m of real ground-truth displacement, against 2.76 m of "phantom" wheel claim.**
+They are the same number. `odom_vx` sits at a rock-steady 0.1840 m/s for the entire
+window (visible sample-by-sample in the trace, not just at the endpoints), and x/y
+advance in lockstep with it the whole time - there is no stall anywhere inside the
+window the detector flagged, onboard signals included. The rover was driving perfectly
+normally. The "stop" only happens *after* the false declaration, when
+`flip_recovery_node.py` reacts to `/wheel_slip` and overrides `cmd_vel` with a reverse
+command - visible in the trace as a clean deceleration from 0.184 m/s starting at
+sim time 51.47 s, less than a second after the window above ends.
+
+### Why this cell, specifically
+
+Terrain and rocks were already cleared two sections up for wedge point 1 specifically
+(cost 8, nearest rock 6.73 m, nearest seam 1.61 m) but that check didn't explain why -
+if nothing is physically wrong there, why does *this* cell keep coming up. Re-measured
+with the actual generation pipeline (`scripts/inspect_wedge_terrain.py`, no Gazebo
+needed) plus the real scattered-rock set for seed 42
+(`collision_radii_m`-aware, not centre-to-centre):
+
+    wedge1 (6.20, 6.20): cell(22,22) slope=1.74deg dist_to_seam=1.61 max_lip=0.009
+    nearest rock (ellipse-normalised): 6.58 radii away (rock 74, centre 6.32 m off)
+
+A single 4.69 m collision slab, tilted a gentle 1.74 deg, no measurable seam lip (9 mm),
+no rock within six radii. It is not flawed ground - it is unusually *good* ground, flat
+and uniform over an area large enough for the rover to hold a dead-straight line across
+it for more than the detector's 15 s window without a single bump to perturb its
+attitude. That is a rare combination on fBm+crater terrain, which is exactly why
+signature 2 - by its own honestly-recorded history, 0 false positives and 0 true
+positives across 7,755 + 968 recorded windows in the original calibration run - had
+never been observed misfiring before this. It needed a patch this smooth to do it.
+
+### What this does and doesn't explain
+
+The original tour run recorded three wedges on this leg: "the stuck detector fired
+(once on onboard wheel slip, twice on ground truth)." This section explains the first
+one completely - it was signature 2 firing on ordinary driving, not a wedge. It says
+nothing about the other two, which fired on `flip_recovery_node.py`'s separate
+ground-truth-based stuck check (real position against commanded speed, not IMU
+attitude) - a different mechanism with a different failure mode, not investigated here
+and not assumed innocent by association.
+
+**This also means the ZUPT fired backwards.** `wheel_slip_node.py` exists to feed the
+EKF a zero-velocity update while the rover is genuinely stuck, protecting localization
+from phantom wheel odometry. Here it suppressed 15 s of **real, correctly-moving**
+wheel odometry instead - the exact corruption in the opposite direction that
+`clearing()`'s hysteresis design already worried about for the release path
+("holding a ZUPT over a rover that is really driving loses real distance"). Every
+false slip declaration like this one costs both a wasted reverse-turn-replan cycle
+*and* an EKF that was told to believe it stood still for 15 seconds when it did not,
+which is a second, previously unrecorded contributor to the run-to-run divergence
+variance the goal-tolerance campaign flagged and could not explain (seed 42: 8 wedges
+in one arm, 5 in the other, same terrain, same seed).
+
+### Not fixed here
+
+No change to `wheel_slip_node.py` is made in this pass. The honest options are all
+worth their own measured validation before shipping, same standard this project held
+the goal-tolerance change to:
+
+- **Drop signature 2 entirely.** It has now gone 7,755 true negatives, 968 missed
+  positives (never caught a real one), and at least one confirmed false positive to
+  1 - a losing record on the only two ways to score it. Signature 1 (rotation vs gyro)
+  is untouched by this bug and keeps working.
+- **Add a corroborating signal signature 2 currently has none of.** The only onboard
+  candidate is the accelerometer's specific-force channel, and it has the same
+  Galilean blind spot at steady state - it can only see the *transition* into/out of
+  motion, not sustained motion, so it would need to be evaluated at the start of the
+  window rather than as a running statistic.
+- **Narrow it with a corridor-shape argument** (e.g. require recent heading variance
+  above some floor before trusting "no rotation" as "no motion") - untried, and would
+  need calibrating against `calibrate_slip_detector.py`'s recorded run same as the
+  existing thresholds were.
+
+Raw evidence: `traction_stall_repro/trace.csv` (full 150 s drive, 5 Hz) and
+`traction_stall_repro/launch.log.excerpt` (the slip/recovery/replan log lines).
+Reproduction script: `scripts/reproduce_traction_stall.py`. Terrain/rock measurement
+script: `scripts/inspect_wedge_terrain.py`.
+
+## Fixed: signature 2 retired, re-measured on the same repro
+
+Took the first option above. `_body_is_rigid` ("signature 2") no longer decides
+`slipping()` or `clearing()` in `wheel_slip_node.py` - the method and its two
+threshold parameters stay (used by `calibrate_slip_detector.py` and documented in
+the tests that record why they were retired), but nothing live calls them any more.
+Full reasoning, dated, is in the module docstring itself now, not just here: signature
+2 was the detector's *original* design, was refuted by the one real recorded wedge
+(0.119-0.195 rad of attitude, 12-20x its own 0.010 rad threshold - it could not have
+caught the failure it was built for), was kept afterward only as a hedge against a
+symmetric-wedge hypothetical that has never once been observed, and has now produced
+a confirmed false positive against that 0-observed record. Its two inputs (attitude
+span, gyro RMS) cannot discriminate the false case from the real one by construction,
+not by mistuning - a straight, uniform-terrain drive and a symmetric wedge are
+byte-identical on both signals - so no threshold adjustment was a candidate; only
+removal was.
+
+`regolith_bringup/test/test_wheel_slip_detector.py` was updated alongside, not left to
+rot: three tests exercised signature 2 directly and now assert the RETIRED behaviour,
+each with a docstring explaining why (`test_symmetric_wedge_without_commanded_turn_is_a_known_undetected_gap`,
+formerly `test_wedged_rover_is_detected`, is the sharpest one - it states outright that
+this exact input is now a known, accepted gap rather than quietly changing what it
+checks). `regolith_bringup` suite: 43/43, same count as before - no coverage was lost,
+three tests changed what they assert and say so.
+
+**Re-measured on the exact repro that found the bug**, not just unit-tested: re-ran
+`scripts/reproduce_traction_stall.py` seed 42, same goal (12, 12), after rebuilding.
+Zero `WHEEL SLIP` and zero `STUCK RECOVERY` in the launch log - against one of each in
+the pre-fix run. The trace (`traction_stall_repro/trace_after_fix.csv`) shows the rover
+crossing the old wedge point at t=48.8 s at the same 0.184 m/s it held for the whole
+drive (82 samples land within 0.3 m of (6.2, 6.2), all still moving), continuing
+uninterrupted, and arriving at (11.81, 11.73) - 0.33 m from the (12, 12) goal, inside
+the 0.35 m tolerance - where it stops normally and stays stopped. Same seed, same goal,
+same terrain, same speed profile, and the only prior obstacle to finishing the drive is
+gone.
+
+**What this does not establish.** One repro run on one seed proves the specific bug is
+fixed, not that the change is free everywhere. It has not been re-measured against a
+real wedge (there is no live "genuine wedge" repro on hand to confirm signature 1 alone
+still catches one - the unit tests cover that logic but not a full physics run), and it
+has not been run through the goal-tolerance campaign's seeds/replicates to see whether
+it actually narrows the seed-42 run-to-run variance this section flagged as a plausible
+target. That would be the next measured step, same standard as everything else in this
+document - not assumed from this result.
+
+## The signature-2 A/B campaign: three metrics separate cleanly, two don't
+
+Took the next measured step named above. `scripts/wheel_slip_ab_campaign.sh` ran seed 42
+(the seed with the unexplained run-to-run spread this whole investigation started from),
+same goal both arms (-84.52, -13.39, 85.6 m straight line, drawn deterministically from
+the seed by `m4_acceptance.py`'s own `pick_goal`), `goal_tolerance_m` pinned at 0.35
+explicitly (the harness's own CLI default is a stale 1.0, unrelated to this campaign -
+passing it explicitly stops that stale default from silently entering the comparison).
+Three reps per arm, interleaved, same build throughout - a single new launch argument
+(`legacy_rigid_body_signature`, added to `hello_moon.launch.py` and threaded through
+`wheel_slip_node.py`'s `SlipDetector` for exactly this purpose) toggles signature 2 back
+on for the "legacy" arm rather than requiring two separate builds, the same discipline
+the goal_tolerance_m campaign used and for the same reason: a build-vs-build comparison
+is what produced the visual-odometry confound earlier in this document. Six runs,
+uninterrupted, roughly 45-55 minutes of wall clock each (seed 42's terrain is difficult
+enough that even the fixed arm racks up several genuine stuck-recovery events - this was
+never going to be a differential from 8 events to 0).
+
+| arm | rep | verdict | gt error | divergence | stuck | slips | phantom m suppressed | travelled | sim time |
+|---|---|---|---|---|---|---|---|---|---|
+| legacy | 1 | PASS | 1.47 m | 2.05 m | 7 | 8 | 7.68 m | 109.3 m | 708.6 s |
+| legacy | 2 | PASS | 1.47 m | 0.44 m | 6 | 3 | 3.78 m | 106.2 m | 671.9 s |
+| legacy | 3 | PASS | 1.49 m | 1.14 m | 7 | 7 | 6.94 m | 108.1 m | 717.5 s |
+| fixed | 1 | PASS | 1.48 m | 0.69 m | 4 | 2 | 1.18 m | 98.8 m | 587.2 s |
+| fixed | 2 | **FAIL_FALSE_ARRIVAL** | 1.58 m | 1.25 m | 3 | 3 | 1.37 m | 97.9 m | 577.3 s |
+| fixed | 3 | PASS | 1.47 m | 0.38 m | 3 | 0 | 0.00 m | 97.2 m | 558.5 s |
+
+"Phantom m suppressed" is `wheel_slip_node`'s own running total - "Phantom distance kept
+out of the EKF so far" - read from each run's final `WHEEL SLIP #N cleared` log line, not
+computed here. It is the ZUPT's own account of how much wheel-odometry distance it zeroed
+out, correct or not, and it is a sharper instrument than a raw event count because it
+weighs each episode by how long it actually held the gate rather than counting a 2-second
+false trigger the same as a 40-second one.
+
+**Four metrics separate cleanly - every legacy value beats every fixed value, no
+overlap:**
+
+- **Stuck-recovery events**: legacy 6-7, fixed 3-4. The fix roughly halves how often the
+  rover ever needs the reverse-turn escape maneuver at all.
+- **Phantom distance suppressed**: legacy 3.78-7.68 m, fixed 0.00-1.37 m - the widest,
+  cleanest gap of any metric measured here, and the most direct one: it is a straight
+  readout of how much real (or previously-believed-phantom) motion the ZUPT held out of
+  the EKF, and fixed rep 3 zeroed nothing at all across the entire drive.
+- **Ground-truth distance travelled**: legacy 106.2-109.3 m, fixed 97.2-98.8 m, against
+  an 85.6 m straight line. Follows mechanically from fewer stuck-recovery detours - the
+  rover simply backtracks less.
+- **Wall-clock sim time**: legacy 671.9-717.5 s, fixed 558.5-587.2 s (~18% faster). Same
+  mechanism: fewer escape maneuvers means less time spent not making progress.
+
+**Two metrics do not separate, and are reported as such rather than rounded toward the
+clean result above:**
+
+- **Wheel-slip events**: legacy {8, 3, 7}, fixed {2, 3, 0} - a strong tendency (medians 7
+  vs 2) but not a clean split. Legacy rep 2's 3 ties fixed rep 1 and rep 2's 3. Consistent
+  with the mechanism (signature 2 retirement removes a source of slip *declarations*, it
+  does not touch signature 1, which both arms still run and which still fires on genuine
+  wedges), but the overlap means "the fix eliminates false slips" is not the same claim
+  as "the fixed arm has fewer slips, full stop" - some of the fixed arm's slips are real.
+- **EKF divergence**: legacy {2.05, 0.44, 1.14} m, fixed {0.69, 1.25, 0.38} m. Medians
+  differ (1.14 vs 0.69) but the ranges overlap heavily - legacy's own low end (0.44 m)
+  beats fixed's own high end (1.25 m). **The fix does not reliably reduce divergence in
+  this sample.** This matches what the goal-tolerance campaign already established about
+  this exact seed: "run-to-run spread on seed 42 is an order of magnitude larger than"
+  any single-parameter effect measured so far, and this campaign's own spread (an
+  almost-5x range within the legacy arm alone, 0.44 to 2.05 m) is more evidence of the
+  same thing, not new evidence against it.
+
+  Checked one step further, since phantom distance suppressed *is* the mechanism by
+  which a ZUPT can corrupt localization: divergence correlates with it across all six
+  runs pooled (Pearson r = 0.70, both arms combined - legacy rep 2's 3.78 m suppressed
+  giving only 0.44 m divergence is the clearest outlier below the trend). A moderate,
+  partial correlation, not a tight one - phantom distance suppressed explains roughly
+  half the variance in divergence (r^2 ~ 0.49) and something else explains the rest.
+  That something else is what actually gates seed 42's pass rate and remains
+  unidentified - this campaign narrows the search (it is not simply "how many times did
+  the rover declare itself stuck," which barely correlates at all: legacy rep 2's 6
+  events produced less divergence than fixed rep 2's 3) without resolving it.
+- **Verdict**: legacy went 3/3 PASS, fixed went 2/3 PASS (one FAIL_FALSE_ARRIVAL - the
+  rover's own `/goal_reached` fired at 1.58 m true error, past the 1.5 m bar). Read
+  naively this looks like the fix making things *worse*; it is not read that way here.
+  n=3 is too small to attach meaning to a 3/3-vs-2/3 split by itself, and the FAIL landed
+  on fixed rep 2's divergence draw (1.25 m, the arm's own high end, not an outlier by the
+  legacy arm's range) - a fully ordinary consequence of divergence remaining unfixed, not
+  a new failure mode introduced by retiring signature 2.
+
+### What this establishes, honestly
+
+The fix does what its mechanism predicts and no more. It measurably, cleanly reduces how
+often this rover declares itself stuck and how much distance and time that costs, on the
+one seed with the most stuck-recovery activity in this whole project. It does **not**
+measurably reduce EKF divergence or move seed 42's pass rate - both remain gated on
+whatever is actually driving that seed's order-of-magnitude run-to-run spread, which is
+still not identified. The false-positive traction stall was a real, confirmed, fixed bug;
+it was never the dominant source of seed 42's variance, and this campaign is the
+measurement that says so rather than assumes it either way.
+
+One more cheap check before leaving the divergence question open, using data already on
+disk rather than new sim time: M3 established turning as wheel odometry's dominant known
+error source (skid-steer scrub, ~3x over-claim), so path complexity - not just event
+count - was a candidate. Replans-per-run, drift-triggered replans specifically, and total
+planned waypoints (all read from the same six launch logs) all correlate with divergence
+more weakly than phantom distance suppressed does (r = 0.46, 0.33, 0.26 respectively,
+against 0.70 for phantom distance) - not zero, but a worse predictor, not a better one.
+This doesn't rule turning-induced drift out (both mechanisms plausibly contribute, and
+this is three proxies, not a direct measurement of accumulated turning), but it means the
+search shouldn't jump straight to "it's replanning/turning instead" on the strength of
+this data - phantom distance suppressed remains the best single predictor found so far,
+at a moderate r^2 ~ 0.49 that still leaves roughly half the variance unexplained.
+
+A second free check, same data: does divergence grow in a few large jumps (pointing at
+specific incidents - an escape maneuver, a ZUPT boundary transient) or gradually across
+the whole drive (pointing at something continuous, e.g. ordinary wheel-odometry scrub
+error accumulating with distance)? Every trace sample is 5 s apart and there are
+459-629 of them per run. In every one of the six runs, the single largest jump between
+consecutive samples is 0.23-0.25 m (0.05 m in fixed rep 3) against total net growth of
+0.38-2.06 m, and divergence moves both up AND down constantly throughout the drive
+(200-280 upward steps and 170-220 downward ones per run, not a one-way ratchet). No run
+has one incident that dominates its final number. That rules out "one bad escape
+maneuver decides the outcome" fairly cleanly, across all six runs, and is consistent
+with something that accumulates steadily during ordinary driving - which points back
+toward M3's already-measured mechanism (skid-steer wheel odometry over-claims rotation
+by ~3x during turning) rather than toward the stuck/ZUPT machinery this whole
+investigation has been focused on. Not measured directly - these are travelled-distance
+and jump-shape proxies, not accumulated turning itself - but two independent proxies
+(replan count, jump-shape) now point the same direction and away from "isolated stuck
+incidents," which is a real narrowing even though it isn't a root cause yet.
+
+### What this does not establish
+
+n=3 per arm, one seed (42, chosen because it's the seed this whole investigation started
+from - the one with 8-vs-5 wedge variance in the original goal-tolerance campaign). Seeds
+7 and 123 were not run. A larger n might separate wheel-slip events cleanly (the medians
+are 3.5x apart) or might not - not measured. Whatever is actually driving seed 42's
+divergence spread remains an open question this campaign was not built to answer, same
+status as before this section. The most promising untried next step, on the evidence
+above, was to instrument a live run with continuous `/odom` and `/imu` angular-rate
+logging (the traces here only carry position) and correlate accumulated turning directly
+against divergence growth, rather than through the proxies used above - see the next
+section for that measurement.
+
+Raw evidence: `wheel_slip_ab_campaign/` (all 6 runs' launch logs, ground-truth/EKF trace
+CSVs, and result/summary JSON). Campaign script: `scripts/wheel_slip_ab_campaign.sh`. The
+A/B lever itself (`legacy_rigid_body_signature`, default off) stays in the code - see
+`wheel_slip_node.py` and `hello_moon.launch.py` - as it is not meant to be a permanent
+setting, just the mechanism this comparison needed.
+
+## Turning vs. divergence, measured directly - and why the obvious answer is confounded
+
+The proxies above were indirect. `scripts/turning_vs_divergence_campaign.sh` gets the
+direct measurement: three more fixed-arm seed-42 runs, same goal, `--record-signals`
+logging `/odom` and `/imu` angular velocity at 10 Hz throughout the whole drive, so
+accumulated turning (`integral of |wz| dt`, both onboard signals) can be correlated
+against final divergence without a proxy in between.
+
+| rep | verdict | accum &#124;odom_wz&#124; dt | accum &#124;imu_wz&#124; dt | divergence | travelled | stuck | slips |
+|---|---|---|---|---|---|---|---|
+| 1 | PASS | 17.91 rad | 13.15 rad | 0.42 m | 97.2 m | 3 | 0 |
+| 2 | PASS | 16.34 rad | 12.46 rad | 0.40 m | 97.3 m | 3 | 0 |
+| 3 | **FAIL_FALSE_ARRIVAL** | 29.14 rad | 18.85 rad | 1.45 m | 109.9 m | 7 | 3 |
+
+Raw Pearson r across these three points: **0.995** (odom-based turning) and **0.996**
+(IMU-based) against divergence. Stated plainly and then immediately qualified, because
+at n=3 this number is close to meaningless as a statistical test - three points nearly
+always look correlated when one of them (rep 3) is simultaneously the high point on both
+axes, and there is no way at n=3 to rule out that a third variable is driving both.
+
+There is an obvious third variable sitting right there: rep 3 also has more than double
+the stuck-recovery events (7 vs 3), and **every escape maneuver is itself a commanded
+turn** - `flip_recovery_node.py`'s escalating maneuver logs its exact rate and duration
+per event, so the turning it contributes is computable exactly rather than estimated:
+
+    escalation level 0: 0.50 rad/s x 2.0s = 1.00 rad
+    escalation level 1: 0.50 rad/s x 3.5s = 1.75 rad
+    escalation level 2: 0.50 rad/s x 5.0s = 2.50 rad
+    escalation level 3: 0.50 rad/s x 6.5s = 3.25 rad
+
+Subtracting each run's actual escalation sequence (rep 1 and 2: levels 0,1,2 = 5.25 rad;
+rep 3: levels 0,1,2,3,0,1,2, escalation resetting after its second relapse-window cycle =
+13.75 rad) from the total accumulated odometry turning leaves the turning that happened
+during *ordinary driving*, separate from escapes:
+
+| rep | total odom turning | escape-attributable | ordinary-driving turning | divergence |
+|---|---|---|---|---|
+| 1 | 17.91 rad | 5.25 rad | 12.66 rad | 0.42 m |
+| 2 | 16.34 rad | 5.25 rad | 11.09 rad | 0.40 m |
+| 3 | 29.14 rad | 13.75 rad | 15.39 rad | 1.45 m |
+
+Once escape-attributable turning is removed, rep 3's *ordinary-driving* turning is only
+about 30-40% higher than reps 1-2's (15.39 vs 11.09-12.66 rad) - while its divergence is
+roughly 3.5x higher (1.45 vs 0.40-0.42 m). Those two ratios don't match. **The clean
+"turning during ordinary driving explains the divergence spread" story does not survive
+its own confound check.** Most of rep 3's excess turning, and essentially all of the
+qualitative jump in stuck-recovery activity, comes from having more escape episodes, not
+from driving a more convoluted ordinary path - which shifts the weight of evidence back
+toward the escape/stuck-event machinery itself (matching the phantom-distance-suppressed
+r=0.70 finding in the previous section) rather than toward general path-turning as the
+dominant mechanism. Neither is proven; this measurement's actual contribution is ruling
+out a clean version of the turning hypothesis that the proxy correlations couldn't rule
+out on their own.
+
+### What this does not establish
+
+n=3, one seed, one arm (fixed only - there was no A/B question left to ask here, this
+campaign exists purely to get (turning, divergence) pairs). The escape-attributable
+turning subtraction is exact arithmetic on logged commanded rates/durations, not a
+measurement of what the wheels actually achieved - real escape-maneuver turning may
+differ from commanded turning by the same kind of skid-steer scrub M3 already measured
+for ordinary driving, which this analysis does not correct for. And rep 3's divergence
+draw is one sample of whatever seed 42's real variance distribution is - it might have
+been a high draw for reasons unrelated to either turning or stuck events. The honest
+summary after two campaigns and eleven total seed-42 runs this investigation has now
+produced: phantom distance suppressed (r=0.70, n=6) is still the best single predictor
+of divergence found, stuck-recovery/escape activity is implicated more than ordinary-path
+turning is, and no single mechanism has been isolated as sufficient on its own. That is
+where this line of investigation stands at the end of this session.
+
+Raw evidence: `turning_vs_divergence_campaign/` (3 runs' launch logs, ground-truth/EKF
+trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz, and result/summary JSON). Campaign
+script: `scripts/turning_vs_divergence_campaign.sh`.
