@@ -1,0 +1,59 @@
+[
+  {
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "goal": [
+      -84.52,
+      -13.39
+    ],
+    "gt_final": [
+      -83.09947316410177,
+      -12.319911254564397
+    ],
+    "ekf_final": [
+      -84.27038772437865,
+      -13.168193620069115
+    ],
+    "gt_error_m": 1.7784786798314391,
+    "divergence_m": 1.4458989864768175,
+    "gt_travelled_m": 109.9426218474015,
+    "ekf_travelled_m": 109.09049380507949,
+    "sim_time_s": 674.6800000000001,
+    "verdict_gt_error_m": 1.7784786798314391,
+    "stopped_gt_error_m": 1.7784786798314391,
+    "stopped_gt_pos": [
+      -83.09947316410177,
+      -12.319911254564397
+    ],
+    "settled_reason": "verdict is terminal",
+    "settle_sim_s": 0.0,
+    "max_roll_deg": 9.258149061766517,
+    "max_pitch_deg": 12.179031048676567,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": true,
+    "goal_reached_gt_error_m": 1.779239356555044,
+    "wall_time_s": 2838.0063691059986,
+    "seed": 42,
+    "goal_validation": {
+      "goal": [
+        -84.52,
+        -13.39
+      ],
+      "cell": [
+        110,
+        19
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 85.57407609784636
+    },
+    "straight_line_m": 85.57407609784636,
+    "stuck_events": 7,
+    "flip_events": 0,
+    "slip_events": 3,
+    "log": "turning_vs_divergence_campaign/seed42_rep3/seed_42_launch.log",
+    "trace": "turning_vs_divergence_campaign/seed42_rep3/seed_42_trace.csv",
+    "started": "2026-08-21 02:52:54"
+  }
+]
