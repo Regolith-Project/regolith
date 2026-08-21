@@ -115,9 +115,15 @@ def analyze(run_dir):
     started = datetime.datetime.strptime(run_meta["started"], "%Y-%m-%d %H:%M:%S")
     anchor_epoch = started.timestamp()
 
-    trace = load_trace(run_dir / "seed_42_trace.csv")
-    signals = load_signals(run_dir / "seed_42_signals.csv")
-    windows = escape_windows_t_s(run_dir / "seed_42_launch.log", anchor_epoch)
+    # Layout is scripts/m4_acceptance.py's own naming (seed_<N>_{trace,signals,launch.log}),
+    # not hardcoded to seed 42 - any seed's run_dir works.
+    (trace_path,) = run_dir.glob("seed_*_trace.csv")
+    (signals_path,) = run_dir.glob("seed_*_signals.csv")
+    (log_path,) = run_dir.glob("seed_*_launch.log")
+
+    trace = load_trace(trace_path)
+    signals = load_signals(signals_path)
+    windows = escape_windows_t_s(log_path, anchor_epoch)
 
     run_t0, run_t1 = trace[0][0], trace[-1][0]
     escape_total_dt = 0.0
