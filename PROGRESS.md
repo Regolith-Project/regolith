@@ -4027,3 +4027,118 @@ dedicated experiment.
 
 Raw evidence: reuses `turning_vs_divergence_campaign/`, no new sim time spent. Script:
 `scripts/escape_window_divergence.py`.
+
+## Does the signature-2 fix generalize past seed 42? Seeds 7 and 123, same-build A/B
+
+Every A/B measurement so far - the wheel-slip A/B campaign and the escape-window
+analysis above - used seed 42 exclusively, the seed this whole investigation started
+from. `scripts/wheel_slip_generalization_campaign.sh` runs the same same-build A/B
+discipline (`legacy_rigid_body_signature` toggling the retired signature 2 back on for
+one arm, `goal_tolerance_m` pinned at 0.35 explicitly) on seeds 7 and 123, one rep per
+arm - a first-light-touch generalization check, not a replicate campaign. Goals matched
+the previously banked ones exactly (seed 7: `(-42.57, -59.25)`, 72.96 m straight line -
+confirmed byte-identical against `m4_tolerance_run2/seed7_tol0.35/summary.json`'s
+recorded goal, so this is the same terrain/goal the earlier goal-tolerance campaign used,
+not a fresh draw).
+
+| seed | arm | verdict | gt error | divergence | travelled | sim time | stuck | slips |
+|---|---|---|---|---|---|---|---|---|
+| 7 | legacy | FAIL_FALSE_ARRIVAL | 1.7 m | 1.38 m | 106.6 m | 679 s | 9 | 8 |
+| 7 | fixed | FAIL_FALSE_ARRIVAL | 2.1 m | 1.80 m | 96.7 m | 601 s | 5 | 3 |
+| 123 | legacy | FAIL_FALSE_ARRIVAL | 13.0 m | 12.66 m | 123.1 m | 1044 s | 18 | 18 |
+| 123 | fixed | FAIL_FALSE_ARRIVAL | 10.3 m | 9.98 m | 97.9 m | 838 s | 11 | 22 |
+
+**The three metrics that separated cleanly on seed 42 generalize cleanly to both new
+seeds, in the same direction, 4 for 4:** stuck-recovery events, ground-truth distance
+travelled, and sim time are all lower on the fixed arm than the legacy arm, on both seed
+7 and seed 123. This is the same mechanical story as the seed-42 campaign - fewer false
+stuck declarations means fewer escape maneuvers, less backtracking, less time spent not
+making progress - now confirmed on terrain the fix was never tuned against.
+
+**The two metrics that didn't separate on seed 42 also don't separate here, which is
+itself consistent rather than a new problem:** wheel-slip events go the "wrong" direction
+on seed 123 (fixed has *more*, 22 vs 18 - signature 1 is untouched by the fix and still
+fires on genuine wedges, so more real wedges on the fixed arm's particular run means more
+real slip declarations, nothing to do with the retired signature). Divergence also
+doesn't separate in one consistent direction: fixed is *worse* on seed 7 (1.80 vs 1.38 m)
+and *better* on seed 123 (9.98 vs 12.66 m). Exactly the pattern the seed-42 campaign
+already established - divergence is not reliably moved by this fix either way - now seen
+on two more seeds instead of asserted from one.
+
+**All four runs failed** (`FAIL_FALSE_ARRIVAL`), which was not the case for seed 42 in
+its own campaign (5/6 PASS there). n=1 per cell, so this is one draw each, not a rate -
+but it surfaces something worth flagging on its own:
+
+**Seed 7's divergence here (1.38-1.80 m) is 2-3x the previously banked range for the same
+seed and goal (0.56-0.77 m across all 6 runs of the replicate campaign, both tolerance
+arms, "The replicate campaign, finished" above) - on what is otherwise the same code.**
+Checked directly rather than assumed: the only functional changes between that banked
+build (`aec4964` / `5968d029d`) and this one (`b0be587` / `333c2d48a`) are the signature-2
+retirement itself (the deliberate lever, off in the "legacy" arm here, so it can't explain
+the legacy arm's own 1.38 m) and pure formatting/style commits already verified as no-ops
+earlier in this document (`git log aec4964..b0be587` and the equivalent range in
+`regolith.universe`, both checked). `TerminalApproach` predates both builds (recorded as
+"uncommitted work" at the time of the banked runs, committed afterward as `16b125e22`) -
+not a confound either. **Seed 7 was characterised in the replicate campaign as the
+seed where the tolerance change is decisive, implicitly because its drift looked small
+and stable (0.56-0.67 m across three replicates).** This single additional draw - on
+either arm - says that characterisation was drawn from a narrower slice of seed 7's real
+variance than three replicates could reveal, the same lesson this document already
+learned twice about seed 42 (order-of-magnitude spread) and once about the wheel-slip
+A/B campaign's own divergence numbers. It is one more data point, not a reversal of the
+n=3 finding, but it means seed 7 should no longer be treated as the "low-variance" seed
+in contrast to 42 and 123 - that contrast has not actually been measured.
+
+### Bonus, using data already in hand: does the escape-vs-ordinary parity from seed 42 hold on these seeds?
+
+`scripts/escape_window_divergence.py` (generalised to any seed's `seed_<N>_*` filenames,
+not just 42's) ran against all four of these runs for free, since `--record-signals` was
+already on. **It does not hold - these two seeds show the opposite pattern from seed 42:**
+
+| run | escape div/rad (odom) | ordinary div/rad (odom) | ratio |
+|---|---|---|---|
+| seed 42, 3 reps (previous section) | 0.0041-0.0123 | 0.0062-0.0117 | 0.65-1.05x |
+| seed 7, legacy | 0.0347 | 0.0024 | **14.49x** |
+| seed 7, fixed | 0.0247 | 0.0130 | 1.90x |
+| seed 123, legacy | 0.0318 | 0.0257 | 1.24x |
+| seed 123, fixed | 0.0604 | 0.0247 | 2.45x |
+
+On seed 42, escape-window turning cost about the same divergence per radian as
+ordinary-driving turning, in all three reps (ratios near 1x) - the finding the previous
+section built on. On these two seeds, escape-window turning costs *more* per radian than
+ordinary driving in all four cells, sometimes by an order of magnitude. Seed 7 legacy's
+14.49x is driven by an unusually small ordinary-driving denominator (0.229 m of
+divergence over 95.71 rad of ordinary turning - close to the noise floor) as much as by a
+large escape numerator, so that specific multiple should not be taken at face value; the
+other three cells (1.24x, 1.90x, 2.45x) are on firmer footing and still all point the same
+direction, away from seed 42's parity.
+
+**What this means for the escape-vs-ordinary question:** seed 42's near-1x parity does
+not generalize. Either seed 42 is the unusual case (three reps of tame, non-symmetric
+wedges relative to whatever these two seeds' terrain produces), or the escape/ordinary
+divergence-per-radian ratio is itself terrain- or seed-dependent rather than a fixed
+property of escape maneuvers, or n=1 per cell here is simply too little to trust over
+seed 42's n=3. This does not overturn the previous section's seed-42-specific conclusion,
+but it means "escape turning doesn't cost more than ordinary turning" cannot be stated as
+a general claim off the strength of that one seed - it is now one seed's finding against
+two seeds' worth of the opposite pattern, at even lower replicate counts. Absolute
+divergence-per-radian rates also differ by roughly an order of magnitude across seeds
+(seed 42's ordinary rate ~0.006-0.012 m/rad vs seed 7/123's ~0.002-0.026 m/rad) - a
+reminder that this rate is not a fixed constant of the vehicle, and cross-seed
+comparisons of it should stay qualitative (direction, ratio) rather than quantitative.
+
+### What this does not establish
+
+n=1 per cell, two seeds, one rep each - a first-light-touch generalization check, exactly
+as scoped, not a replicate campaign. It answers "does the fix's benefit show up on other
+terrain" (yes, on the three metrics that were ever expected to move) and "does the
+escape/ordinary parity from seed 42 hold generally" (evidence now says no, on n=1x2). It
+does not establish a rate for any of these seeds, does not explain why seed 7's divergence
+jumped between campaigns, and does not explain why the escape/ordinary ratio differs by
+seed. All three are open questions this pass surfaces rather than resolves - the honest
+shape of this investigation continues to be that no single mechanism has been isolated as
+sufficient, and each targeted look narrows the search rather than closing it.
+
+Raw evidence: `wheel_slip_generalization_campaign/` (4 runs' launch logs, ground-truth/EKF
+trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz, result/summary JSON). Campaign script:
+`scripts/wheel_slip_generalization_campaign.sh`.
