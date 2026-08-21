@@ -3952,3 +3952,78 @@ where this line of investigation stands at the end of this session.
 Raw evidence: `turning_vs_divergence_campaign/` (3 runs' launch logs, ground-truth/EKF
 trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz, and result/summary JSON). Campaign
 script: `scripts/turning_vs_divergence_campaign.sh`.
+
+## Escape-window vs. ordinary-driving divergence rate - a sharper cut, and a new lead
+
+The previous section's escape-attributable-turning subtraction used *commanded* escape
+rates (the exact rates `flip_recovery_node.py` logs it commanded), not what the wheels
+actually did, and it only compared totals across runs, not regimes within a run. Both
+limits are avoidable with data already on disk: the same three runs already carry 10 Hz
+`/odom` and `/imu` angular-rate signals, and the launch log already timestamps every
+escape maneuver's start ("Recovery node has taken over /cmd_vel") and end ("Recovery
+finished"). `scripts/escape_window_divergence.py` uses those directly - the *actual*
+instrumented `|wz|` integrated within each escape window, not the commanded rate - to
+split each run's own divergence growth into an escape-window share and an
+ordinary-driving share, and asks the sharper question directly: within the same run, is
+divergence accumulated per radian of turning higher during escape maneuvers than during
+ordinary driving?
+
+| rep | escape windows | escape dt | divergence: escape / ordinary | odom turning: escape / ordinary | div per rad (odom): escape / ordinary | ratio |
+|---|---|---|---|---|---|---|
+| 1 | 3 | 118 s / 5.3% | 0.058 / 0.361 m | 14.16 / 57.24 rad | 0.0041 / 0.0063 m/rad | 0.65x |
+| 2 | 3 | 123 s / 5.3% | 0.076 / 0.327 m | 14.87 / 52.57 rad | 0.0051 / 0.0062 m/rad | 0.82x |
+| 3 | 7 | 318 s / 11.2% | 0.479 / 0.964 m | 39.09 / 82.62 rad | 0.0123 / 0.0117 m/rad | 1.05x |
+
+**Escape-window turning does not cost more divergence per radian than ordinary-driving
+turning, in any of the three runs** (ratios 0.65-1.05x, no consistent direction). This
+sharpens rather than reverses the previous section's finding: that section already ruled
+out "escape turning has an outsized effect" as the sole explanation via a cruder
+arithmetic check; this rules out the same idea more directly, with the actual wheel/gyro
+signal instead of the commanded rate (so it also closes the specific gap that section
+flagged - "real escape-maneuver turning may differ from commanded turning by the same
+kind of skid-steer scrub" - since this measurement already reflects whatever scrub
+happened).
+
+**But the runs don't share one rate.** Rep 3's per-radian rate is roughly double rep 1
+and rep 2's - in BOTH regimes at once, escape and ordinary alike. That is the new,
+sharper observation: it isn't that rep 3 does more turning of a kind that costs more: its
+turning costs more everywhere in that run, uniformly. A direct cross-run check makes this
+concrete - predict each run's total divergence from the *other two* runs' average
+ordinary-driving per-radian rate, applied to its own total turning:
+
+    rep 1: predicted 0.639 m (0.0089 m/rad x 71.4 rad)   actual 0.419 m   (0.66x predicted)
+    rep 2: predicted 0.606 m (0.0090 m/rad x 67.4 rad)   actual 0.403 m   (0.66x predicted)
+    rep 3: predicted 0.762 m (0.0063 m/rad x 121.7 rad)  actual 1.443 m  (1.89x predicted)
+
+Rep 1 and rep 2 agree with each other almost exactly (both 0.66x). Rep 3 is the outlier,
+by nearly a factor of 3 relative to where the other two land - and it's an outlier on the
+*rate*, not on how much it turned.
+
+**A candidate for what's different about rep 3: it is the only one of the three with any
+genuine wheel-slip declarations.** From each run's own counters: rep 3 had 3 real
+`/wheel_slip` events (signature 1, actual wedges) and 7 stuck-recovery events; rep 1 and
+rep 2 both had 0 slip events and 3 stuck events each. A real slip episode holds the EKF
+on a zero-velocity update for a sustained window - if that also leaves the filter's
+state/covariance perturbed afterward rather than cleanly recovering, the visible effect
+would be an elevated divergence-per-radian conversion rate for the *rest* of the run, in
+whatever driving follows - both ordinary and escape alike, which is exactly what rep 3
+shows and rep 1/2 don't. This is a different mechanism from the previous campaign's
+"phantom distance suppressed" predictor (r=0.70): that one measures the distance withheld
+during the ZUPT itself; this one is a hypothesis about a lingering rate change
+afterward, and the two are not mutually exclusive.
+
+### What this does not establish
+
+n=3, one seed (42), and only one of the three runs has any real slip events at all - this
+is a single data point in favour of the "slip event leaves a persistent elevated rate"
+hypothesis, not a confirmation of it. It could equally be that rep 3 drew a harder patch
+of terrain for reasons unconnected to its slip events, and the slip events and the rate
+increase are both downstream of that, rather than the slip events causing the rate
+increase directly. Testing it properly needs either more seed-42 reps with signals
+recorded (to get more slip-event/no-slip-event pairs on the same seed) or the same
+recording extended to other seeds - which the next section's campaign does, incidentally,
+letting the same escape-window analysis run cross-seed as a byproduct rather than a
+dedicated experiment.
+
+Raw evidence: reuses `turning_vs_divergence_campaign/`, no new sim time spent. Script:
+`scripts/escape_window_divergence.py`.
