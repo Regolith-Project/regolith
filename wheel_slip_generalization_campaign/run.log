@@ -1,0 +1,80 @@
+=== wheel-slip generalization campaign -> wheel_slip_generalization_campaign (seed 7, 1 rep(s)/arm) ===
+Fri Aug 21 10:00:09 AM BST 2026
+
+=== seed 7, legacy, rep 1 - 10:00:09 ===
+Results -> wheel_slip_generalization_campaign/seed7_legacy_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=24
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.7 m from the goal after 106.6 m travelled, EKF divergence 1.4 m, 9 stuck events, 0 flips, 8 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      1.7m     106.6m     1.4m      9      0      8
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.7 m true error
+=== finished 10:47:26 ===
+
+=== seed 7, fixed, rep 1 - 10:47:36 ===
+Results -> wheel_slip_generalization_campaign/seed7_fixed_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=39
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 2.1 m from the goal after 96.7 m travelled, EKF divergence 1.8 m, 5 stuck events, 0 flips, 3 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      2.1m      96.7m     1.8m      5      0      3
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 2.1 m true error
+=== finished 11:39:32 ===
+
+=== wheel-slip generalization campaign finished (seed 7) - Fri Aug 21 11:39:42 AM BST 2026 ===
+=== wheel-slip generalization campaign -> wheel_slip_generalization_campaign (seed 123, 1 rep(s)/arm) ===
+Fri Aug 21 11:39:42 AM BST 2026
+
+=== seed 123, legacy, rep 1 - 11:39:42 ===
+Results -> wheel_slip_generalization_campaign/seed123_legacy_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=73
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 13.0 m from the goal after 123.1 m travelled, EKF divergence 12.7 m, 18 stuck events, 0 flips, 18 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     13.0m     123.1m    12.7m     18      0     18
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 13.0 m true error
+=== finished 13:00:17 ===
+
+=== seed 123, fixed, rep 1 - 13:00:26 ===
+Results -> wheel_slip_generalization_campaign/seed123_fixed_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=30
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 10.3 m from the goal after 97.9 m travelled, EKF divergence 10.0 m, 11 stuck events, 0 flips, 22 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     10.3m      97.9m    10.0m     11      0     22
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 10.3 m true error
+=== finished 13:53:25 ===
+
+=== wheel-slip generalization campaign finished (seed 123) - Fri Aug 21 01:53:35 PM BST 2026 ===

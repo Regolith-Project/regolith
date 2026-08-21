@@ -1,0 +1,83 @@
+[INFO] [launch]: All log files can be found below /home/balazs/.ros/log/2026-08-21-10-47-39-613593-DESKTOP-IE5MOME-50227
+[INFO] [launch]: Default logging verbosity is set to INFO
+[hello_moon.launch] Using ROS_DOMAIN_ID=39 (isolated DDS domain for this launch - see PROGRESS.md)
+[INFO] [ruby $(which gz) sim-1]: process started with pid [50271]
+[INFO] [robot_state_publisher-2]: process started with pid [50274]
+[INFO] [parameter_bridge-3]: process started with pid [50276]
+[INFO] [wheel_slip_node.py-4]: process started with pid [50279]
+[INFO] [sensor_covariance_relay.py-5]: process started with pid [50281]
+[INFO] [ekf_node-6]: process started with pid [50283]
+[INFO] [costmap_node-7]: process started with pid [50285]
+[INFO] [planner_node-8]: process started with pid [50287]
+[INFO] [pure_pursuit_node-9]: process started with pid [50289]
+[INFO] [flip_recovery_node.py-10]: process started with pid [50291]
+[INFO] [mission_markers_node.py-11]: process started with pid [50293]
+[robot_state_publisher-2] [INFO] [1787305661.851108946] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1787305661.851358791] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1787305661.851380633] [robot_state_publisher]: got segment chassis
+[robot_state_publisher-2] [INFO] [1787305661.851387543] [robot_state_publisher]: got segment front_left_wheel
+[robot_state_publisher-2] [INFO] [1787305661.851393900] [robot_state_publisher]: got segment front_right_wheel
+[robot_state_publisher-2] [INFO] [1787305661.851400094] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-2] [INFO] [1787305661.851406350] [robot_state_publisher]: got segment rear_left_wheel
+[robot_state_publisher-2] [INFO] [1787305661.851412339] [robot_state_publisher]: got segment rear_right_wheel
+[parameter_bridge-3] [INFO] [1787305661.897973124] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.901420395] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.904375821] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.909842592] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/odometry (gz.msgs.Odometry) -> /odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.913237168] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/odometry (nav_msgs/msg/Odometry) -> /odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.918537560] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera (gz.msgs.Image) -> /camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.921401993] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera (sensor_msgs/msg/Image) -> /camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.923002157] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera_info (gz.msgs.CameraInfo) -> /camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.925103902] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera_info (sensor_msgs/msg/CameraInfo) -> /camera_info (gz.msgs.CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.927462380] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/depth_camera (gz.msgs.Image) -> /depth_camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.929087893] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/depth_camera (sensor_msgs/msg/Image) -> /depth_camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.929991714] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu (gz.msgs.IMU) -> /imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.933940723] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/imu (sensor_msgs/msg/Imu) -> /imu (gz.msgs.IMU)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.938618236] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/regolith_moon/model/rover/joint_state (gz.msgs.Model) -> /world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.940376950] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState) -> /world/regolith_moon/model/rover/joint_state (gz.msgs.Model)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1787305661.942371001] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/rover/pose (gz.msgs.Pose) -> /model/rover/pose (geometry_msgs/msg/PoseStamped)] (Lazy 0)
+[flip_recovery_node.py-10] [INFO] [1787305662.619826104] [regolith_flip_recovery]: Flip/stuck recovery armed (simulated set_pose backstop for flips, straight-line cmd_vel override for stuck-but-upright)
+[wheel_slip_node.py-4] [INFO] [1787305662.643976849] [regolith_wheel_slip]: Wheel-slip ZUPT armed: /odom -> /odom/gated (onboard signals only - wheel odometry and IMU, never ground truth). legacy_rigid_body_signature=False
+[mission_markers_node.py-11] [INFO] [1787305662.135853981] [regolith_mission_markers]: Mission markers active - start at (0.0, 0.0), Gazebo flags on, RViz on /mission_markers
+[costmap_node-7] [INFO] [1787305662.141536122] [regolith_costmap]: Published costmap: 256x256 cells at 0.781 m/cell
+[planner_node-8] [WARN] [1787305666.400808262] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-8] [INFO] [1787305676.492081519] [regolith_planner]: Planned path: 103 waypoints, start=(128, 128) goal=(52, 73)
+[parameter_bridge-3] [INFO] [1787305676.954013314] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[costmap_node-7] [WARN] [1787305691.141524749] [regolith_costmap]: Hazard #1 marked at (0.64, -0.48): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-9] [INFO] [1787305691.155346822] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[pure_pursuit_node-9] [INFO] [1787305707.439371204] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1787305707.500662989] [regolith_flip_recovery]: STUCK RECOVERY #1 (escalation level 0, triggered by ground truth; 1 ground-truth / 0 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, at a measured 0.30x real time). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-8] [WARN] [1787305707.502265286] [regolith_planner]: Current-position cell (128, 127) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (128, 126) instead
+[flip_recovery_node.py-10] [WARN] [1787305707.505521857] [regolith_flip_recovery]: STUCK RECOVERY #1 result: ground truth moved 0.14 m during the maneuver - STILL WEDGED (0/1 escapes have freed the rover so far)
+[planner_node-8] [INFO] [1787305707.574962637] [regolith_planner]: Planned path: 103 waypoints, start=(128, 126) goal=(52, 73)
+[pure_pursuit_node-9] [INFO] [1787305721.663578201] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1787305721.670822412] [regolith_costmap]: Hazard #2 marked at (-0.04, -0.38): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-9] [INFO] [1787305757.149315074] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1787305757.209888362] [regolith_flip_recovery]: STUCK RECOVERY #2 (escalation level 1, triggered by ground truth; 2 ground-truth / 0 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 6.0s, then turned right at 0.50 rad/s for 3.5s (sim time, at a measured 0.26x real time). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-8] [INFO] [1787305757.318093694] [regolith_planner]: Planned path: 104 waypoints, start=(129, 126) goal=(52, 73)
+[flip_recovery_node.py-10] [WARN] [1787305761.979402924] [regolith_flip_recovery]: STUCK RECOVERY #2 result: ground truth moved 1.17 m during the maneuver - FREED (1/2 escapes have freed the rover so far)
+[wheel_slip_node.py-4] [WARN] [1787306775.419317698] [regolith_wheel_slip]: WHEEL SLIP #1: over the last 15.0 s the wheels claim 2.52 m and 2.78 rad of turning; the gyro saw 0.40 rad (14% of it) and the attitude spanned 8.05 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[pure_pursuit_node-9] [INFO] [1787306800.929151597] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1787306800.936989670] [regolith_costmap]: Hazard #3 marked at (-11.20, -38.56): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[wheel_slip_node.py-4] [WARN] [1787306819.537262812] [regolith_wheel_slip]: WHEEL SLIP #1 cleared - over the last 5.0 s the wheels claimed 0.59 rad of turning and the gyro corroborated 26% of it. Phantom distance kept out of the EKF so far: 1.23 m.
+[wheel_slip_node.py-4] [WARN] [1787306819.632861140] [regolith_wheel_slip]: WHEEL SLIP #2: over the last 15.0 s the wheels claim 2.13 m and 3.59 rad of turning; the gyro saw 0.33 rad (9% of it) and the attitude spanned 7.61 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[pure_pursuit_node-9] [INFO] [1787306826.421543601] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1787306826.482983291] [regolith_flip_recovery]: STUCK RECOVERY #3 (escalation level 0, triggered by wheel slip (onboard); 2 ground-truth / 1 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, at a measured 0.20x real time). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-8] [WARN] [1787306826.485563882] [regolith_planner]: Current-position cell (79, 113) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (80, 112) instead
+[planner_node-8] [INFO] [1787306826.514808913] [regolith_planner]: Planned path: 55 waypoints, start=(80, 112) goal=(52, 73)
+[pure_pursuit_node-9] [INFO] [1787306827.272683372] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1787306827.280447221] [regolith_costmap]: Hazard #4 marked at (-10.79, -38.54): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[wheel_slip_node.py-4] [WARN] [1787306829.761841483] [regolith_wheel_slip]: WHEEL SLIP #2 cleared - over the last 5.0 s the wheels claimed 0.61 rad of turning and the gyro corroborated 90% of it. Phantom distance kept out of the EKF so far: 1.30 m.
+[pure_pursuit_node-9] [INFO] [1787306875.056521514] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1787306875.117836197] [regolith_flip_recovery]: STUCK RECOVERY #4 (escalation level 1, triggered by wheel slip (onboard); 2 ground-truth / 2 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 6.0s, then turned right at 0.50 rad/s for 3.5s (sim time, at a measured 0.19x real time). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-8] [INFO] [1787306875.146410736] [regolith_planner]: Planned path: 56 waypoints, start=(81, 113) goal=(52, 73)
+[flip_recovery_node.py-10] [WARN] [1787306880.632462952] [regolith_flip_recovery]: STUCK RECOVERY #4 result: ground truth moved 1.17 m during the maneuver - FREED (2/4 escapes have freed the rover so far)
+[pure_pursuit_node-9] [INFO] [1787307491.446500087] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1787307491.456865295] [regolith_costmap]: Hazard #5 marked at (-16.57, -52.64): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[wheel_slip_node.py-4] [WARN] [1787307549.029436233] [regolith_wheel_slip]: WHEEL SLIP #3: over the last 15.0 s the wheels claim 2.31 m and 1.21 rad of turning; the gyro saw 0.18 rad (14% of it) and the attitude spanned 9.24 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[wheel_slip_node.py-4] [WARN] [1787307559.949016350] [regolith_wheel_slip]: WHEEL SLIP #3 cleared - over the last 5.0 s the wheels claimed 0.43 rad of turning and the gyro corroborated 68% of it. Phantom distance kept out of the EKF so far: 1.41 m.
+[pure_pursuit_node-9] [INFO] [1787307581.184087529] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1787307581.244531288] [regolith_flip_recovery]: STUCK RECOVERY #5 (escalation level 2, triggered by ground truth; 3 ground-truth / 2 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 10.0s, then turned left at 0.50 rad/s for 5.0s (sim time, at a measured 0.16x real time). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-8] [INFO] [1787307581.264110053] [regolith_planner]: Planned path: 40 waypoints, start=(63, 109) goal=(52, 73)
+[flip_recovery_node.py-10] [WARN] [1787307587.656331514] [regolith_flip_recovery]: STUCK RECOVERY #5 result: ground truth moved 2.14 m during the maneuver - FREED (3/5 escapes have freed the rover so far)
+[pure_pursuit_node-9] [INFO] [1787308761.629960957] [regolith_pure_pursuit]: Goal reached (within 0.34 m of the commanded goal)
