@@ -4804,3 +4804,38 @@ of expensive, many-hour paired-campaign measurement this document has repeatedly
 just to characterise the CURRENT behaviour. Not attempted this session - recorded as the
 strongest concrete next candidate, with its risk stated plainly rather than undertaken
 without discussing the trade-off first.
+
+### Checked against seed 123: the same phenomenon, both signatures at once
+
+Asked whether to attempt the timing fix or keep measuring; chose to keep measuring. Seed
+123 (the hardest, most drift-limited seed in this document, previously not checked for
+this pattern) shows both signatures already found separately on other seeds, together in
+one dataset:
+
+    legacy rep1: stuck#1 at t=99.5s, (0.16,0.47)   - common chokepoint
+    legacy rep2: stuck#1 at t=828.0s, (-28.11,-6.03) - threaded it, stuck elsewhere far later
+    legacy rep3: stuck#1 at t=71.9s, (0.16,0.48)   - common chokepoint
+    fixed  rep1: stuck#1 at t=742.0s, (-28.03,-5.90) - threaded it, stuck elsewhere far later
+    fixed  rep2: stuck#1 at t=76.7s, (0.16,0.48)   - common chokepoint
+    fixed  rep3: stuck#1 at t=69.4s, (0.17,0.50)   - common chokepoint
+
+**4 of 6 runs hit the same chokepoint at (0.16-0.17, 0.47-0.50), t=69-100s - matching the
+pattern on seeds 42, 55, and 7 exactly.** The other 2 (legacy rep 2, fixed rep 1) threaded
+it and instead had their first stuck event 650-750 s later, at a location roughly 28 m
+away - the same "escaped the common choke point, ended up stuck somewhere else entirely"
+outcome seen exactly once before, on `seed42_fixed_rep2`. Two independent seeds now show
+this same second signature, not just the shared-chokepoint one.
+
+Seed 123's escalation sequences also confirm the "long shared prefix, then bifurcation"
+shape at a finer grain than seed 7 or 55 showed: legacy rep1/rep3 share the identical
+15-event prefix `[0,1,2,3,0,1,2,3,4,5,6,7,8,9,10]` before diverging at event 16 (rep1
+resets to `[0,1,2]`, rep3 continues escalating to `[11,12]`); fixed rep2/rep3 share the
+13-event prefix `[0,1,0,1,2,3,4,5,6,7,8,9,10]` before rep2 inserts an extra reset-and-
+reattempt cycle rep3 doesn't have. Consistent with this being the intrinsically harder
+seed already established elsewhere in this document: even the "typical" outcome here
+means a much longer fight (11-23 events, escalating to level 10-14) than seed 7 or 55's
+typical 4-9 events, level 2-4 - the terrain difficulty and the bifurcation phenomenon are
+two separate, additive things, not the same axis.
+
+Raw evidence: reuses `wheel_slip_generalization_campaign/seed123_{legacy,fixed}_rep{1,2,3}/`
+- no new sim time. Same one-off analysis approach as the seed 42/55/7 check above.
