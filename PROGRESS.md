@@ -4817,6 +4817,27 @@ unidentified: candidates still open include RTF's fuller time history rather tha
 sample, or something the code doesn't expose at all (contact-solver floating-point
 path-dependence, DDS message timing/ordering jitter across the whole graph).
 
+**Correction to the above, caught immediately after writing it**: "escape #5 is the
+decision point" was itself a wrong assumption, worth stating plainly rather than quietly
+fixing. The actual per-escape "ground truth moved X m" log line shows escape #5 **FREED
+the rover in all seven reps**, including the six that go on to escalate further - so
+escape #5's own success or failure cannot be what the sequences diverge on. Escalation
+only resets after a successful escape is followed by driving cleanly for long enough
+(`stuck_relapse_window_s`); getting flagged again too soon keeps escalating regardless of
+the intervening escape's own result. The real branch point is therefore *how long the
+rover drives before the next stuck flag*, not whether escape #5 worked. Checked directly:
+the wall-clock gap between escape #5 ending and escape #6 being declared is 438 s (rep 4,
+continues escalating), 546 s (**rep 5**, resets to level 0), 448 s (rep 6, continues
+escalating) - converted to sim time with each rep's own RTF, roughly 110 s, 137 s, and
+117 s. Rep 5 drove about 15-20% longer, in sim time, before its next stuck flag than
+either of the two campaign-mates it otherwise matches on RTF and escape-success. That is
+a real, if modest, difference - and a better-targeted lead than the escape-level RTF
+check above, which was answering a question ("did this specific escape succeed") that
+turns out not to be the one the sequences actually branch on. Not investigated further
+this pass: this would need looking at what happens *during* that post-escape driving
+window (heading held, terrain crossed, whether a false-positive signature-2 event is what
+ends it) rather than only the two endpoints.
+
 The natural fix - replace `_hold`'s blocking, pre-estimated-RTF wall-clock sleep with a
 non-blocking, timer-driven state machine that checks the actual sim clock directly - would
 make escape-maneuver duration exact regardless of RTF estimation error. Given the
