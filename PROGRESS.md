@@ -4636,3 +4636,131 @@ uncertainty.
 
 Raw evidence: `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_rep{6,7}/` (4 runs).
 Instrumentation: `scripts/m4_acceptance.py`'s `ekf_cov_vx` column.
+
+## The root mechanism behind the run-to-run divergence variance, found - almost by accident
+
+Digging into why seed 55's divergence clusters into discrete outcomes (see two sections
+up) rather than answering that question in isolation, turned up something that explains
+the shape of variance across THIS ENTIRE INVESTIGATION - seeds 42, 55, and 7 alike, going
+back to the very first goal-tolerance campaign.
+
+### Every run hits the same first wedge, at the same time, at the same place
+
+Checked directly, not assumed: the ground-truth position and elapsed time at each run's
+first `STUCK RECOVERY #1` event, across every seed-55 run (12), every seed-42 run from
+two separate campaigns run at different points in this investigation (9), and every
+seed-7 run (14) - 35 runs in total.
+
+    seed 55 (12 runs, both arms): first wedge at (-0.36, -0.40) +-0.05m, t=45-50s - every run
+    seed 42 (9 runs, both arms, 2 campaigns): first wedge at (0.36,-0.66) +-0.02m, t=74-82s
+                                                - 8 of 9 runs (the exception below)
+    seed 7  (14 runs, both arms): first wedge at (-0.38,0.35) +-0.03m, t=44-53s - every run
+
+**Every run of a given seed wedges at the same physical spot, at nearly the same elapsed
+time, regardless of which arm (legacy/fixed) it's running.** This makes sense once stated:
+the terrain, the seed, the goal, and the starting behaviour are all identical between
+runs, so nothing has had a chance to diverge yet by the time the rover reaches its first
+obstacle - of course it hits the same one. It is still worth having checked, because it
+means the run-to-run variance this whole investigation has been chasing does not begin as
+variance at all. It begins from an identical starting condition, every time.
+
+The one exception is itself informative: `wheel_slip_ab_campaign/seed42_fixed_rep2` never
+recorded a `STUCK RECOVERY #1` near the common wedge point at all - its first stuck event
+came at t=1701.8s, 1700 m/s deep into the far side of the run, at a completely different
+location (-70.50,-5.82). That run evidently threaded the same choke point the other 8
+runs failed at, by whatever margin separates "just barely gets through" from "just barely
+doesn't" - and its whole subsequent trajectory is unlike any of its own campaign-mates as
+a result. (This is also, not coincidentally, the same run flagged in the original A/B
+campaign section as an outlier - "legacy rep 2's 3.78 m suppressed giving only 0.44 m
+divergence is the clearest outlier below the trend" was about a different rep, but the
+pattern of one campaign-mate behaving unlike the rest is the same phenomenon showing up
+twice.)
+
+### From that identical point, the escape sequence itself is highly reproducible - and then it isn't
+
+The escalation-level sequence recorded across an entire run (every `STUCK RECOVERY #N
+(escalation level L...)` line, in order) turns out to repeat almost verbatim across many
+reps of the same seed and arm:
+
+    seed 55 legacy: rep3+rep4 both [0,1,0,1,2,0] (6 events); rep5+rep6 both [0,1,2,3,4] (5 events)
+    seed 55 fixed:  rep3+rep5+rep6 all [0,1,2,0] (4 events); rep1+rep4 both [0] (1 event)
+    seed 7 legacy:  6 of 7 reps [0,1,0,1,2,3,4,0,1] (9 events) - only rep 5 differs, [0,1,0,1,2,0,1]
+    seed 7 fixed:   5 of 7 reps [0,1,0,1,2] (5 events) - reps 4,7 differ, [0,1,0,1] (4 events)
+
+This is a stronger claim than "similar magnitude": these are the literal same sequence of
+escalation levels, in the same order, arising from a deterministic terrain/seed/goal
+combination and a wall-clock-timed escape maneuver (`flip_recovery_node.py`'s own
+docstring already documents that escape durations are computed from a measured real-time
+factor because "a blocking node cannot read the ROS clock" while executing one - meaning
+the maneuver's actual physical effect is sensitive to real CPU/scheduling timing that
+varies slightly run to run). The escape process is a **small number of discrete
+attractors**, not a continuum: most runs fall into whichever attractor is most probable
+for that seed/arm, a few fall into a different one, and rep 1 of seed 55 (the pre-fix
+catastrophic run, escalating to level 8 across 11 events, unique among all 12 seed-55
+reps) shows what an escape into a much rarer, worse attractor looks like.
+
+**This is almost certainly the actual root cause of the run-to-run divergence variance
+this document has been chasing since the very first goal-tolerance campaign** (seed 42's
+8-vs-5 wedge count across two banked runs, "an order of magnitude larger than" any
+single-parameter effect measured; the wheel-slip A/B campaign's own divergence spread
+that didn't separate cleanly; seed 7's "clean" stuck-event counts that turned out not to
+be clean at n=5; seed 55's dramatic n=1 gap that mostly washed out at n=2). It was never
+continuous sensor noise accumulating smoothly. It is a small number of qualitatively
+different escape-sequence outcomes, bifurcating from an identical starting point via
+timing sensitivity in the escape maneuver's own execution, each of which then determines
+most of what happens for the rest of that run.
+
+### Seed 7's escalation sequences explain the shape of the arm difference, not all of its size
+
+Seed 7's dominant sequences let the earlier "legacy has lower divergence than fixed"
+finding be checked at a finer grain. Legacy's typical 9-event sequence
+`[0,1,0,1,2,3,4,0,1]` alternates escape-turn direction (left, right, left, right, left,
+right, left, left, right - read directly off each event's own logged maneuver) for a
+**net** commanded rotation of `0.5 * (2-3.5+2-3.5+5-6.5+8+2-3.5) = 1.0 rad` over 18 rad of
+*total* absolute rotation. Fixed's typical 5-event sequence `[0,1,0,1,2]` - the exact
+prefix of legacy's sequence - nets to the identical `0.5 * (2-3.5+2-3.5+5) = 1.0 rad` over
+8 rad of total rotation. Legacy's four additional events (`[3,4,0,1]`, directions
+right/left/left/right) net to exactly **zero** additional rotation on their own
+(`0.5 * (-6.5+8+2-3.5) = 0`).
+
+**This rules out net commanded heading change as the explanation**: both arms' dominant
+sequences net to the same 1.0 rad regardless of how many escapes happened, because
+legacy's extra escapes are almost perfectly self-cancelling by direction. It does not
+explain why legacy's divergence is nonetheless lower (1.04-1.38 m vs fixed's 1.71-1.80 m
+across the matching-history reps) - if anything, twice the absolute turning ought to
+generate twice the skid-steer wheel-odometry scrub error (M3's already-measured
+mechanism), which does not obviously net out just because the resulting heading does.
+This is consistent with, and does not add new evidence beyond, the phantom-distance-
+suppressed mechanism from the wheel-slip A/B campaign much earlier in this document
+(r=0.70, n=6): legacy's extra escape activity likely comes with extra ZUPT coverage
+gating that same extra scrub back out of the filter before it can register as divergence.
+That reading was not re-verified directly here (it would need per-escape phantom-distance
+figures matched against these specific event sequences) - offered as the best-fitting
+existing explanation, not a new confirmed one.
+
+Even within a matching escalation-sequence, divergence still varies meaningfully on
+seed 7 (legacy's six `[0,1,0,1,2,3,4,0,1]` reps span 1.04-1.38 m, not a point value) but
+not on seed 55 (matching sequences there land within ~0.03 m of each other, not ~0.3 m).
+Whatever residual, finer-grained variance seed 7's matching-history reps still show -
+plausibly the same real-time-factor sensitivity acting within a fixed escalation
+skeleton, rather than between skeletons - was not characterised further.
+
+### What this does not establish
+
+The real-time-factor/wall-clock-timing-sensitivity explanation for WHY the escape process
+bifurcates is the most consistent with what's already documented in this codebase
+(`flip_recovery_node.py`'s own RTF-conversion comment), not a directly instrumented
+finding - no run's actual measured RTF was compared against another's to confirm this is
+the specific mechanism, as opposed to some other source of run-to-run non-determinism
+(DDS message timing/ordering jitter, physics-engine floating-point path-dependence, or
+scheduler noise elsewhere in the graph). The escalation-sequence match was checked as an
+exact string match on recorded levels, not validated against a null model of how often
+sequences would coincidentally match by chance - with only a handful of qualitatively
+distinct sequences observed per seed/arm and small sample sizes (n=6-7), some coincidental
+matching is possible, though the additional confirmation that MATCHING sequences also land
+on nearly-matching divergence values (especially on seed 55) makes pure coincidence an
+unlikely full explanation. Seed 123 was not checked for this pattern at all this pass.
+
+Raw evidence: reuses every run directory from every campaign referenced above - no new sim
+time spent on this section. Analysis was one-off Python against existing launch logs and
+traces, not saved as a script.
