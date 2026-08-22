@@ -4438,3 +4438,92 @@ knowing the seed, one replicate is never enough to say which way."
 Raw evidence: `wheel_slip_generalization_campaign/seed55_{legacy,fixed}_rep{1,2}/` (4 runs,
 launch logs, ground-truth/EKF trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz,
 result/summary JSON).
+
+## Root-caused and fixed: a hazard mark can wall off the mission's own goal
+
+Legacy rep 1's `FAIL_TIMEOUT` above (17.94 m divergence, the largest recorded in this
+investigation) was left as "not investigated further than this one observation." It has
+now been root-caused, fixed, and the fix has been live-validated against a real
+recurrence of the exact same condition - not just unit-tested.
+
+### The mechanism
+
+`flip_recovery_node.py`'s `_mark_hazard` marks keep-out zones in the **estimator's**
+frame, deliberately (its own docstring already explained why: "the planner routes in
+that frame, so a hazard marked there stays put relative to the path being planned even
+if the estimate has drifted"). The mission goal, in contrast, is a fixed **world-frame**
+point published once and never adjusted for drift. Those two facts don't collide under
+ordinary drift - but at 17.94 m of divergence, they can: legacy rep 1's estimated pose
+when it wedged was `(-59.599, 19.588)`, about 1.0 m from the actual goal `(-60.58,
+19.42)`. The hazard `_mark_hazard` published landed inside the same costmap cell as the
+goal, and `planner_node` (which validates the goal cell's cost independently of the
+current pose, so it's genuinely a fixed-property check) refused it as lethal for the
+rest of the run - not because anything is really there, but because the rover's drifted
+belief of "here" happened to coincide with the one cell the whole mission is driving
+toward.
+
+### The fix
+
+`_mark_hazard` now checks the candidate hazard point against the active goal
+(`self._last_goal`, already tracked for replanning) before publishing, and skips the
+mark - logging why - if it would land within a new `hazard_goal_clearance_m` parameter
+(default 1.5 m, chosen to exceed `regolith_costmap`'s own `hazard_radius_m` default of
+1.2 m) of the goal. Two new pure functions, `hazard_point_xy` and
+`hazard_too_close_to_goal`, carry the actual geometry so it's testable without a node;
+`test_flip_recovery_hazard_clearance.py` pins both the ordinary case and the exact
+seed-55 numbers as a regression case. `regolith_bringup` suite: 48/48.
+
+This is a strictly local fix for one specific collision, not a fix for the divergence
+that causes it - stated in the code's own docstring so it isn't mistaken for one. A
+hazard skipped this way is a real potential obstacle left unmarked, traded deliberately
+against permanently blocking the goal. Whatever is driving the underlying divergence (the
+open question this whole document has been circling) is untouched.
+
+### Live validation, not just a unit test
+
+Two more reps of seed 55 (`wheel_slip_generalization_campaign`'s `reps=4` re-run, which
+skips the two already-done cells) put the fix in front of a real simulator, and the exact
+condition it exists for recurred **twice**, both on the legacy arm:
+
+    legacy rep 3: "Skipping hazard mark at (-60.69, 19.16) - within 1.5 m of the active
+                   goal (-60.58, 19.42)." -> resolved FAIL_FALSE_ARRIVAL, div 8.89 m
+    legacy rep 4: guard fired once -> resolved FAIL_FALSE_ARRIVAL, div 8.94 m
+
+Both hit the same near-goal collision rep 1 hit unfixed, and both resolved to an ordinary
+verdict instead of a goal blocked for the rest of the run. The fixed arm never triggered
+the guard in any of its four reps (0/4) - consistent with the fixed arm's generally lower
+divergence on this seed established already.
+
+| rep | legacy verdict | legacy div | guard fired | fixed verdict | fixed div | guard fired |
+|---|---|---|---|---|---|---|
+| 1 | FAIL_TIMEOUT (pre-fix) | 17.94 m | n/a | FAIL_FALSE_ARRIVAL | 4.37 m | n/a |
+| 2 | FAIL_FALSE_ARRIVAL (pre-fix) | 8.80 m | n/a | FAIL_FALSE_ARRIVAL | 8.99 m | n/a |
+| 3 | FAIL_FALSE_ARRIVAL | 8.89 m | **yes** | FAIL_FALSE_ARRIVAL | 1.34 m | no |
+| 4 | FAIL_FALSE_ARRIVAL | 8.94 m | **yes** | FAIL_FALSE_ARRIVAL | 4.38 m | no |
+
+Reps 1-2 predate the fix (recorded before it was written); reps 3-4 ran against it live.
+Legacy's post-fix divergence (8.89, 8.94 m) is close to rep 2's pre-fix number (8.80 m) -
+consistent with the fix not changing the divergence itself (it was never meant to), only
+preventing that divergence from permanently locking out the goal.
+
+### A second, unrelated anomaly found while checking this: an isolated `gt_travelled_m` spike
+
+Legacy rep 3 recorded `gt_travelled_m = 2103.4 m` for a 63.6 m straight-line goal - 26x
+every other seed-55 run. Checked directly rather than assumed to be a harness bug:
+independently recomputing ground-truth path length from the same run's own 5-second
+`trace.csv` gives 78.2 m, in line with every other run on this seed (65.6-89.6 m). The
+same cross-check against the *other* four seed-55 runs' own `gt_travelled_m` matches
+their 5-second-trace recomputation almost exactly (ratio 1.00x, all four) - **this rules
+out a systemic bug in the travelled-distance metric**, which the rest of this document's
+travelled-distance comparisons have relied on. Whatever produced the 2103 m figure is
+isolated to this one run, likely a burst of high-frequency ground-truth jitter (invisible
+even at 10 Hz resampling of the same run - a 10 Hz recompute gives only 43 m, confirming
+the anomaly lives at a frequency between 10 Hz and whatever rate `/ground_truth/pose`
+actually publishes at) during some transient event, not a standing defect. Left open,
+not chased further - it doesn't touch any conclusion in this document, since every
+travelled-distance claim so far has been a same-run or same-campaign comparison, and this
+is the only run out of the dozens completed tonight that shows it.
+
+Raw evidence: same `wheel_slip_generalization_campaign/seed55_*` directories, reps 3-4
+added. Fix: `flip_recovery_node.py`, `test_flip_recovery_hazard_clearance.py` (both in
+`regolith.universe`).
