@@ -4838,6 +4838,41 @@ this pass: this would need looking at what happens *during* that post-escape dri
 window (heading held, terrain crossed, whether a false-positive signature-2 event is what
 ends it) rather than only the two endpoints.
 
+**Followed up immediately, and it resolves cleanly.** `stuck_relapse_window_s` defaults
+to 120.0 s, measured in sim time (`_fire_recovery`: escalates if the new event is within
+`window` sim-seconds of the last one, resets otherwise). Converting the three reps' gaps
+to sim time with their own RTF: rep 4 ~109.5 s, rep 6 ~116.5 s - both *under* 120 s, both
+escalate; rep 5 ~136.5 s - *over* 120 s, resets. **The bifurcation is a threshold effect
+on this one parameter**, not a mysterious new source of chaos.
+
+And what actually re-triggers `STUCK RECOVERY #6` in all three reps is not a new obstacle
+at all: the `WHEEL SLIP` declaration immediately preceding it, in every one of the three,
+shows the exact false-positive signature this document root-caused and retired sessions
+ago - near-zero claimed rotation (0.01 rad), a fraction-of-a-degree attitude span (0.34-
+0.41 deg), against 2.6-2.9 m of claimed straight-line distance. This is signature 2 firing
+on ordinary smooth driving, not a genuine re-wedge - and signature 2 is only live at all
+in these runs because `legacy_rigid_body_signature=true` deliberately re-enables it for
+this A/B comparison. **The escalation-sequence bifurcation this section spent several
+passes chasing turns out to be, at least in this instance, the same retired false-positive
+mechanism from earlier in this document, now manifesting one level up**: whether an
+essentially incidental false trigger happens to land just inside or just outside a
+120-second window decides whether a run's escalation count climbs further or resets -
+and legacy's higher stuck-event/escalation-level counts relative to fixed on this seed are
+partly just more chances for this same false-positive clock to land inside the window
+before it expires, not evidence of more real obstacle interaction. This also fits the
+per-episode divergence-delta finding several sections up (legacy's episodes average near
+zero, a mix of costly real events and free-or-negative false positives) without needing a
+new mechanism to explain it.
+
+What remains genuinely open: *why* a run drives 110 s before the next false trigger
+versus 137 s is still down to whichever patch of terrain the post-escape heading happens
+to cross being smooth enough, for long enough, to fool signature 2 - and that, in turn,
+plausibly does trace back to the RTF-sensitive escape execution after all (a slightly
+different escape leaves a slightly different heading/position, which crosses a different
+stretch of ground) - just via a longer, now much clearer causal chain than "RTF directly
+determines escape success," which was refuted above. Not re-tested against RTF at this
+finer grain this pass.
+
 The natural fix - replace `_hold`'s blocking, pre-estimated-RTF wall-clock sleep with a
 non-blocking, timer-driven state machine that checks the actual sim clock directly - would
 make escape-maneuver duration exact regardless of RTF estimation error. Given the
