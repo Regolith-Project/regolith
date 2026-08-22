@@ -262,6 +262,7 @@ def run_watcher(args) -> int:
             self._last_gt = None
             self._last_ekf = None
             self._ekf_cov_xy = None  # (cov[0], cov[7]) - position x/y variance, EKF's own estimate
+            self._ekf_cov_vx = None  # twist.covariance[0] - vx variance, what a ZUPT actually measures
             self.max_roll = 0.0
             self.max_pitch = 0.0
             self.goal_reached_at = None      # (gt_error, t) when /goal_reached fired
@@ -299,7 +300,7 @@ def run_watcher(args) -> int:
                 # this file as if it were the live signal must use sim_t.
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
-                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy\n"
+                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx\n"
                 )
             self.sim_first = None
             self.sim_last = None
@@ -374,13 +375,14 @@ def run_watcher(args) -> int:
                 return
             roll, pitch, yaw = self._rpy
             cov_xx, cov_yy = self._ekf_cov_xy if self._ekf_cov_xy is not None else (float("nan"),) * 2
+            cov_vx = self._ekf_cov_vx if self._ekf_cov_vx is not None else float("nan")
             self._signals.write(
                 f"{time.monotonic() - self.started:.2f},{self._odom[2]:.3f},"
                 f"{self._odom[0]:.4f},{self._odom[1]:.4f},"
                 f"{self._imu[0]:.4f},{self._imu[1]:.4f},{self._imu[2]:.4f},"
                 f"{roll:.4f},{pitch:.4f},{yaw:.4f},"
                 f"{self.gt[0]:.3f},{self.gt[1]:.3f},{self._gt_speed:.4f},"
-                f"{cov_xx:.6g},{cov_yy:.6g}\n"
+                f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g}\n"
             )
 
         def _on_ekf(self, msg):
@@ -401,6 +403,12 @@ def run_watcher(args) -> int:
             # PROGRESS.md's overnight analysis - not otherwise used by the
             # harness.
             self._ekf_cov_xy = (msg.pose.covariance[0], msg.pose.covariance[7])
+            # twist.covariance is the same 6x6 layout (vx,vy,vz,wx,wy,wz) - [0]
+            # is vx-variance, the state a ZUPT actually asserts a measurement
+            # against. Position covariance was checked first and did not
+            # tighten during a ZUPT in any run (see PROGRESS.md); this is the
+            # more direct test the earlier pass flagged as still missing.
+            self._ekf_cov_vx = msg.twist.covariance[0]
 
         def _on_path(self, msg):
             if msg.poses:
