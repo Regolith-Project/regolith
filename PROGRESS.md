@@ -4764,3 +4764,43 @@ unlikely full explanation. Seed 123 was not checked for this pattern at all this
 Raw evidence: reuses every run directory from every campaign referenced above - no new sim
 time spent on this section. Analysis was one-off Python against existing launch logs and
 traces, not saved as a script.
+
+### The mechanism, precisely - and why it's hard to fix safely
+
+`flip_recovery_node.py`'s `_hold()` (the routine every escape maneuver segment calls)
+blocks the executor for the maneuver's duration, because it has to publish `/cmd_vel`
+faster than `pure_pursuit_node`'s 10 Hz loop can overwrite it. Blocking means the ROS
+clock cannot advance during the call - so the sim-time duration a maneuver asks for
+(e.g. "reverse for 3.0 s") is converted to a wall-clock sleep using `self._rtf`, an
+exponentially-smoothed real-time-factor estimate **sampled before the block started**.
+Whatever the sim's actual real-time factor does *during* that specific blocked window -
+which depends on live CPU/scheduling conditions this WSL environment does not control -
+is invisible to the code; it only ever sees the pre-block estimate. A maneuver that asks
+for "3.0 s of reverse" gets however much real sim-time that wall-clock sleep happens to
+buy, which can be more or less than 3.0 s depending on how good the stale estimate turned
+out to be. That is a precise, mechanistic account of where the chaotic sensitivity in
+escape outcomes documented above actually comes from - checked against the code, not
+inferred.
+
+A quick, weak check of one predicted consequence: if a badly-off RTF estimate at the
+*first* escape is what tips a run into a different attractor, that run's first-escape RTF
+should look unusual against its campaign-mates. Seed 7's one legacy outlier (`rep 5`, the
+only one of seven not to follow the dominant 9-event sequence) does show the highest
+first-escape RTF in its group (0.31x vs 0.27-0.30x for the other six) - but fixed's two
+outliers don't confirm it as cleanly (`rep 4`: 0.29x, unremarkable; `rep 7`: 0.31x, also
+high). **This is suggestive, not confirmed** - a single scalar sampled once before the
+first escape is a coarse proxy for whatever the live RTF actually does throughout a whole
+multi-escape sequence, and this check does not rule out other sources of run-to-run
+non-determinism (DDS timing/ordering jitter, physics floating-point path-dependence).
+
+The natural fix - replace `_hold`'s blocking, pre-estimated-RTF wall-clock sleep with a
+non-blocking, timer-driven state machine that checks the actual sim clock directly - would
+likely make escape-maneuver duration exact regardless of RTF estimation error, which could
+plausibly remove a meaningful share of this whole investigation's unexplained run-to-run
+variance. It is also a materially bigger and riskier change than anything else made this
+session: it touches the timing/control-flow architecture of the one mechanism responsible
+for actually freeing a stuck rover, in a way that is hard to validate without the same kind
+of expensive, many-hour paired-campaign measurement this document has repeatedly needed
+just to characterise the CURRENT behaviour. Not attempted this session - recorded as the
+strongest concrete next candidate, with its risk stated plainly rather than undertaken
+without discussing the trade-off first.
