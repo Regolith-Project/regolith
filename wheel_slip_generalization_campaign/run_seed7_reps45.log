@@ -1,0 +1,76 @@
+=== wheel-slip generalization campaign -> wheel_slip_generalization_campaign (seed 7, 5 rep(s)/arm) ===
+Sat Aug 22 11:53:22 AM BST 2026
+--- legacy rep 1: done, skipping ---
+--- fixed rep 1: done, skipping ---
+--- legacy rep 2: done, skipping ---
+--- fixed rep 2: done, skipping ---
+--- legacy rep 3: done, skipping ---
+--- fixed rep 3: done, skipping ---
+
+=== seed 7, legacy, rep 4 - 11:53:22 ===
+Results -> wheel_slip_generalization_campaign/seed7_legacy_rep4
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=61
+[seed 7] PASS - ground truth 1.5 m from the goal after 106.9 m travelled, EKF divergence 1.2 m, 9 stuck events, 0 flips, 7 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m     106.9m     1.2m      9      0      7
+=== finished 12:35:19 ===
+
+=== seed 7, fixed, rep 4 - 12:35:28 ===
+Results -> wheel_slip_generalization_campaign/seed7_fixed_rep4
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=74
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.7 m from the goal after 91.9 m travelled, EKF divergence 1.4 m, 4 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      1.7m      91.9m     1.4m      4      0      2
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.7 m true error
+=== finished 13:10:37 ===
+
+=== seed 7, legacy, rep 5 - 13:10:47 ===
+Results -> wheel_slip_generalization_campaign/seed7_legacy_rep5
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=43
+[seed 7] PASS - ground truth 1.5 m from the goal after 102.9 m travelled, EKF divergence 0.7 m, 7 stuck events, 0 flips, 7 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m     102.9m     0.7m      7      0      7
+=== finished 13:52:14 ===
+
+=== seed 7, fixed, rep 5 - 13:52:24 ===
+Results -> wheel_slip_generalization_campaign/seed7_fixed_rep5
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=77
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 2.0 m from the goal after 96.6 m travelled, EKF divergence 1.7 m, 5 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      2.0m      96.6m     1.7m      5      0      2
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 2.1 m true error
+=== finished 14:30:30 ===
+
+=== wheel-slip generalization campaign finished (seed 7) - Sat Aug 22 02:30:38 PM BST 2026 ===
