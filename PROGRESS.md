@@ -4873,6 +4873,18 @@ stretch of ground) - just via a longer, now much clearer causal chain than "RTF 
 determines escape success," which was refuted above. Not re-tested against RTF at this
 finer grain this pass.
 
+**Checked the fixed arm too, for the same bifurcation (5 reps reach escalation level 2;
+reps 4 and 7 stop at level 1)** - simpler than legacy's case, and consistent with it. The
+five that escalate all get a new stuck trigger 114-117 s (sim time) after escape #4 -
+comfortably under the 120 s window, same as legacy's escalating reps. Reps 4 and 7 don't
+get a new trigger AT ALL for the rest of the run - there's no relapse-window judgment call
+to make in their case, the rover simply never re-encountered a stuck condition. Fixed
+can't have a signature-2 false-positive re-trigger (it isn't armed in this arm), so this
+confirms the mechanism generalises beyond the false-positive case specifically: the same
+120 s relapse-window logic governs whether ANY new detection (false or genuine) continues
+an escalation or starts fresh, and which side of that line a run falls on is what actually
+produces the discrete attractors documented throughout this section.
+
 The natural fix - replace `_hold`'s blocking, pre-estimated-RTF wall-clock sleep with a
 non-blocking, timer-driven state machine that checks the actual sim clock directly - would
 make escape-maneuver duration exact regardless of RTF estimation error. Given the
