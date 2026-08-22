@@ -4527,3 +4527,48 @@ is the only run out of the dozens completed tonight that shows it.
 Raw evidence: same `wheel_slip_generalization_campaign/seed55_*` directories, reps 3-4
 added. Fix: `flip_recovery_node.py`, `test_flip_recovery_hazard_clearance.py` (both in
 `regolith.universe`).
+
+## The covariance-tightening hypothesis, tested directly - and refuted for position
+
+The candidate mechanism proposed several sections up for seed 7's divergence reversal
+("frequent ZUPT intervention may leave the filter's covariance in a state more
+responsive to correction afterward") was explicitly flagged as untested speculation.
+`m4_acceptance.py`'s `--record-signals` now logs the EKF's own `pose.covariance[0]` and
+`[7]` (x/y position variance) alongside everything else, and two more reps of seed 7
+(both arms, `reps=5`) were run to get real covariance traces spanning multiple slip
+episodes each.
+
+For every slip episode in all four new runs - legacy rep 4/5 (7 episodes each) and fixed
+rep 4/5 (2 episodes each) - the position-covariance value at the moment the episode
+*clears* is higher than at the moment it *started*, every single time (ratios 1.00-1.24x,
+never below 1.0), and continues climbing for at least 20 s afterward in every case. There
+is no dip, no plateau, no visible tightening anywhere in either arm's position covariance
+during or immediately after a ZUPT:
+
+    legacy rep 4: 1.150x 1.183x 1.039x 1.239x 1.029x 1.002x 1.000x (7 episodes)
+    legacy rep 5: 1.149x 1.178x 1.031x 1.199x 1.035x 1.001x 1.000x (7 episodes)
+    fixed  rep 4: 1.189x 1.040x (2 episodes)
+    fixed  rep 5: 1.188x 1.042x (2 episodes)
+
+**This refutes the specific hypothesis as stated.** A zero-velocity update does not
+visibly tighten the EKF's position uncertainty in either arm - position covariance simply
+keeps growing through every slip episode exactly as it does during ordinary driving,
+consistent with an unbounded dead-reckoning filter that has no absolute position
+reference to correct against (which this stack deliberately does not have - see the
+wheel-slip module's own docstring on why an oracle-fed ZUPT would make M4's numbers
+meaningless). Whatever produces seed 7's far-field convergence asymmetry, it is not
+visible as a position-covariance effect.
+
+**What this does not establish.** A ZUPT directly measures *velocity*, not position - the
+hypothesis's actual mechanism would show up first in the EKF's *velocity*-state
+covariance (`twist.covariance`, not `pose.covariance`), which was not logged this pass.
+Position covariance not tightening does not rule out velocity covariance tightening and
+that never propagating visibly into position uncertainty over a 20 s window - a real gap
+in this test, not a second confirmation of the null result. The honest state of the
+seed-7 divergence-reversal question: the specific position-covariance mechanism proposed
+is refuted; the velocity-covariance version of the same idea remains untested; and no
+alternative mechanism has been proposed or tested to replace it.
+
+Raw evidence: `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_rep{4,5}/` (4 runs,
+covariance-instrumented). Instrumentation: `scripts/m4_acceptance.py`'s
+`ekf_cov_xx`/`ekf_cov_yy` columns.
