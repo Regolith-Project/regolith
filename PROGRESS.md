@@ -4793,11 +4793,39 @@ first escape is a coarse proxy for whatever the live RTF actually does throughou
 multi-escape sequence, and this check does not rule out other sources of run-to-run
 non-determinism (DDS timing/ordering jitter, physics floating-point path-dependence).
 
+**A more rigorous version of the same check weakens it further, not confirms it.** Asked
+to keep measuring rather than attempt the timing fix, the natural next step was to check
+RTF at the actual *decision point* - the specific escape whose outcome (freed vs. still
+wedged) determines whether a run continues the dominant pattern or bifurcates - rather
+than only at the first escape. Seed 7 legacy's escape #5 (escalation level 2) is exactly
+that decision point: the dominant path escalates to level 3 next; rep 5 instead resets to
+level 0, meaning escape #5 itself freed the rover that one time. The measured RTF at that
+exact escape:
+
+    rep1 0.24   rep2 0.25   rep3 0.24   rep4 0.26   rep5 0.26   rep6 0.26   rep7 0.25
+
+**Reps 4, 5, and 6 all show the identical 0.26 RTF at the decision-point escape, yet only
+rep 5 frees the rover there - reps 4 and 6 do not, and continue escalating like the other
+four.** If RTF at this escape were the determining variable, matching RTF should predict
+matching outcomes; it doesn't. This is a genuine negative result for the specific
+hypothesis, not just an unconfirmed one: the bifurcation is real and reproducible in
+aggregate (the attractors themselves are solid, checked across three seeds and 35 runs),
+but RTF - the mechanism that seemed like the natural candidate given `_hold`'s documented
+design - does not cleanly predict which attractor an individual run falls into, at least
+not as a single scalar sampled at the decision escape. The actual trigger remains
+unidentified: candidates still open include RTF's fuller time history rather than one
+sample, or something the code doesn't expose at all (contact-solver floating-point
+path-dependence, DDS message timing/ordering jitter across the whole graph).
+
 The natural fix - replace `_hold`'s blocking, pre-estimated-RTF wall-clock sleep with a
 non-blocking, timer-driven state machine that checks the actual sim clock directly - would
-likely make escape-maneuver duration exact regardless of RTF estimation error, which could
-plausibly remove a meaningful share of this whole investigation's unexplained run-to-run
-variance. It is also a materially bigger and riskier change than anything else made this
+make escape-maneuver duration exact regardless of RTF estimation error. Given the
+decision-point check above, this should now be read as "removes one plausible contributor
+to the bifurcation, of uncertain size" rather than "removes a meaningful share of the
+variance" - the rigorous check found RTF does not cleanly predict which attractor a run
+falls into, so fixing it might close only part of the gap, or a smaller part than hoped,
+even if it is executed correctly. It is also a materially bigger and riskier change than
+anything else made this
 session: it touches the timing/control-flow architecture of the one mechanism responsible
 for actually freeing a stuck rover, in a way that is hard to validate without the same kind
 of expensive, many-hour paired-campaign measurement this document has repeatedly needed
