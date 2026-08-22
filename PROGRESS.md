@@ -4572,3 +4572,30 @@ alternative mechanism has been proposed or tested to replace it.
 Raw evidence: `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_rep{4,5}/` (4 runs,
 covariance-instrumented). Instrumentation: `scripts/m4_acceptance.py`'s
 `ekf_cov_xx`/`ekf_cov_yy` columns.
+
+## Seed 55 to n=6: the divergence spread isn't continuous, it clusters
+
+Two more reps per arm (`wheel_slip_generalization_campaign`'s `reps=6` re-run):
+
+| rep | legacy verdict | legacy div | legacy stuck/slips | fixed verdict | fixed div | fixed stuck/slips |
+|---|---|---|---|---|---|---|
+| 1 | FAIL_TIMEOUT (pre-fix) | 17.94 m | 11/20 | FAIL_FALSE_ARRIVAL | 4.37 m | 1/0 |
+| 2 | FAIL_FALSE_ARRIVAL | 8.80 m | 7/3 | FAIL_FALSE_ARRIVAL | 8.99 m | 7/1 |
+| 3 | FAIL_FALSE_ARRIVAL | 8.89 m | 6/4 | FAIL_FALSE_ARRIVAL | 1.34 m | 4/1 |
+| 4 | FAIL_FALSE_ARRIVAL | 8.94 m | 6/4 | FAIL_FALSE_ARRIVAL | 4.38 m | 1/0 |
+| 5 | FAIL_FALSE_ARRIVAL | 1.89 m | 5/2 | FAIL_FALSE_ARRIVAL | 1.34 m | 4/1 |
+| 6 | FAIL_FALSE_ARRIVAL | 1.86 m | 5/2 | FAIL_FALSE_ARRIVAL | 1.27 m | 4/1 |
+
+Neither arm's spread looks like noise scattered around a mean. **Legacy sits in three
+visible clusters**: ~8.8-8.9 m (reps 2-4, stuck/slips 6-7/3-4 each time), ~1.86-1.89 m
+(reps 5-6, stuck/slips 5/2 both times), and rep 1's 17.94 m alone. **Fixed repeats a
+value to the reported precision**: rep 3 and rep 5 both land at exactly 1.34 m with
+identical stuck/slip counts (4/1); reps 1 and 4 both land at 4.37-4.38 m with identical
+counts (1/0). This is a stronger structure than "high variance" - it looks like a small
+number of distinguishable outcomes (probably tied to which specific escape/wedge sequence
+the run happens to fall into) that repeat, rather than a wide continuous distribution.
+Not investigated further than noticing it: confirming this would need looking at whether
+matching-divergence reps also match on WHERE the wedges occurred and what escalation
+sequence fired, which this pass didn't check.
+
+Raw evidence: `wheel_slip_generalization_campaign/seed55_{legacy,fixed}_rep{5,6}/`.
