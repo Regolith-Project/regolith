@@ -4387,3 +4387,54 @@ read as one.** That narrows what the seed-7 finding actually is: not "removing s
 generally makes the filter worse at self-correcting," but something that happens on this
 seed's terrain/goal specifically, still unexplained. The covariance-tightening hypothesis
 above remains the leading candidate for seed 7 alone, not for the fix in general.
+
+## A fourth seed (55, fresh): a dramatic first read that mostly washed out at n=2
+
+How common is a clean divergence separation, in either direction? Seeds 42 (parity),
+7 (clean, favors legacy), and 123 (no separation at all) gave three different answers.
+`scripts/wheel_slip_generalization_campaign.sh wheel_slip_generalization_campaign 55 2`
+picked a seed not used anywhere else in this document, same discipline as before
+(same-build A/B, `--record-signals` on).
+
+| rep | legacy verdict | legacy div | legacy stuck/slips | fixed verdict | fixed div | fixed stuck/slips |
+|---|---|---|---|---|---|---|
+| 1 | FAIL_TIMEOUT | 17.94 m | 11 / 20 | FAIL_FALSE_ARRIVAL | 4.37 m | 1 / 0 |
+| 2 | FAIL_FALSE_ARRIVAL | 8.80 m | 7 / 3 | FAIL_FALSE_ARRIVAL | 8.99 m | 7 / 1 |
+
+Rep 1 alone looked like the cleanest, most dramatic result yet in the fix's favor - a 4x
+divergence gap and 11 stuck events reduced to 1. Rep 2 mostly erased it: fixed's second
+run landed at 8.99 m, above legacy's own second run (8.80 m) and matching its stuck-event
+count (7 vs 7) exactly. **n=2 is enough to show that rep 1's gap was not the seed's stable
+behaviour** - the same lesson this document has now learned about seed 42, seed 7, and
+seed 123 individually, learned again here in miniature, within a single seed, going from
+"looks dramatic" to "overlapping" between the first and second replicate alone.
+
+**Legacy rep 1 produced the largest divergence recorded anywhere in this investigation:
+17.94 m**, via a failure mode distinct from anything seen before: the EKF diverged far
+enough that `planner_node` began repeatedly declaring the actual goal cell "lethal"
+(`Goal cell (152, 50) is lethal (obstacle or too-steep slope) - pick another goal`), and
+`pure_pursuit_node` cycled "Stalled for 8s - stopping and replanning" against that same
+rejected goal until the sim-time budget expired (`FAIL_TIMEOUT`, matching seed 123 rep 3's
+timeout mechanism but via a different path - that one was pure pursuit's consecutive-replan
+give-up cap, this one is the planner refusing the goal outright). A plausible reading: once
+divergence gets large enough, the planner's own belief of where the goal sits (relative to
+its drifted position estimate) can become bad enough to make a perfectly reachable goal look
+untraversable, which would be a divergence-caused failure mode distinct from - and layered
+on top of - the ZUPT/stuck-event machinery this whole document has focused on. Not
+investigated further than this one observation.
+
+### What this does not establish
+
+n=2, one seed, and the headline lesson is explicitly about how *little* n=2 establishes
+(rep 1's dramatic-looking gap didn't survive rep 2). Four seeds now checked for the
+divergence question (42, 7, 123, 55) and none of the four shows the same qualitative
+picture as any other - parity, clean-favors-legacy, no-separation, and
+dramatic-then-erased are four different shapes from four different seeds. The honest
+summary of the whole overnight campaign is that **seed-to-seed variability in how this
+fix affects divergence is itself the dominant finding** - there is no single answer to
+"does retiring signature 2 help localization," only "it depends on the seed, and even
+knowing the seed, one replicate is never enough to say which way."
+
+Raw evidence: `wheel_slip_generalization_campaign/seed55_{legacy,fixed}_rep{1,2}/` (4 runs,
+launch logs, ground-truth/EKF trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz,
+result/summary JSON).
