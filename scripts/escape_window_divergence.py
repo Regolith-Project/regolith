@@ -33,6 +33,8 @@ from pathlib import Path
 
 TAKEOVER_RE = re.compile(r"^\[.*?\]\s+\[([\d.]+)\].*Recovery node has taken over /cmd_vel")
 FINISHED_RE = re.compile(r"^\[.*?\]\s+\[([\d.]+)\].*Recovery finished - resuming path following")
+SLIP_START_RE = re.compile(r"^\[.*?\]\s+\[([\d.]+)\].*WHEEL SLIP #(\d+): ")
+SLIP_END_RE = re.compile(r"^\[.*?\]\s+\[([\d.]+)\].*WHEEL SLIP #(\d+) cleared")
 
 
 def load_trace(path):
@@ -88,6 +90,65 @@ def escape_windows_t_s(log_path, anchor_epoch):
     return list(zip(starts, ends))
 
 
+def slip_windows_t_s(log_path, anchor_epoch):
+    """WHEEL SLIP #N start/cleared pairs, matched by number rather than
+    position - a slip episode does not always trigger an escape maneuver
+    (flip_recovery_node has its own separate stuck criteria), so these
+    windows are not a subset of escape_windows_t_s and must be tracked
+    independently."""
+    starts, ends = {}, {}
+    with open(log_path, errors="replace") as f:
+        for line in f:
+            m = SLIP_START_RE.match(line)
+            if m:
+                starts[int(m.group(2))] = float(m.group(1)) - anchor_epoch
+                continue
+            m = SLIP_END_RE.match(line)
+            if m:
+                ends[int(m.group(2))] = float(m.group(1)) - anchor_epoch
+    # A slip still active when the run ends (verdict fires, or the sim dies)
+    # never logs a "cleared" line - treat it as open-ended rather than
+    # erroring; bucket_sum clips every window to the trace's own end anyway.
+    still_open = set(starts) - set(ends)
+    for n in still_open:
+        ends[n] = float("inf")
+    orphaned_ends = set(ends) - set(starts)
+    if orphaned_ends:
+        raise ValueError(f"{log_path}: WHEEL SLIP #{sorted(orphaned_ends)} cleared with no "
+                          f"matching start - log parsing assumption broken")
+    return [(starts[n], ends[n]) for n in sorted(starts)]
+
+
+def merge_windows(windows):
+    """Sorts and merges overlapping/touching (t0, t1) intervals."""
+    merged = []
+    for t0, t1 in sorted(windows):
+        if merged and t0 <= merged[-1][1]:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], t1))
+        else:
+            merged.append((t0, t1))
+    return merged
+
+
+def subtract_windows(a_windows, b_windows):
+    """a_windows with every overlap against (merged) b_windows removed,
+    leaving the parts of a that don't also fall in b."""
+    result = []
+    for t0, t1 in a_windows:
+        cur = t0
+        for b0, b1 in b_windows:
+            if b1 <= cur or b0 >= t1:
+                continue
+            if b0 > cur:
+                result.append((cur, min(b0, t1)))
+            cur = max(cur, b1)
+            if cur >= t1:
+                break
+        if cur < t1:
+            result.append((cur, t1))
+    return result
+
+
 def accumulate_turning(signals, t0, t1, idx):
     """Trapezoidal accumulation of |wz| dt over [t0, t1], clipping partial
     boundary segments to the overlap, using every consecutive sample pair in
@@ -123,58 +184,87 @@ def analyze(run_dir):
 
     trace = load_trace(trace_path)
     signals = load_signals(signals_path)
-    windows = escape_windows_t_s(log_path, anchor_epoch)
+    escape_windows = merge_windows(escape_windows_t_s(log_path, anchor_epoch))
+    slip_windows_raw = merge_windows(slip_windows_t_s(log_path, anchor_epoch))
+    # A slip episode does not always trigger an escape maneuver - subtract out
+    # whatever part of each slip window already overlaps an escape window, so
+    # the three buckets below (escape / slip-without-escape / true-ordinary)
+    # partition the run with no double-counting.
+    slip_only_windows = subtract_windows(slip_windows_raw, escape_windows)
 
     run_t0, run_t1 = trace[0][0], trace[-1][0]
-    escape_total_dt = 0.0
-    escape_div_delta = 0.0
-    escape_odom_turn = 0.0
-    escape_imu_turn = 0.0
 
-    for (t0, t1) in windows:
-        t0 = max(t0, run_t0)
-        t1 = min(t1, run_t1)
-        if t1 <= t0:
-            continue
-        escape_total_dt += (t1 - t0)
-        escape_div_delta += interp(trace, t1) - interp(trace, t0)
-        escape_odom_turn += accumulate_turning(signals, t0, t1, 1)
-        escape_imu_turn += accumulate_turning(signals, t0, t1, 2)
+    def bucket_sum(windows):
+        dt_sum = div_sum = odom_sum = imu_sum = 0.0
+        for (t0, t1) in windows:
+            t0, t1 = max(t0, run_t0), min(t1, run_t1)
+            if t1 <= t0:
+                continue
+            dt_sum += t1 - t0
+            div_sum += interp(trace, t1) - interp(trace, t0)
+            odom_sum += accumulate_turning(signals, t0, t1, 1)
+            imu_sum += accumulate_turning(signals, t0, t1, 2)
+        return dt_sum, div_sum, odom_sum, imu_sum
+
+    escape_total_dt, escape_div_delta, escape_odom_turn, escape_imu_turn = bucket_sum(escape_windows)
+    slip_only_dt, slip_only_div_delta, slip_only_odom_turn, slip_only_imu_turn = bucket_sum(slip_only_windows)
 
     total_div_delta = trace[-1][1] - trace[0][1]
     total_odom_turn = accumulate_turning(signals, run_t0, run_t1, 1)
     total_imu_turn = accumulate_turning(signals, run_t0, run_t1, 2)
     total_dt = run_t1 - run_t0
 
+    # "ordinary" (2-bucket, kept for continuity with the previous section's
+    # table): everything outside an escape window, slip-contaminated or not.
     ordinary_dt = total_dt - escape_total_dt
     ordinary_div_delta = total_div_delta - escape_div_delta
     ordinary_odom_turn = total_odom_turn - escape_odom_turn
     ordinary_imu_turn = total_imu_turn - escape_imu_turn
+
+    # "true ordinary" (3-bucket): also excludes slip-without-escape windows -
+    # the part of "ordinary" that is not contaminated by any ZUPT at all.
+    true_ord_dt = ordinary_dt - slip_only_dt
+    true_ord_div_delta = ordinary_div_delta - slip_only_div_delta
+    true_ord_odom_turn = ordinary_odom_turn - slip_only_odom_turn
+    true_ord_imu_turn = ordinary_imu_turn - slip_only_imu_turn
 
     def rate(div, turn):
         return div / turn if turn > 1e-9 else float("nan")
 
     return {
         "run_dir": str(run_dir),
-        "n_escape_windows": len(windows),
+        "n_escape_windows": len(escape_windows),
+        "n_slip_only_windows": len(slip_only_windows),
         "total_dt_s": total_dt,
         "escape_dt_s": escape_total_dt,
         "ordinary_dt_s": ordinary_dt,
+        "slip_only_dt_s": slip_only_dt,
+        "true_ordinary_dt_s": true_ord_dt,
         "total_div_delta_m": total_div_delta,
         "escape_div_delta_m": escape_div_delta,
         "ordinary_div_delta_m": ordinary_div_delta,
+        "slip_only_div_delta_m": slip_only_div_delta,
+        "true_ordinary_div_delta_m": true_ord_div_delta,
         "total_odom_turn_rad": total_odom_turn,
         "escape_odom_turn_rad": escape_odom_turn,
         "ordinary_odom_turn_rad": ordinary_odom_turn,
+        "slip_only_odom_turn_rad": slip_only_odom_turn,
+        "true_ordinary_odom_turn_rad": true_ord_odom_turn,
         "total_imu_turn_rad": total_imu_turn,
         "escape_imu_turn_rad": escape_imu_turn,
         "ordinary_imu_turn_rad": ordinary_imu_turn,
+        "slip_only_imu_turn_rad": slip_only_imu_turn,
+        "true_ordinary_imu_turn_rad": true_ord_imu_turn,
         "escape_div_per_rad_odom": rate(escape_div_delta, escape_odom_turn),
         "ordinary_div_per_rad_odom": rate(ordinary_div_delta, ordinary_odom_turn),
+        "slip_only_div_per_rad_odom": rate(slip_only_div_delta, slip_only_odom_turn),
+        "true_ordinary_div_per_rad_odom": rate(true_ord_div_delta, true_ord_odom_turn),
         "escape_div_per_rad_imu": rate(escape_div_delta, escape_imu_turn),
         "ordinary_div_per_rad_imu": rate(ordinary_div_delta, ordinary_imu_turn),
         "escape_div_per_s": rate(escape_div_delta, escape_total_dt),
         "ordinary_div_per_s": rate(ordinary_div_delta, ordinary_dt),
+        "slip_only_div_per_s": rate(slip_only_div_delta, slip_only_dt),
+        "true_ordinary_div_per_s": rate(true_ord_div_delta, true_ord_dt),
     }
 
 
@@ -201,6 +291,12 @@ def main():
         print(f"  divergence per second: escape {r['escape_div_per_s']:.5f} m/s  "
               f"ordinary {r['ordinary_div_per_s']:.5f} m/s  "
               f"ratio {r['escape_div_per_s']/r['ordinary_div_per_s']:.2f}x")
+        print(f"  3-way split: escape {r['escape_dt_s']:.0f}s / slip-no-escape "
+              f"{r['slip_only_dt_s']:.0f}s ({r['n_slip_only_windows']} windows) / "
+              f"true-ordinary {r['true_ordinary_dt_s']:.0f}s")
+        print(f"  div/rad (odom), 3-way: escape {r['escape_div_per_rad_odom']:.4f}  "
+              f"slip-no-escape {r['slip_only_div_per_rad_odom']:.4f}  "
+              f"true-ordinary {r['true_ordinary_div_per_rad_odom']:.4f} m/rad")
 
     print("\n=== summary across runs (escape vs ordinary, per radian of odom turning) ===")
     for r in results:
