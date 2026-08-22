@@ -4362,3 +4362,28 @@ seed's dynamics may not be typical of the other two.
 Raw evidence: same 6 seed-7 run directories used in the section above. No new sim time
 spent; both analyses were one-off Python run directly against the existing traces and
 launch logs, not saved as reusable scripts.
+
+### Checked against seed 123: the far-field pattern does not generalize
+
+The same proximity split, run against seed 123's six runs (also `--record-signals` on
+both arms, so this cost no new sim time either):
+
+| run | post-slip rate | far rate |
+|---|---|---|
+| legacy rep 1 | 0.0303 | 0.0180 |
+| legacy rep 2 | 0.0817 | 0.0105 |
+| legacy rep 3 | 0.0411 | 0.0124 |
+| fixed rep 1 | 0.0224 | 0.0210 |
+| fixed rep 2 | 0.0487 | 0.0093 |
+| fixed rep 3 | 0.0426 | 0.0052 |
+
+**Every far-field rate is positive on seed 123, both arms** - none of legacy's three
+reps go negative here, unlike every one of seed 7's. And the arms don't separate:
+legacy's range (0.0105-0.0180) sits inside fixed's (0.0052-0.0210), heavily overlapping,
+consistent with this seed's already-established "nothing separates cleanly" finding two
+sections up. **The far-field-convergence hypothesis is specific to seed 7, at least as
+far as this evidence goes - it is not a general property of the fix, and should not be
+read as one.** That narrows what the seed-7 finding actually is: not "removing signature 2
+generally makes the filter worse at self-correcting," but something that happens on this
+seed's terrain/goal specifically, still unexplained. The covariance-tightening hypothesis
+above remains the leading candidate for seed 7 alone, not for the fix in general.
