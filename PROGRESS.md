@@ -4142,3 +4142,136 @@ sufficient, and each targeted look narrows the search rather than closing it.
 Raw evidence: `wheel_slip_generalization_campaign/` (4 runs' launch logs, ground-truth/EKF
 trace CSVs, `/odom`+`/imu` signal CSVs at 10 Hz, result/summary JSON). Campaign script:
 `scripts/wheel_slip_generalization_campaign.sh`.
+
+## Seeds 7 and 123 to n=3: the n=1 generalization picture does not survive replication
+
+The previous section's n=1-per-cell generalization check flagged its own biggest weakness:
+one draw each is not enough to tell a real effect from noise, and seed 7's divergence
+already looked surprisingly high against its own banked history. `scripts/wheel_slip_generalization_campaign.sh`
+was re-run for both seeds with `reps=3` - it skips cells that already have a `summary.json`,
+so this added exactly the two missing reps per arm per seed (8 more runs) rather than
+repeating the first four.
+
+| seed | arm | rep | verdict | divergence | stuck | flips | slips |
+|---|---|---|---|---|---|---|---|
+| 7 | legacy | 1 | FAIL_FALSE_ARRIVAL | 1.38 m | 9 | 0 | 8 |
+| 7 | legacy | 2 | **PASS** | 1.04 m | 9 | 0 | 7 |
+| 7 | legacy | 3 | FAIL_FALSE_ARRIVAL | 1.37 m | 9 | 0 | 7 |
+| 7 | fixed | 1 | FAIL_FALSE_ARRIVAL | 1.80 m | 5 | 0 | 3 |
+| 7 | fixed | 2 | FAIL_FALSE_ARRIVAL | 1.74 m | 5 | 0 | 2 |
+| 7 | fixed | 3 | FAIL_FALSE_ARRIVAL | 1.71 m | 5 | 0 | 2 |
+| 123 | legacy | 1 | FAIL_FALSE_ARRIVAL | 12.66 m | 18 | 0 | 18 |
+| 123 | legacy | 2 | FAIL_FALSE_ARRIVAL | 9.90 m | 8 | 0 | 18 |
+| 123 | legacy | 3 | **FAIL_TIMEOUT** | 12.71 m | 17 | **1** | 13 |
+| 123 | fixed | 1 | FAIL_FALSE_ARRIVAL | 9.98 m | 11 | 0 | 22 |
+| 123 | fixed | 2 | FAIL_FALSE_ARRIVAL | 15.92 m | 23 | 0 | 36 |
+| 123 | fixed | 3 | FAIL_FALSE_ARRIVAL | 10.72 m | 16 | 0 | 22 |
+
+### Seed 7: stuck events replicate perfectly; divergence separates cleanly - in the wrong direction
+
+**Stuck-recovery events show zero within-arm variance**: legacy is 9, 9, 9; fixed is 5, 5, 5.
+On this seed and goal specifically, which cell in the terrain each wedge happens at is
+apparently fully deterministic given the arm - the cleanest possible version of the
+"fix reduces stuck events" claim, stronger than seed 42's own campaign (which had some
+within-arm spread).
+
+**Divergence also separates cleanly now - and fixed is worse, not better.** Legacy:
+1.04-1.38 m. Fixed: 1.71-1.80 m. **No overlap.** This is not noise settling toward "no
+difference," which is what the seed-42 campaign found (heavily overlapping ranges) and
+what the n=1 pass over these two seeds looked consistent with. On seed 7 specifically, the
+full replicate picture is a clean separation with the fixed arm on the losing side. Legacy
+also gets one outright PASS (rep 2); fixed goes 0/3.
+
+This does not reverse the case for the fix - the previous sections' reasoning (the false
+positive was real, confirmed, and directly cost 15s ZUPT episodes on ordinary driving,
+which is what the fix was measured to remove) still stands regardless of what this specific
+seed's divergence does. What it does mean is that "the fix doesn't reliably move divergence
+either way," the seed-42 campaign's finding, is not quite the full story: on seed 7, with
+enough replicates to see past the noise, divergence moves in the direction *away* from the
+fix, cleanly. The mechanism for that is not established here - candidates include the
+escape-window analysis below, or something specific to how this seed's few wedges resolve
+under each signature - and is worth its own investigation rather than a guess.
+
+### Seed 123: nothing separates cleanly - variance dominates every metric
+
+Unlike seed 42 and seed 7, **no metric shows a clean split on seed 123**: divergence
+(legacy 9.90-12.71 m, fixed 9.98-15.92 m - fixed's own range contains legacy's entirely),
+stuck events (legacy 8-18, fixed 11-23), sim time, and travelled distance all overlap
+substantially between arms. This is the seed already flagged as the hardest and most
+drift-limited one in this document, and the replicate campaign shows why a single run per
+arm was never going to answer the generalization question here - the spread within an arm
+is comparable to or larger than the spread between arms.
+
+**Two failure modes appeared for the first time this session, both on legacy rep 3**:
+a **flip event** (the first of any run in this document's wheel-slip investigation - every
+prior run, on every seed, recorded zero) and a **`FAIL_TIMEOUT` via `pure_pursuit_node`'s
+own give-up safety cap**, not a false arrival. The log: 17 stuck-recovery events, escalation
+climbing to level 12+ without ever resetting, then `pure_pursuit_node` gave up on the goal
+outright after "9 consecutive deviate/stall replans with no progress" - the safety cap
+documented in this file's "overnight freeze" note, working exactly as designed to stop an
+unreachable goal from looping forever. The rover then sat motionless (confirmed in the
+signal trace: `odom_vx` pinned at 0.0000 for the rest of the run) until the 1800 s
+sim-time budget expired. This is a real, previously-undocumented-in-practice failure mode
+- one data point, not a rate, but distinct from every other verdict recorded in this
+document and worth having on record.
+
+### The escape-window analysis, corrected: slip episodes don't all trigger an escape
+
+Re-checking the previous section's escape-vs-ordinary split against this new data surfaced
+a real gap in `scripts/escape_window_divergence.py` itself: not every `WHEEL SLIP` episode
+triggers a `STUCK RECOVERY` (confirmed directly in a seed-7-legacy log - `WHEEL SLIP #1`, a
+straight-driving false positive, cleared 17.6 s later with no recovery maneuver anywhere
+near it), so the old escape/ordinary split was quietly counting some ZUPT-affected time as
+"ordinary." The script now parses `WHEEL SLIP #N` / `#N cleared` pairs directly (handling
+the case where a run ends mid-slip and never logs a clearance) and reports a three-way
+split - escape, slip-without-escape, and **true ordinary** (neither) - alongside the
+original two-way numbers so the earlier table stays comparable.
+
+Re-measuring seed 42's own three reps with this corrected 3-bucket script first (its
+"ordinary" bucket had 0 or 2 slip-without-escape windows per rep, so the correction barely
+moves its numbers): 0.65x, 0.82x, 0.91x - all three still at or below parity, same
+conclusion as before, now on the corrected method. Then the 12 cells from this section's
+seed 7 and seed 123 campaign (escape vs. true-ordinary divergence per radian of odom
+turning):
+
+    seed 7:    15.77x  2.31x  0.81x  |  2.06x  2.84x  2.93x
+    seed 123:   1.39x  1.18x  1.22x  |  2.78x  1.07x  2.21x
+
+**11 of these 12 cells show escape-window turning costing MORE divergence per radian than
+true ordinary driving** (median 2.21x, mean 3.05x - pulled up by seed 7 legacy rep 1's
+15.77x outlier). The one exception, seed 7 legacy rep 3 (0.81x), is a genuine
+counter-example, not a rounding artefact, and is reported as such. **Seed 42, as a cluster,
+now looks like the odd one out**: all three of its reps sit at or below parity (0.65-0.91x),
+while 11 of the 12 cells on seeds 7 and 123 sit above it, several by a wide margin. Extending
+the corrected method to two more seeds reverses which finding looks like the general rule:
+escape maneuvers costing more divergence per radian than ordinary driving is now the
+better-supported claim across three seeds, not the near-1x parity seed 42 showed on its
+own - though "seed 42 uniformly below parity, the other two seeds mostly above, one
+outright counter-example on seed 7" is the honest, still-seed-dependent shape of the
+evidence, not a single clean multiplier.
+
+Seed 123 legacy rep 3 (the give-up/timeout run) needed a caveat before being pooled in:
+its `slip-without-escape` bucket is dominated by the frozen dead-time after the rover
+stopped moving entirely (one `WHEEL SLIP` window that never logged a clearance, handled by
+treating it as open to the run's end) - near-zero turning and near-zero divergence change
+for most of that bucket's ~3700 s, so it does not distort the escape-vs-true-ordinary ratio
+reported above, but its raw window-count/duration numbers should not be read as
+representative of an ordinary run.
+
+### What this does not establish
+
+n=3 is still not large - seed 7's clean stuck-event split could still be a property of this
+specific goal rather than the seed's terrain in general, and seed 123's "nothing separates"
+finding is itself a small-sample result (a seed with this much intrinsic variance might
+need n=10+ to characterise properly, not n=3). The mechanism behind seed 7's
+divergence-favors-legacy result is not identified. The escape-vs-true-ordinary ratio is a
+real, now better-supported pattern across three seeds, but "why" - what is mechanistically
+different about an escape maneuver's turning versus ordinary driving's, beyond both being
+turning - remains open. The give-up/flip failure mode is one observation, not a
+characterised rate.
+
+Raw evidence: `wheel_slip_generalization_campaign/seed{7,123}_{legacy,fixed}_rep{1,2,3}/`
+(12 runs total, launch logs, ground-truth/EKF trace CSVs, `/odom`+`/imu` signal CSVs at
+10 Hz, result/summary JSON). Campaign script: `scripts/wheel_slip_generalization_campaign.sh`
+(re-run with `reps=3`). Escape-window analysis script:
+`scripts/escape_window_divergence.py` (now 3-bucket).
