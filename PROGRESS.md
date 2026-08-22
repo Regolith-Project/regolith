@@ -4275,3 +4275,90 @@ Raw evidence: `wheel_slip_generalization_campaign/seed{7,123}_{legacy,fixed}_rep
 10 Hz, result/summary JSON). Campaign script: `scripts/wheel_slip_generalization_campaign.sh`
 (re-run with `reps=3`). Escape-window analysis script:
 `scripts/escape_window_divergence.py` (now 3-bucket).
+
+## Why does seed 7's legacy arm have lower divergence? A candidate mechanism, from data already on disk
+
+The previous section left this as the open question worth explaining. Two more free
+analyses, both one-off (not committed as scripts, since they're exploratory checks on this
+specific question rather than reusable campaign tooling), using only the 12 traces and
+launch logs already on disk.
+
+**First: what does each slip episode cost, individually?** For every `WHEEL SLIP` window
+in each seed-7 run, divergence at the moment it clears minus divergence when it started:
+
+    legacy rep 1 (8 episodes): +0.136 +0.084 -0.072 -0.086 +0.179 +0.001 -0.049 +0.002  (mean +0.025, 3/8 negative)
+    legacy rep 2 (7 episodes): -0.007 -0.208 +0.106 +0.066 +0.265 +0.006 -0.001          (mean +0.032, 3/7 negative)
+    legacy rep 3 (7 episodes): -0.000 -0.209 +0.064 -0.125 +0.207 +0.008 -0.002          (mean -0.008, 4/7 negative)
+    fixed  rep 1 (3 episodes): -0.048 +0.324 +0.003                                       (mean +0.093, 1/3 negative)
+    fixed  rep 2 (2 episodes): +0.425 -0.113                                              (mean +0.156, 1/2 negative)
+    fixed  rep 3 (2 episodes): +0.451 -0.082                                              (mean +0.184, 1/2 negative)
+
+Legacy's episodes average close to zero (a mix of costly and free-or-negative individual
+events); fixed's average solidly positive, 3-6x legacy's mean. This is consistent with
+signature 1 being the only thing still armed in the fixed arm: its remaining slip episodes
+are exclusively genuine wedges (signature 1 requires an actual rotation disagreement,
+which the retired signature 2 never needed), and genuine wedges cost real divergence by
+their nature. Legacy's larger episode count is diluted by signature-2 false positives
+mixed in among the real ones, some of which cost nothing or even coincide with a small net
+improvement.
+
+That explains why legacy's episodes individually look cheaper on average, but not why its
+*total* run divergence ends up lower than fixed's - diluting a real cost with free events
+should wash out to roughly the same total, not less.
+
+**Second, and this is the sharper result: does driving far from any slip episode behave
+differently between arms?** Splitting each run's "true ordinary" time (from the section
+above) further, into time within 60 s of a slip/escape window ending ("post-slip") versus
+everything else ("far"):
+
+| run | post-slip rate (m/rad) | far rate (m/rad) |
+|---|---|---|
+| legacy rep 1 | 0.0082 | **-0.0044** |
+| legacy rep 2 | 0.0170 | **-0.0018** |
+| legacy rep 3 | 0.0273 | 0.0034 |
+| fixed rep 1 | 0.0164 | 0.0097 |
+| fixed rep 2 | 0.0153 | 0.0099 |
+| fixed rep 3 | 0.0143 | 0.0088 |
+
+**Legacy's "far" rate is negative or near-zero in all three reps - the EKF's divergence
+actually shrinks, on net, during long clean stretches. Fixed's "far" rate is positive in
+all three - divergence keeps growing even far from any slip event.** The separation is
+completely clean: every legacy value (-0.0044 to 0.0034) is below every fixed value
+(0.0088 to 0.0099). This is the most specific, best-supported lead this section has
+produced: it isn't that legacy's slip episodes are individually cheaper (established
+above, and true, but insufficient on its own) - it's that **something about frequent ZUPT
+intervention leaves the filter better able to self-correct during the driving that follows,
+well past the episode itself**, while a filter that rarely gets a ZUPT (the fixed arm, with
+only genuine wedges triggering one) just accumulates ordinary wheel-odometry scrub
+error steadily with nothing to correct it.
+
+A plausible mechanism, stated as a hypothesis and not verified further here: a
+zero-velocity update is an unusually strong, low-noise correction (it asserts velocity is
+exactly zero, which is either exactly right or - in the false-positive case - exactly
+zero real information, but never adds *noise*), and an EKF's covariance typically tightens
+under a strong update regardless of whether the update's content was correct. A tightened
+covariance changes how much the filter trusts its own prediction versus the next real
+measurement, which could plausibly make it more responsive to correction over the following
+seconds - "the wrong update but the right kind of confidence reset." This is offered as the
+leading candidate, not a proven mechanism; it was not tested by deliberately injecting a
+ZUPT and observing the aftermath, which would be the direct test.
+
+### What this does not establish
+
+One seed, one goal, n=3 both arms - the same scope as everything else in this campaign,
+not more. The 60 s "post-slip" boundary is a round-number choice, not derived from
+anything; a different boundary could change the exact split without necessarily changing
+the qualitative story (legacy's far-field rate has been below zero or near it in every rep
+measured). The covariance-tightening mechanism is plausible and consistent with the
+data but not tested directly - the direct test would be instrumenting `wheel_slip_node`'s
+actual published covariance around a ZUPT and its clearing, or deliberately forcing a
+ZUPT on ordinary driving via a debug flag and watching whether divergence over the
+following minutes improves relative to a matched control. Neither was done tonight.
+Whether this generalises to seed 42 (near-parity between arms) or seed 123 (arms don't
+separate on anything) is also unknown - this analysis was not repeated on either, and
+seed 42's escape-vs-ordinary near-parity finding two sections up is itself a hint that this
+seed's dynamics may not be typical of the other two.
+
+Raw evidence: same 6 seed-7 run directories used in the section above. No new sim time
+spent; both analyses were one-off Python run directly against the existing traces and
+launch logs, not saved as reusable scripts.
