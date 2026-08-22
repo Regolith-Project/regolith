@@ -4599,3 +4599,40 @@ matching-divergence reps also match on WHERE the wedges occurred and what escala
 sequence fired, which this pass didn't check.
 
 Raw evidence: `wheel_slip_generalization_campaign/seed55_{legacy,fixed}_rep{5,6}/`.
+
+## The covariance-tightening hypothesis, finished: velocity covariance shows no signal either
+
+The position-covariance test found monotonic growth through every slip episode, no
+exception - a clean refutation, but incomplete, since a ZUPT measures velocity, not
+position. `ekf_cov_vx` (`twist.covariance[0]`) now closes that gap: 4 more runs (seed 7,
+both arms, reps 6-7), same before/at-clear/after-20s measurement at every slip episode.
+
+    legacy rep 6: 0.937 0.999 1.097 1.041 0.887 1.000 1.000  (7 episodes, mean 0.994)
+    legacy rep 7: 0.968 0.902 1.006 0.915 1.011 0.994 0.936  (7 episodes, mean 0.962)
+    fixed  rep 6: 1.048 0.978 0.898                          (3 episodes, mean 0.975)
+    fixed  rep 7: 1.119 1.000                                (2 episodes, mean 1.060)
+
+Unlike position covariance (100% of ratios above 1.0, every run), velocity covariance
+ratios scatter both above and below 1.0 in every run, averaging close to 1.0 overall, with
+no consistent direction and no visible legacy-vs-fixed difference. The raw values
+themselves explain why: `ekf_cov_vx` spends most of its time oscillating in a narrow band
+(roughly 0.0021-0.00238, repeatedly touching what looks like a ceiling at 0.002375)
+rather than trending in any direction - continuous odometry+IMU velocity fusion already
+holds it near a steady state regardless of slip activity, and whatever a ZUPT
+specifically contributes is not visible above that background noise with this
+measurement.
+
+**The covariance-tightening hypothesis is now tested from both angles it could plausibly
+show up in, and neither shows the predicted signature.** Position covariance never
+tightens (always grows). Velocity covariance doesn't show a consistent tightening
+(or loosening) tied to slip episodes at all - it looks saturated by ordinary sensor
+fusion instead. This is now a fully-tested, negative result rather than a half-finished
+one: the specific mechanism proposed for seed 7's legacy-arm divergence advantage does
+not hold up under direct measurement of either covariance channel it could have worked
+through. What actually causes that seed's far-field EKF convergence asymmetry remains
+open, and no further covariance-based hypothesis is proposed to replace this one - the
+next candidate mechanism, if pursued, would need to be something other than filter
+uncertainty.
+
+Raw evidence: `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_rep{6,7}/` (4 runs).
+Instrumentation: `scripts/m4_acceptance.py`'s `ekf_cov_vx` column.
