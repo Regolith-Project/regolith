@@ -1,0 +1,103 @@
+=== wheel-slip generalization campaign -> wheel_slip_generalization_campaign (seed 55, 6 rep(s)/arm) ===
+Sat Aug 22 03:45:55 PM BST 2026
+--- legacy rep 1: done, skipping ---
+--- fixed rep 1: done, skipping ---
+--- legacy rep 2: done, skipping ---
+--- fixed rep 2: done, skipping ---
+--- legacy rep 3: done, skipping ---
+--- fixed rep 3: done, skipping ---
+--- legacy rep 4: done, skipping ---
+--- fixed rep 4: done, skipping ---
+
+=== seed 55, legacy, rep 5 - 15:45:55 ===
+Results -> wheel_slip_generalization_campaign/seed55_legacy_rep5
+
+=== seed 55 ===
+[seed 55] goal (-60.58, 19.42), 63.6 m straight line, valid=True (clear=True, connected=True)
+[seed 55] launch is on ROS_DOMAIN_ID=27
+[seed 55] FAIL_FALSE_ARRIVAL - ground truth 2.1 m from the goal after 84.1 m travelled, EKF divergence 1.9 m, 5 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    55   FAIL_FALSE_ARRIVAL      2.1m      84.1m     1.9m      5      0      2
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 55: claimed arrival at 2.1 m true error
+=== finished 16:20:46 ===
+
+=== seed 55, fixed, rep 5 - 16:20:56 ===
+Results -> wheel_slip_generalization_campaign/seed55_fixed_rep5
+
+=== seed 55 ===
+[seed 55] goal (-60.58, 19.42), 63.6 m straight line, valid=True (clear=True, connected=True)
+[seed 55] launch is on ROS_DOMAIN_ID=94
+[seed 55] FAIL_FALSE_ARRIVAL - ground truth 1.7 m from the goal after 78.0 m travelled, EKF divergence 1.3 m, 4 stuck events, 0 flips, 1 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    55   FAIL_FALSE_ARRIVAL      1.7m      78.0m     1.3m      4      0      1
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 55: claimed arrival at 1.7 m true error
+=== finished 16:53:14 ===
+
+=== seed 55, legacy, rep 6 - 16:53:22 ===
+Results -> wheel_slip_generalization_campaign/seed55_legacy_rep6
+
+=== seed 55 ===
+[seed 55] goal (-60.58, 19.42), 63.6 m straight line, valid=True (clear=True, connected=True)
+[seed 55] launch is on ROS_DOMAIN_ID=25
+[seed 55] FAIL_FALSE_ARRIVAL - ground truth 2.1 m from the goal after 84.1 m travelled, EKF divergence 1.9 m, 5 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    55   FAIL_FALSE_ARRIVAL      2.1m      84.1m     1.9m      5      0      2
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 55: claimed arrival at 2.1 m true error
+=== finished 17:27:06 ===
+
+=== seed 55, fixed, rep 6 - 17:27:16 ===
+Results -> wheel_slip_generalization_campaign/seed55_fixed_rep6
+
+=== seed 55 ===
+[seed 55] goal (-60.58, 19.42), 63.6 m straight line, valid=True (clear=True, connected=True)
+[seed 55] launch is on ROS_DOMAIN_ID=30
+[seed 55] FAIL_FALSE_ARRIVAL - ground truth 1.6 m from the goal after 77.8 m travelled, EKF divergence 1.3 m, 4 stuck events, 0 flips, 1 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    55   FAIL_FALSE_ARRIVAL      1.6m      77.8m     1.3m      4      0      1
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 55: claimed arrival at 1.6 m true error
+=== finished 17:58:06 ===
+
+=== wheel-slip generalization campaign finished (seed 55) - Sat Aug 22 05:58:16 PM BST 2026 ===
+=== wheel-slip generalization campaign -> wheel_slip_generalization_campaign (seed 7, 7 rep(s)/arm) ===
+Sat Aug 22 05:58:16 PM BST 2026
+--- legacy rep 1: done, skipping ---
+--- fixed rep 1: done, skipping ---
+--- legacy rep 2: done, skipping ---
+--- fixed rep 2: done, skipping ---
+--- legacy rep 3: done, skipping ---
+--- fixed rep 3: done, skipping ---
+--- legacy rep 4: done, skipping ---
+--- fixed rep 4: done, skipping ---
+--- legacy rep 5: done, skipping ---
+--- fixed rep 5: done, skipping ---
+
+=== seed 7, legacy, rep 6 - 17:58:16 ===
+Results -> wheel_slip_generalization_campaign/seed7_legacy_rep6
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=96
