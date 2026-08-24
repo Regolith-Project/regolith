@@ -5060,6 +5060,37 @@ pattern or is legacy-like instead; and, if the pattern holds, what in the escape
 exact trajectory specifically routes three of five reps into worse terrain than the other
 two - the next natural check, not attempted this pass.
 
+### A cheap follow-up check, no new sim time: escapes got more reliable, and the fixed-arm split reframes cleanly
+
+Grepped every launch log in both this campaign and the pre-fix one for the escape
+maneuver's own "FREED" / "STILL WEDGED" result line (`_check_escape_result`, unchanged
+by this fix). **Pre-fix: 5 of 94 escape attempts across all 14 seed-7 runs (both arms)
+failed to free the rover. Post-fix: 0 of 36 across all 10 runs here.** That is a clean,
+direct, unambiguous confirmation of the fix's core mechanism working as designed - an
+escape that runs its full asked-for duration is less likely to under-run and fail to
+clear the obstacle than one whose duration depended on a stale RTF sample. This is the
+cleanest positive result in this section, and it says nothing by itself about the
+divergence numbers above.
+
+That in turn reframes what the fixed arm's remaining bifurcation actually is. Every one
+of its 20 escapes freed the rover - the split between the `[0,0]` reps (2, 3) and the
+`[0,0,0,1]`/`[0,0,1,2]` reps (1, 4, 5) is not escape failure causing a retry, it is
+whether the rover meets a THIRD stuck condition at all after cleanly recovering from the
+first two. Reps 2 and 3 simply never get flagged stuck again for the rest of their run
+(the same "no further trigger" outcome the pre-fix fixed-arm reps 4 and 7 showed, per the
+section on the shared chokepoint above); reps 1, 4, and 5 do, and each extra escape adds
+its own reverse-and-turn distance on top. The event-count split (2 vs 4) lines up with
+the divergence split almost exactly - 1.12 m/1.40 m for the two-event reps, 2.98-3.52 m
+for the four-event reps - which is at least consistent with the extra escape mileage
+itself being the direct source of the extra divergence (skid-steer wheel-odometry scrub
+from the additional reversing and turning, the same mechanism M3 already measured
+elsewhere in this document), rather than a coincidence of which reps happen to diverge
+more for unrelated reasons. Not confirmed as causal here - would need the same per-escape
+phantom-distance figures the wheel-slip A/B campaign used, matched against these specific
+events - but it narrows "why does the fixed arm still bifurcate" from an open question
+about the escape mechanism itself to a much more specific one: what determines whether a
+run meets a third obstacle at all, now that the first two escapes are on rails.
+
 Raw evidence: `escape_timing_fix_campaign/seed7_{legacy,fixed}_rep{1..5}/` (new this
 pass, ~31 MB, `--record-signals` on for both arms matching the pre-fix campaign);
 pre-fix numbers reused from `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_
