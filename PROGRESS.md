@@ -4935,3 +4935,133 @@ two separate, additive things, not the same axis.
 
 Raw evidence: reuses `wheel_slip_generalization_campaign/seed123_{legacy,fixed}_rep{1,2,3}/`
 - no new sim time. Same one-off analysis approach as the seed 42/55/7 check above.
+
+## The natural fix, attempted - and the result is real but asymmetric, not a clean win
+
+Implemented the change flagged above as the strongest concrete next candidate:
+`flip_recovery_node.py`'s escape maneuver (reverse, then turn) no longer runs as a
+blocking loop converting its sim-time duration into a wall-clock sleep via an
+exponentially-smoothed RTF estimate sampled before the block started. It now runs as a
+non-blocking state machine (`_recover_stuck` starts it, a 30 Hz timer's `_escape_tick`
+advances it, `_finish_escape` closes it out) that checks maneuver deadlines against the
+real sim clock directly - the duration a maneuver asks for is now exactly the duration it
+gets, regardless of how good or bad the RTF estimate for that window would have been.
+Flip/stuck detection still freezes for the maneuver's duration, matching the old
+blocking behaviour, deliberately, rather than letting detectors run concurrently with a
+maneuver they never used to overlap with. Smoke-tested live first (seed 7, fixed arm,
+400 s sim cap): 2/2 escapes freed the rover on the first attempt, clean exit, no
+exceptions. `git log`: `e5534872e` in `regolith.universe`.
+
+That smoke test only proves the mechanism works, not that it fixes anything - the
+implementation commit says so explicitly, because the rigorous decision-point RTF check
+several sections up already found a single RTF sample does not cleanly predict which
+attractor a run falls into. The only way to know is the same paired-campaign discipline
+this investigation has used throughout: same seed, same harness
+(`wheel_slip_generalization_campaign.sh`), same both-arms methodology, fresh output
+directory (`escape_timing_fix_campaign/`), n=5/arm against seed 7 - the seed with the
+richest pre-fix escalation-sequence data already banked (n=7/arm, see "Seed 7's
+escalation sequences..." above) to compare against.
+
+(One false start: the campaign was first launched via a bare `nohup bash
+campaign.sh ...`, without sourcing the ROS/colcon environment - every cell failed
+instantly on `ModuleNotFoundError: regolith_costmap` before any sim time was spent.
+Caught from the very first two cells' output, killed, cleaned up, relaunched correctly.
+Flagging this because it is exactly the kind of silent-failure risk this project's own
+convention warns against - it would have been easy to let it "run overnight" and find
+nothing but 10 identical tracebacks in the morning.)
+
+### Legacy arm: the bifurcation is gone, not just reduced
+
+    metric              PRE-FIX (n=7)              POST-FIX (n=5)
+    verdicts             4 PASS / 3 FAIL            5 PASS / 0 FAIL
+    divergence range     0.69 - 1.38 m              0.36 - 0.60 m
+    divergence mean      1.14 m                     0.46 m
+    escalation sequence  6/7: [0,1,0,1,2,3,4,0,1]   5/5: [0,0,1,0]
+                          (9 events)                 (4 events)
+                          1/7: [0,1,0,1,2,0,1]
+                          (7 events)
+
+Every one of the 5 post-fix legacy reps produced the **identical** 4-event escalation
+sequence - not just a matching shape, the exact same sequence of levels, every time -
+against a pre-fix picture that was already the most reproducible arm in this document and
+still needed 6 of 7 reps to agree, with a real (if rare) alternate attractor. Divergence
+dropped by roughly 2.5x on top of that, and the verdict flipped from a mixed 4/7 PASS to
+a clean 5/5. This is close to the strongest possible confirmation available from n=5: the
+specific mechanism this document root-caused for legacy's bifurcation - a signature-2
+false-positive re-trigger landing just inside or just outside the 120 s relapse window,
+itself decided by exactly how far post-escape driving got before the next stuck flag,
+itself sensitive to the RTF-jittered escape's actual displacement - is gone once that
+displacement stops being jittered. Legacy's extra escapes (nine events down to four) were
+mostly the false-positive clock rolling differently run to run, exactly as hypothesized;
+removing the jitter removed the different rolls.
+
+### Fixed arm: the bifurcation is still there, and the number that matters most got worse
+
+    metric              PRE-FIX (n=7)              POST-FIX (n=5)
+    verdicts             0 PASS / 7 FAIL            1 PASS / 4 FAIL
+    divergence range     1.36 - 1.80 m              1.12 - 3.52 m
+    divergence mean      1.64 m                     2.42 m
+    escalation sequence  5/7: [0,1,0,1,2] (5 ev.)   2/5: [0,0,0,1] (4 ev.) - div 3.08, 2.98
+                          2/7: [0,1,0,1]  (4 ev.)   2/5: [0,0]     (2 ev.) - div 1.12, 1.40
+                                                      1/5: [0,0,1,2] (4 ev.) - div 3.52
+
+Fixed can never have the signature-2 false positive (it isn't armed in this arm at all -
+see the relapse-window section above), so the mechanism that cleanly resolved legacy's
+case was never going to apply here the same way, and it doesn't: the fixed arm still
+splits into multiple discrete escalation patterns post-fix, not one. What removing the
+timing jitter changed for this arm is real but not an improvement - **every post-fix
+sequence is shorter than any pre-fix one** (2-4 events vs 4-5), consistent with escapes
+now doing exactly what they're asked rather than sometimes running short and needing an
+immediate re-attempt, but the two reps that land on the shortest attractor (`[0,0]`,
+divergence 1.12 and 1.40 m) are now the best fixed-arm numbers ever measured in this
+document, while the three that escalate further (`[0,0,0,1]` x2, `[0,0,1,2]` x1,
+divergence 2.98-3.52 m) are worse than any pre-fix fixed rep's 1.36-1.80 m ceiling. Mean
+divergence rose from 1.64 m to 2.42 m and the divergence spread widened more than 5x
+(0.44 m to 2.40 m). Pass rate technically improved (0/7 to 1/5), but on a sample this
+small, and with divergence moving in the opposite direction on average, that is not
+evidence of a real improvement - it's one PASS out of five.
+
+### Honest reading: one real, mechanistic fix; one open, unimproved arm
+
+This was not a clean win, and it should not be reported as one. What's confirmed:
+
+- The specific mechanism targeted (RTF-estimated wall-clock sleep as the source of
+  escape-duration jitter) is real, and removing it produces an exact, reproducible
+  escape maneuver - checked directly, not inferred, on both arms.
+- On the arm where this document had already root-caused the bifurcation driver
+  (legacy's false-positive/relapse-window interaction), removing the jitter eliminated
+  the bifurcation essentially completely at n=5. This is strong, direct confirmation of
+  that earlier root-cause finding, not just of the fix.
+- On the arm that actually ships (fixed), the same change did not collapse the
+  bifurcation, and the average and worst-case divergence got worse, not better. Either
+  this fix trades legacy's improvement for a fixed-arm regression on this specific seed
+  and terrain, or n=5 is simply too small to characterise a still-bifurcating process and
+  a larger sample would land closer to (or even better than) the pre-fix 1.64 m mean -
+  both are live readings and this data cannot distinguish them yet.
+- The RTF-decision-point check's own finding - that a single RTF sample does not cleanly
+  predict which attractor a run falls into - is corroborated, not overturned: fixed-arm
+  runs still bifurcate with RTF jitter removed, so whatever besides RTF was already
+  contributing (DDS message timing/ordering jitter, contact-solver floating-point
+  path-dependence, or a genuine terrain-outcome sensitivity in the escape's exact
+  trajectory that has nothing to do with timing) is still fully live on this arm.
+
+**What this means for shipping the change**: it is not a regression in the sense of
+breaking anything - the node runs correctly, the mechanism it targets is real and now
+provably absent, and it measurably fixes the one arm whose bifurcation driver was already
+understood. It should not be described as "fixing" the fixed-arm bifurcation, because the
+data here says the opposite at n=5. Not reverted - the legacy-arm result and the
+mechanistic argument for why the change is correct on its own terms both stand regardless
+of what the fixed arm does - but the fixed-arm finding is the honest headline, not a
+footnote.
+
+**Not established here**: whether more fixed-arm reps regress toward the pre-fix mean or
+confirm the widened spread as real; whether a different seed shows the same fixed-arm
+pattern or is legacy-like instead; and, if the pattern holds, what in the escape's now-
+exact trajectory specifically routes three of five reps into worse terrain than the other
+two - the next natural check, not attempted this pass.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_{legacy,fixed}_rep{1..5}/` (new this
+pass, ~31 MB, `--record-signals` on for both arms matching the pre-fix campaign);
+pre-fix numbers reused from `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_
+rep{1..7}/`, already on disk from the section above. ~7 hours of wall-clock sim time this
+pass (10 runs, 15:39-22:21).
