@@ -1,0 +1,59 @@
+[
+  {
+    "verdict": "PASS",
+    "goal": [
+      -42.57,
+      -59.25
+    ],
+    "gt_final": [
+      -41.750950487117315,
+      -58.010678008728505
+    ],
+    "ekf_final": [
+      -41.85884267932897,
+      -58.47312896157342
+    ],
+    "gt_error_m": 1.485517116226706,
+    "divergence_m": 0.4748700968974673,
+    "gt_travelled_m": 93.91228612296706,
+    "ekf_travelled_m": 88.8292889440257,
+    "sim_time_s": 635.16,
+    "verdict_gt_error_m": 1.485517116226706,
+    "stopped_gt_error_m": 0.7858613577621353,
+    "stopped_gt_pos": [
+      -42.237362371741035,
+      -58.53800963356939
+    ],
+    "settled_reason": "rover declared arrival",
+    "settle_sim_s": 4.560000000000059,
+    "max_roll_deg": 5.310144079202822,
+    "max_pitch_deg": 18.799324083509397,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": true,
+    "goal_reached_gt_error_m": 0.8017210016421895,
+    "wall_time_s": 2624.199065433,
+    "seed": 7,
+    "goal_validation": {
+      "goal": [
+        -42.57,
+        -59.25
+      ],
+      "cell": [
+        52,
+        73
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 72.95729846972131
+    },
+    "straight_line_m": 72.95729846972131,
+    "stuck_events": 4,
+    "flip_events": 0,
+    "slip_events": 7,
+    "log": "escape_timing_fix_campaign/seed7_legacy_rep3/seed_7_launch.log",
+    "trace": "escape_timing_fix_campaign/seed7_legacy_rep3/seed_7_trace.csv",
+    "started": "2026-08-24 18:19:50"
+  }
+]
