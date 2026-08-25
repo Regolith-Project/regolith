@@ -5096,3 +5096,51 @@ pass, ~31 MB, `--record-signals` on for both arms matching the pre-fix campaign)
 pre-fix numbers reused from `wheel_slip_generalization_campaign/seed7_{legacy,fixed}_
 rep{1..7}/`, already on disk from the section above. ~7 hours of wall-clock sim time this
 pass (10 runs, 15:39-22:21).
+
+### n=10 on the fixed arm: the "mean got worse" framing above was n=5 noise about the SIZE of the effect - the split itself is real, and sharper than it looked
+
+Extended the fixed arm only (legacy's result above was already unambiguous at n=5) with 5
+more reps, `seed7_fixed_rep{6..10}`, same seed/harness/methodology, no code changes
+(`scripts/escape_timing_fix_more_fixed_reps.sh`, new - fixed-arm-only so as not to burn
+another ~3.5 hours re-confirming legacy). Full n=10 fixed-arm divergence:
+
+    rep 1  2     3     4     5     6     7     8     9     10
+    3.08  1.12  1.40  3.52  2.98  1.37  1.32  1.31  2.96  1.04  (m)
+    long  ---------- short cluster ----------  long  --- short
+
+**Sorted, the ten values split into two tight, non-overlapping clusters with a clean gap
+between them**: six reps land at 1.04-1.40 m (mean 1.26 m, spread 0.36 m) and four land at
+2.96-3.52 m (mean 3.13 m, spread 0.56 m) - nothing between 1.40 and 2.96. n=5's 2/3 split
+toward the long cluster (rep1, 4, 5 vs rep2, 3) was itself the misleading small-sample
+draw, not the true 6:4 majority-short split n=10 shows. Overall n=10 mean is 2.01 m -
+higher than the pre-fix fixed mean (1.64 m), so the direction of the n=5 finding holds,
+but the effect is real about being a SPLIT, not real about being uniformly-worse: the
+majority (6/10) short-cluster mean of 1.26 m is comfortably the best fixed-arm number
+this document has ever measured, better than the pre-fix range's own floor (1.36 m); it
+is the minority (4/10) long-cluster mean of 3.13 m, well above the pre-fix range's ceiling
+(1.80 m), that pulls the overall mean up. Verdict pass rate also went from 0/7 pre-fix to
+2/10 post-fix (both PASSes are short-cluster reps) - a small-sample-caveated but genuine
+improvement, not a regression, on the metric the milestone is actually judged on.
+
+This sharpens rather than undermines the section above: pre-fix fixed-arm divergence was
+a comparatively graduated spread (1.36-1.80 m, no obvious internal split); post-fix it
+resolved into exactly the same "small number of discrete attractors, not a continuum"
+shape this whole document's root-cause section already established for the escalation
+sequences themselves - now visible in the divergence numbers directly, and with a wider
+gap between the attractors than any escalation-sequence comparison in this document has
+shown. That is consistent with (though does not on its own prove) the reframing from the
+section above: the two clusters are exactly the two-vs-four-stuck-event split, so the
+open question stays the same, sharper - what determines whether a run's 3rd stuck
+encounter happens at all, now that it's an unambiguous fork between two well-separated,
+reproducible-in-aggregate outcomes rather than a vague "spread."
+
+**Correcting the earlier framing, not just adding to it**: the "Fixed arm... got worse"
+subsection above, and the memory-file update made from it, both say "mean divergence rose
+... spread widened more than 5x" without the n=10 context that six of ten reps are the
+best fixed-arm numbers ever recorded here. Left the original text in place per this
+document's own convention (visible correction, not silent edit) - read this subsection as
+the standing, fuller account of the fixed-arm result, not the one two sections up.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{6..10}/`, new this pass (~15 MB,
+`--record-signals` on, matching every other cell in this document's campaigns). ~3.5 more
+hours of wall-clock sim time (22:26-01:05).
