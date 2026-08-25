@@ -5184,3 +5184,46 @@ threshold) - a shared deterministic setup, then a narrow, still-unidentified for
 
 Raw evidence: reuses `escape_timing_fix_campaign/seed7_fixed_rep{1..10}/` - no new sim
 time. One-off Python against the existing trace/signals CSVs, not saved as a script.
+
+### The obvious next hypothesis - checked directly, and refuted
+
+Added `/cmd_vel` to `--record-signals`'s output (`m4_acceptance.py`, new `cmd_lin_x`/
+`cmd_ang_z` columns - see that commit) specifically to test the one condition the section
+above couldn't see: `_check_stuck` only declares a ground-truth stuck event when GT speed
+stays under `stuck_min_speed_mps` (0.02) **and** `commanded_speed` (`|cmd.linear.x| +
+|cmd.angular.z| * half_track`) stays at or above `stuck_min_commanded_mps` (0.03),
+sustained past `stuck_debounce_s` (3.0s). If pure_pursuit is only idling through this
+chokepoint at low commanded speed in the "short" reps - never crossing 0.03 - that alone
+would explain why the trigger never fires there without needing any new source of
+non-determinism.
+
+Ran 3 more fixed-arm reps with `/cmd_vel` now recorded (reps 11-13, one more mid-flight)
+and checked both a short rep (rep 11, `[0,0]`, 1.31 m) and the first newly-collected long
+rep (rep 13, `[0,0,1,2]`, 3.61 m - the highest divergence recorded in this whole
+investigation) against the exact trigger condition, at the same 10 Hz resolution, over
+the same t=750-1350s chokepoint window:
+
+    rep            longest continuous "GT<0.02 AND commanded>=0.03" stretch
+    rep11 [short]  7.7s   (debounce bar: 3.0s)
+    rep12 [short]  5.2s
+    rep13 [LONG]   14.4s
+
+**This hypothesis is refuted too, as cleanly as the raw-dwell one above**: by every signal
+this harness can now record, the ground-truth trigger's own stated condition is satisfied
+for well over the 3.0s debounce bar in the SHORT reps too - not just the long one. Nothing
+in `/cmd_vel`, `/ground_truth/pose`, or wheel odometry, sampled at 10 Hz, distinguishes a
+rep where the detector fires from one where it doesn't, at this location. Two of the three
+most obvious external signals are now ruled out as the explanation (raw GT motion
+character; commanded-speed availability); what's left is either something at a timing
+resolution finer than 10 Hz logging can see (`flip_recovery_node` samples its own inputs
+at its 5 Hz tick, phase-aligned to nothing this harness controls, so a sub-200ms blip in
+either signal could reset `_stuck_since` in the live node while looking continuous in a
+10 Hz external log), or a piece of the node's own internal state this harness cannot
+observe at all without adding debug logging inside `flip_recovery_node` itself
+(`_stuck_since`, `_stuck_cooldown_until`) and rerunning - not attempted this pass. Recorded
+as a clean negative result, not a shrug: the mechanism is narrower now, even though it
+isn't identified.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{11,12,13}/`, new this pass
+(`cmd_lin_x`/`cmd_ang_z` populated); rep 14 still running as this was written. ~2.5 hours
+of wall-clock sim time so far this sub-pass (01:15- ).
