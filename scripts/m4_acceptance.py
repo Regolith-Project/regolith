@@ -233,6 +233,7 @@ def pick_goal(seed: int, min_m: float, max_m: float) -> dict:
 def run_watcher(args) -> int:
     import rclpy
     from geometry_msgs.msg import PoseStamped
+    from geometry_msgs.msg import Twist
     # Aliased: nav_msgs' Path would otherwise shadow pathlib.Path inside this
     # function, which is used for every output file below.
     from nav_msgs.msg import Odometry
@@ -300,7 +301,7 @@ def run_watcher(args) -> int:
                 # this file as if it were the live signal must use sim_t.
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
-                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx\n"
+                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z\n"
                 )
             self.sim_first = None
             self.sim_last = None
@@ -309,11 +310,19 @@ def run_watcher(args) -> int:
             self._imu = None
             self._odom = None
             self._rpy = (0.0, 0.0, 0.0)
+            # What the follower/recovery layer is actually asking for, as
+            # opposed to what the wheels report doing (_odom) or what the
+            # body actually did (_on_gt) - added to distinguish "not
+            # commanded to move" from "commanded but not moving" at a shared
+            # dwell location neither of the other two signals can tell apart.
+            # See PROGRESS.md, "the split traced to a second shared chokepoint".
+            self._cmd = (0.0, 0.0)
 
             self.create_subscription(PoseStamped, "/ground_truth/pose", self._on_gt, 10)
             self.create_subscription(Odometry, "/odometry/filtered", self._on_ekf, 10)
             self.create_subscription(Odometry, "/odom", self._on_odom, 10)
             self.create_subscription(Imu, "/imu", self._on_imu, 10)
+            self.create_subscription(Twist, "/cmd_vel", self._on_cmd, 10)
             self.create_subscription(Bool, "/goal_reached", self._on_reached, 10)
             # The goal is re-sent until a path comes back, not a fixed number of
             # times: the planner drops any goal that arrives before it has both a
@@ -370,6 +379,9 @@ def run_watcher(args) -> int:
                 msg.linear_acceleration.y,
             )
 
+        def _on_cmd(self, msg):
+            self._cmd = (msg.linear.x, msg.angular.z)
+
         def _log_signals(self):
             if self.gt is None or self._odom is None or self._imu is None:
                 return
@@ -382,7 +394,8 @@ def run_watcher(args) -> int:
                 f"{self._imu[0]:.4f},{self._imu[1]:.4f},{self._imu[2]:.4f},"
                 f"{roll:.4f},{pitch:.4f},{yaw:.4f},"
                 f"{self.gt[0]:.3f},{self.gt[1]:.3f},{self._gt_speed:.4f},"
-                f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g}\n"
+                f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g},"
+                f"{self._cmd[0]:.4f},{self._cmd[1]:.4f}\n"
             )
 
         def _on_ekf(self, msg):
