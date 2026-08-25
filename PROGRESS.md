@@ -5227,3 +5227,12 @@ isn't identified.
 Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{11,12,13}/`, new this pass
 (`cmd_lin_x`/`cmd_ang_z` populated); rep 14 still running as this was written. ~2.5 hours
 of wall-clock sim time so far this sub-pass (01:15- ).
+
+Rep 14 finished (`[0,0,0,1]`, 3.04 m - long cluster). **Fixed-arm total is now n=14** (8
+short, 6 long): short cluster mean 1.27 m [1.04-1.40], long cluster mean 3.20 m
+[2.96-3.61], overall mean 2.10 m. The two-cluster picture is unchanged and, if anything,
+sharper - the gap between clusters (1.40 to 2.96) still has nothing in it at n=14, and
+both cluster means are stable versus the n=10 read (1.26->1.27, 3.13->3.20). Stopping the
+fixed-arm sample here - the split itself is now about as well-established as anything in
+this document; what remains open is the mechanism inside `flip_recovery_node` that decides
+it, which needs internal debug logging, not more reps of the same experiment.
