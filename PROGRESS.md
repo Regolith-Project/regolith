@@ -5144,3 +5144,43 @@ the standing, fuller account of the fixed-arm result, not the one two sections u
 Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{6..10}/`, new this pass (~15 MB,
 `--record-signals` on, matching every other cell in this document's campaigns). ~3.5 more
 hours of wall-clock sim time (22:26-01:05).
+
+### The split traced to a SECOND shared chokepoint, common to all 10 reps - not a fork in the path
+
+No new sim time: reused every fixed-arm trace/signals CSV already on disk (10 reps) to
+check the open question head-on - what determines whether a run meets a third stuck
+condition. Detected low-speed dwells directly from ground truth (a rep's own
+`gt_speed < 0.02 m/s` sustained, independent of anything `flip_recovery_node` itself
+declared), rather than trusting the log.
+
+**Every one of the 10 fixed-arm reps - all 4 "long" ones AND all 6 "short" ones - shows a
+near-stationary ground-truth dwell in the same small area, (-10.8,-37.0) to
+(-11.5,-37.2), at nearly the same elapsed sim time (t=800-1300s depending on rep).** This
+is the same "every run hits the same physical feature at the same time" signature this
+document root-caused for each seed's FIRST wedge (see "Every run hits the same first
+wedge..." far above) - except this is a SECOND shared chokepoint, ~750-1000 sim-seconds
+into the route, not previously identified because no prior campaign looked past each
+run's first stuck event with this level of care. Checked at 10 Hz resolution
+(`--record-signals`), the dwell is not subtly different between the two groups either:
+longest continuous sub-0.02-m/s stretch ranges 7-28s in both groups (comfortably past
+`stuck_debounce_s`'s 3.0s bar everywhere), and wheel odometry (`odom_vx`) stays similarly
+active (mean 0.04-0.08 m/s) throughout the dwell in every rep, long or short. **The four
+"long" reps and six "short" reps are not on different paths and are not moving
+differently at this location** - by every ground-truth and odometry signal checked here,
+the physical event looks the same across all ten.
+
+Yet `flip_recovery_node` only declares a formal `STUCK RECOVERY` there in the four "long"
+reps; the six "short" ones pass through without a trigger and never get flagged stuck
+again for the rest of the run. **This is not established here**: `/cmd_vel` itself isn't
+in `--record-signals`'s columns, so whether `_check_stuck`'s OTHER condition
+(`commanded_speed >= stuck_min_commanded_mps`, i.e. pure_pursuit is actively asking for
+motion, not just idling through a tight waypoint) is what differs between the two groups
+is a real, testable, still-open hypothesis - not confirmed. What IS confirmed: this is
+not a "different obstacle" or "different path" story at all. Whatever decides the fixed
+arm's remaining bifurcation, it decides it at a shared physical chokepoint every run
+passes through identically, the same shape this document has found for every bifurcation
+mechanism so far (the first wedge, the escalation-sequence prefix, the relapse-window
+threshold) - a shared deterministic setup, then a narrow, still-unidentified fork.
+
+Raw evidence: reuses `escape_timing_fix_campaign/seed7_fixed_rep{1..10}/` - no new sim
+time. One-off Python against the existing trace/signals CSVs, not saved as a script.
