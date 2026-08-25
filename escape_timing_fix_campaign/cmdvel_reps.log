@@ -59,3 +59,15 @@ Results -> /home/balazs/regolith/escape_timing_fix_campaign/seed7_fixed_rep14
 === seed 7 ===
 [seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
 [seed 7] launch is on ROS_DOMAIN_ID=31
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.4 m from the goal after 93.5 m travelled, EKF divergence 3.0 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.4m      93.5m     3.0m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.4 m true error
+=== finished 03:29:51 ===
+=== all cmd_vel-instrumented reps done 03:30:01 ===
