@@ -1,0 +1,17 @@
+{
+  "started": "2026-08-24 23:28:05",
+  "seeds": [
+    7
+  ],
+  "arrival_bar_m": 1.5,
+  "goal_tolerance_m": 0.35,
+  "legacy_rigid_body_signature": false,
+  "sim_timeout_s": 1800.0,
+  "sensor_suite": "wheel odometry + IMU",
+  "localization_oracle": false,
+  "milestone_result": true,
+  "git": {
+    "regolith": "0fc3a81-dirty",
+    "regolith.universe": "e5534872e"
+  }
+}

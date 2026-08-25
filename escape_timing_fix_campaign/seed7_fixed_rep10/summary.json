@@ -1,0 +1,59 @@
+[
+  {
+    "verdict": "PASS",
+    "goal": [
+      -42.57,
+      -59.25
+    ],
+    "gt_final": [
+      -41.93089006574357,
+      -57.9208560661234
+    ],
+    "ekf_final": [
+      -42.24933710709066,
+      -58.91167315723011
+    ],
+    "gt_error_m": 1.4748169733991494,
+    "divergence_m": 1.040733888259571,
+    "gt_travelled_m": 87.85719080307769,
+    "ekf_travelled_m": 87.13091143468772,
+    "sim_time_s": 545.32,
+    "verdict_gt_error_m": 1.4748169733991494,
+    "stopped_gt_error_m": 1.3410802062710723,
+    "stopped_gt_pos": [
+      -42.02689655509122,
+      -58.023812914853416
+    ],
+    "settled_reason": "rover declared arrival",
+    "settle_sim_s": 0.9599999999999227,
+    "max_roll_deg": 5.352332900299184,
+    "max_pitch_deg": 17.658772197618003,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": true,
+    "goal_reached_gt_error_m": 1.3591428122126374,
+    "wall_time_s": 1812.006254357002,
+    "seed": 7,
+    "goal_validation": {
+      "goal": [
+        -42.57,
+        -59.25
+      ],
+      "cell": [
+        52,
+        73
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 72.95729846972131
+    },
+    "straight_line_m": 72.95729846972131,
+    "stuck_events": 2,
+    "flip_events": 0,
+    "slip_events": 2,
+    "log": "/home/balazs/regolith/escape_timing_fix_campaign/seed7_fixed_rep10/seed_7_launch.log",
+    "trace": "/home/balazs/regolith/escape_timing_fix_campaign/seed7_fixed_rep10/seed_7_trace.csv",
+    "started": "2026-08-25 00:34:51"
+  }
+]
