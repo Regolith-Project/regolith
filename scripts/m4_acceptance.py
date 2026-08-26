@@ -600,7 +600,7 @@ def run_watcher(args) -> int:
 
 def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
             visual_odometry: bool = False, goal_tolerance_m: float = 1.0,
-            legacy_rigid_body_signature: bool = False):
+            legacy_rigid_body_signature: bool = False, stuck_debug: bool = False):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
@@ -610,7 +610,8 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
         f"localization_oracle:={'true' if oracle else 'false'} "
         f"visual_odometry:={'true' if visual_odometry else 'false'} "
         f"goal_tolerance_m:={goal_tolerance_m} "
-        f"legacy_rigid_body_signature:={'true' if legacy_rigid_body_signature else 'false'}"
+        f"legacy_rigid_body_signature:={'true' if legacy_rigid_body_signature else 'false'} "
+        f"stuck_debug:={'true' if stuck_debug else 'false'}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -702,6 +703,7 @@ def _run_metadata(args) -> dict:
         "arrival_bar_m": args.tolerance_m,
         "goal_tolerance_m": args.goal_tolerance_m,
         "legacy_rigid_body_signature": args.legacy_rigid_body_signature,
+        "stuck_debug": args.stuck_debug,
         "sim_timeout_s": args.sim_timeout_s,
         "sensor_suite": "wheel odometry + IMU + visual odometry" if args.visual_odometry
                         else "wheel odometry + IMU",
@@ -737,7 +739,8 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     proc, domain = _launch(seed, log_path, counters, oracle=args.localization_oracle,
                            visual_odometry=args.visual_odometry,
                            goal_tolerance_m=args.goal_tolerance_m,
-                           legacy_rigid_body_signature=args.legacy_rigid_body_signature)
+                           legacy_rigid_body_signature=args.legacy_rigid_body_signature,
+                           stuck_debug=args.stuck_debug)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -889,6 +892,13 @@ def main() -> int:
              "stall' found false-positives on ordinary straight-line driving. Default off, "
              "matching the shipped (fixed) behaviour - pass this flag for the 'before' arm "
              "of a same-build comparison, same discipline as --goal-tolerance-m below."
+    )
+    parser.add_argument(
+        "--stuck-debug", action="store_true",
+        help="DIAGNOSTIC ONLY: have flip_recovery_node log every _stuck_since streak "
+             "start/reset/fire at its own 5 Hz tick, with the instantaneous gt_speed/ "
+             "commanded_speed that caused it. For investigating the fixed-arm chokepoint "
+             "split (PROGRESS.md) - noisy, not for campaign use."
     )
     parser.add_argument("--watch", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--goal", help=argparse.SUPPRESS)
