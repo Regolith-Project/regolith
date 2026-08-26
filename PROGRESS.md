@@ -5236,3 +5236,83 @@ both cluster means are stable versus the n=10 read (1.26->1.27, 3.13->3.20). Sto
 fixed-arm sample here - the split itself is now about as well-established as anything in
 this document; what remains open is the mechanism inside `flip_recovery_node` that decides
 it, which needs internal debug logging, not more reps of the same experiment.
+
+### Internal debug logging built, and one instrumented rep points at a noise-floor coin-flip, not a code bug
+
+Built the internal visibility the section above said was needed: `stuck_debug` (new
+param, off by default) on `flip_recovery_node.py` logs every `_stuck_since` streak
+start/reset/fire at the node's own 5 Hz tick, with the exact `gt_speed`/`commanded_speed`
+that caused it - see that commit for why (a 10 Hz external log, phase-misaligned to a node
+tick this harness doesn't control, can miss a reset the node itself sees). Wired through
+`hello_moon.launch.py` (`stuck_debug` arg) and `m4_acceptance.py` (`--stuck-debug`).
+48/48 `regolith_bringup` tests still green - purely additive, gated off by default.
+
+Ran one instrumented fixed-arm seed-7 rep (`seed7_fixed_rep15`, `scripts/
+stuck_debug_chokepoint_rep.sh`). Result: `FAIL_FALSE_ARRIVAL`, divergence 1.349 m,
+2 stuck events - lands squarely in the short cluster (now n=9: mean 1.28 m [1.04-1.40];
+long stays n=6, mean 3.20 m [2.96-3.61]; both unchanged from n=14 within rounding, total
+n=15 now 9 short/6 long). Nothing new in the aggregate. The internal trace is what's new:
+
+**The chokepoint arrival time itself doesn't hold at 800-1300 s.** Locating rep15's pass
+through the documented bounding box `(-11.6,-37.3)-(-10.7,-36.9)` directly (not by GT-speed
+dwell, by position) puts it at sim `t≈249-281 s` - a different regime entirely from every
+rep examined in the section above, not just outside their 500 s spread. Same physical
+feature (confirmed by the bbox match), reached far earlier this rep. The "nearly the same
+elapsed time" finding from the original 35-run root-cause (far above) was never rechecked
+against a rep this early, and evidently doesn't extend to one.
+
+**`stuck_debug` logged nothing at all near the chokepoint** - the only streak start/reset
+pair in the whole 552 s run is the universal first wedge at t=2.6-18.4 s (matches every
+other rep's `STUCK RECOVERY #1`, same wall-clock line number, same RTF band). Read alone
+that would say "the ground-truth condition was never even close to satisfied here", which
+would refute the reset-hypothesis outright. It doesn't hold up against the 10 Hz signals
+CSV for the same window (`sim_t=245-257`, i.e. just before rep15's second escape fires):
+`gt_speed` sits in a tight, noisy band straddling the 0.02 m/s threshold nearly the whole
+time - mostly 0.010-0.030, occasional spikes to 0.05-0.14 - while `commanded_speed` stays
+comfortably above `stuck_min_commanded_mps` throughout (cmd_lin_x~0.12-0.17, cmd_ang_z~
+-0.3). **This is the reset-hypothesis's predicted signature exactly**: a true velocity
+riding on the threshold, not cleanly above or below it, so whether `_stuck_since` ever
+accumulates 3.0 s depends on whether the node's own 5 Hz-phase samples happen to land on
+the below-0.02 side often enough in a row - a coin-flip against measurement noise, not a
+qualitative "is it actually stuck" difference. That `stuck_debug` logged zero streaks here
+is consistent with this too: the internal estimate, sampled at a different phase/dt than
+the external CSV's, apparently never crossed below 0.02 at its own sample instants during
+this particular noisy window, even though the continuous signal clearly dips there.
+
+**What actually resolved this rep's chokepoint encounter was a different detector**:
+`WHEEL SLIP #2` (onboard, 15 s-integrated wheel-vs-gyro mismatch) fired at `sim_t≈257`,
+triggering the escape before the noisy 3 s ground-truth debounce got a chance. This
+surfaces a real blind spot in this pass's instrumentation, not just a finding: `_check_stuck`
+checks `_slip_triggered` FIRST and returns immediately on a hit, before touching
+`_stuck_since` - so a `stuck_debug`-invisible near-miss streak's fate is unobservable
+whenever slip preempts it. Not fixed this pass.
+
+**Read together, honestly**: this is one instrumented rep, not a proof. It does not
+directly reproduce or test the specific "does a streak get within reach of 3.0s before
+resetting" pattern the two earlier-analyzed short reps (11, 12) showed via the external
+log (5.2-7.7 s of externally-computed sustained trigger condition, never firing) - rep15's
+own mechanism turned out to be different (slip preemption, not a ground-truth near-miss
+that quietly resets). So the original reset-hypothesis remains not directly confirmed by
+internal logging. What IS now well-evidenced, independent of that specific hypothesis: the
+chokepoint's true GT speed genuinely oscillates in a band straddling the exact threshold
+this detector uses, for 10+ seconds, in at least one rep - which on its own is enough to
+explain non-deterministic debounce completion without needing any timing/phase mechanism
+at all, just ordinary measurement noise sitting on a hard threshold. The two explanations
+aren't mutually exclusive and this rep's data is consistent with both operating together.
+
+**Next steps, not attempted**: (1) a `stuck_debug`-instrumented LONG-cluster rep, to see
+whether a genuine ground-truth debounce completion shows several near-miss resets right
+before the one that sticks (the timing/phase-sensitivity signature) or a clean run straight
+to 3.0s (the noise-floor story alone, no phase sensitivity); (2) instrument the wheel-slip
+path the same way, now that it's shown to be an active competitor at this exact chokepoint,
+not just a fallback; (3) the noise-floor reading suggests a structural fix worth measuring
+independently of any of this - debouncing on a majority-of-samples basis, or smoothing
+`gt_speed` itself, rather than resetting `_stuck_since` on any single sub-threshold-crossing
+tick - but that changes detector behaviour and needs the same paired-campaign discipline
+as every other change in this document before being trusted.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep15/` (new this pass, `--record-
+signals --stuck-debug`); `scripts/stuck_debug_chokepoint_rep.sh` (new); `flip_recovery_
+node.py`'s `stuck_debug` param, `hello_moon.launch.py`'s `stuck_debug` arg, `m4_acceptance.
+py`'s `--stuck-debug` flag (all new, committed separately). ~38 min wall-clock for the one
+rep (RTF ~0.25x, matching every other rep in this campaign).
