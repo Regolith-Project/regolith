@@ -5622,3 +5622,83 @@ it gives the run's RTF (0.24-0.31). The column now means what its name says.
 Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{18,19}/` (new; rep
 18 onward carry the corrected `gt_speed`). ~2.6 h of wall-clock sim time for
 the two.
+
+### Correcting the last section: the obstacle is a 4 cm step, and the hard turn is downstream of the escape, not upstream of the stall
+
+No new sim time - this is the same 19 reps read more carefully, prompted by
+looking at the rover's own attitude instead of only its position. Two claims
+in the section above are wrong, and the chain they described runs the other
+way round in one place.
+
+**"The ground there is featureless" is wrong.** That came from a slope
+computed by central difference over +-0.39 m, which smooths away exactly the
+size of feature that matters here. The raw heightmap patch around the stall
+point has 6.9 cm of relief over 3.1 m, and within it a **4 cm step** between
+two adjacent cells (7.706 m -> 7.666 m, i.e. 5.8 deg over one 0.391 m cell)
+running north-south about 0.6 m west of where the rover stops. The rover's own
+telemetry confirms it crosses something: in **both** clusters the pitch spikes
+to -8 to -9 deg at t=370-371 and the roll then pins at **-5.3 deg** and stays
+there. A 4 cm step under one side of a 0.46 m track is atan(0.04/0.46) =
+5.0 deg of roll - the measured value. The stall point is flat at the scale a
+0.39 m heightmap can express and not flat at the scale this rover cares about.
+The "no rock within 4.5 m" part stands; the obstacle is terrain, and it is
+4 cm tall.
+
+**"The long reps are asked to turn eight times harder" is inflated.** That
+number averaged `|cmd angular_z|` over t=371-384, a window that includes what
+happens *after* the escape maneuver fires. Restricted to the pre-stall window
+(t=371-376, before any recovery at the fork), the separation is smaller but
+still clean, and its sharp marker is saturation rather than magnitude:
+
+    pre-stall t=371-376      mean |cmd_w|   max |cmd_w|   gt progress   mean roll
+    short reps 11,12,15,17   0.033-0.059    0.191-0.240     0.40-0.52 m   -3.9 to -4.4 deg
+    long  reps 14,16,18,19   0.103-0.146    0.300 (all 4)   0.13-0.35 m   -4.2 to -5.3 deg
+
+Every majority-path long rep **saturates** the follower's 0.30 rad/s angular
+limit while on the step; no short rep gets closer than 0.24. The mean ratio is
+about 2.5x, not 8x. Both clusters are equally on the step (roll -3.9 to
+-5.3 deg in both) - what differs is how hard the follower is steering while
+they are on it.
+
+**And the rotate-in-place branch is a consequence, not a cause.** The section
+above suggested the follower demanded a turn the rover could not execute, and
+that this is what stopped it. The ordering says otherwise, identically in all
+four instrumented long reps:
+
+    rep    goes immobile (<5 mm over 1 s)    first sustained |alpha|>30 deg
+    14            t=376.1                            t=381.0
+    16            t=374.9                            t=379.8
+    18            t=375.5                            t=381.0
+    19            t=375.8                            t=380.6
+
+The rover stops **~5 s before** the follower ever enters `abs(alpha) > pi/6`.
+In between, the stuck detector fires (rep 16: t=376.8) and the escape reverses
+and turns the rover ~57 deg - which is what creates the large heading error
+that then trips rotate-in-place. So `pure_pursuit_node`'s zero-forward-speed
+branch is not implicated in the stall at all; it is part of the aftermath.
+
+**The corrected chain, then:** every rep crosses the same 4 cm step at
+t≈370-372 and rolls onto it. The long reps are steering at or near the
+follower's angular limit as they do (0.30 rad/s saturated, against 0.19-0.24
+peak in the short reps), with forward speed already cut to 0.06-0.09 m/s by
+the cost-factor slowdown. Tilted, slow and steering hard, they lose traction
+and stop completely - 1-2 mm and 0.1-0.4 deg over three seconds, the same
+signature as a genuine wedge. The stuck detector fires correctly. The escape
+that follows costs the ~1.8 m of divergence that defines the long cluster,
+and its 57 deg turn leaves a heading error large enough to trip rotate-in-place
+afterwards.
+
+**Still open, and now sharper:** why is the follower steering at its limit at
+that point in nine reps of nineteen and not in the other ten, given the same
+position, heading and pose estimate? That is still the planned-path question,
+and it still needs `/planned_path` recorded per replan - which no campaign
+here has ever captured.
+
+**What this does not establish:** the traction-loss reading is still an
+inference. Roll, commanded steering, wheel odometry and ground truth are all
+consistent with "tilted, slow, steering hard, loses grip", but nothing here
+measures wheel contact or torque, and no experiment has yet varied one of
+those three inputs to see the stall appear or disappear.
+
+Raw evidence: re-analysis of `seed7_fixed_rep{11..19}` and the seed-7
+heightmap; no new sim time.
