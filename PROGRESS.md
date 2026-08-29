@@ -5702,3 +5702,54 @@ those three inputs to see the stall appear or disappear.
 
 Raw evidence: re-analysis of `seed7_fixed_rep{11..19}` and the seed-7
 heightmap; no new sim time.
+
+### A third clock-unit error - this one mine, in the n=17 analysis - and what survives it
+
+The n=17 section reports "EKF divergence at t=370: 0.13-0.20 m in BOTH
+clusters", and uses it for the claim that the split's divergence is created at
+the fork rather than inherited. The number is wrong. `seed_<n>_trace.csv` had
+exactly one time column, `t_s`, and it is **wall** time; the helper that
+produced that table fell back to it when it found no `sim_t`. So those figures
+were read at wall 370 s, which at this world's RTF is sim ~100 s - a quarter of
+the way to the fork, not immediately before it.
+
+Recomputed at sim t=370 for real, by mapping wall to sim through the signals
+CSV (the one file carrying both clocks):
+
+    at sim t=370, just before the fork
+    majority-path short reps    0.96-1.17 m
+    majority-path long  reps    1.04-1.17 m
+    reps 4 and 13 (alt route)   3.42 m, 3.49 m
+    (all 19 reps at sim t=100:  0.16-0.18 m - the figure previously published)
+
+**What survives:** the substance of the claim, for the majority path. Short and
+long reps arrive at the fork with indistinguishable divergence - 0.96-1.17 m
+against 1.04-1.17 m, fully overlapping - so the final gap (1.28 m vs 3.17 m
+mean) is still created at or after the fork, not inherited from a filter that
+was already drifting differently. The "same position, same heading, same
+estimate" framing holds.
+
+**What does not:** the word "every". Reps 4 and 13 arrive at **3.4 m** of
+divergence, twenty times the published figure and already past the long
+cluster's final mean. They are the two reps on the alternate route, and the
+n=17 section folded them into a claim that only ever held for the other
+seventeen. Their story is not "the fork created the divergence" - they were
+lost before they got there.
+
+**And it invalidates a shortcut I was about to take.** With divergence at ~1 m
+rather than ~0.15 m at the fork, reconstructing the follower's heading error
+from ground truth is not viable for *any* rep there, not just the badly
+diverged ones: at a 1.5 m lookahead, a 1 m pose error is tens of degrees of
+alpha. The first paths rep showed this the hard way - reconstruction insisting
+on a saturated -0.300 rad/s where the run recorded ~0.000 - and it is why the
+signals CSV now records `ekf_x`/`ekf_y`/`ekf_yaw` and the reconstruction uses
+them.
+
+`seed_<n>_trace.csv` now carries `sim_t` beside `t_s`. Three of the errors
+corrected in this document have been the same mistake - a wall-clock quantity
+read against a sim-time threshold or timestamp - and two of them were possible
+only because a file offered wall time as its sole time column while every event
+worth correlating against is logged in sim time.
+
+Raw evidence: recomputation over `escape_timing_fix_campaign/seed7_fixed_rep{1..19}`,
+no new sim time; `m4_acceptance.py`'s trace header.

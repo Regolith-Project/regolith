@@ -285,7 +285,17 @@ def run_watcher(args) -> int:
             self.started = time.monotonic()
             self._goal_publishes = 0
             self._trace = trace_path.open("w", buffering=1)
-            self._trace.write("t_s,gt_x,gt_y,ekf_x,ekf_y,gt_error_m,divergence_m,gt_travelled_m\n")
+            # sim_t is second, next to the wall clock, because this file used to
+            # carry ONLY t_s - and every event this project reasons about (a
+            # stuck trigger, a chokepoint, a fork) is quoted in sim time from a
+            # node log. Reading t_s as if it were sim time has now produced two
+            # wrong conclusions in PROGRESS.md, most recently a divergence
+            # figure taken at sim ~100 s and reported as the value at sim 370.
+            # At this world's ~0.25x RTF the two differ by a factor of four and
+            # neither is obviously wrong on inspection.
+            self._trace.write(
+                "t_s,sim_t,gt_x,gt_y,ekf_x,ekf_y,gt_error_m,divergence_m,gt_travelled_m\n"
+            )
 
             # Raw signal log, for judging slip detectors offline: what the wheels
             # claim (/odom twist) against what the IMU and ground truth say the
@@ -505,7 +515,9 @@ def run_watcher(args) -> int:
                 return
             ekf = self.ekf or (float("nan"), float("nan"))
             self._trace.write(
-                f"{time.monotonic() - self.started:.1f},{self.gt[0]:.3f},{self.gt[1]:.3f},"
+                f"{time.monotonic() - self.started:.1f},"
+                f"{self._odom[2] if self._odom else float('nan'):.3f},"
+                f"{self.gt[0]:.3f},{self.gt[1]:.3f},"
                 f"{ekf[0]:.3f},{ekf[1]:.3f},{self.gt_error():.3f},{self.divergence():.3f},"
                 f"{self.gt_travelled:.2f}\n"
             )
