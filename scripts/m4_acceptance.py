@@ -299,6 +299,11 @@ def run_watcher(args) -> int:
                 # world runs well below real time, so integrating vx against
                 # wall-clock dt overstates distance by 1/RTF. Anything replaying
                 # this file as if it were the live signal must use sim_t.
+                # gt_speed is per simulated second too, as of the fix in _on_gt
+                # - it was NOT before, and reps recorded earlier need it
+                # re-derived from gt_x/gt_y over sim_t. t_s is the only
+                # wall-clock column in the file; do not compare it against sim
+                # timestamps quoted by any node's log.
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
                     "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z\n"
@@ -350,10 +355,22 @@ def run_watcher(args) -> int:
                     self._last_gt = (p.x, p.y)
             else:
                 self._last_gt = (p.x, p.y)
-            now = time.monotonic()
-            if self._gt_prev is not None and now > self._gt_prev[0]:
-                self._gt_speed = math.dist((p.x, p.y), self._gt_prev[1:]) / (now - self._gt_prev[0])
-            self._gt_prev = (now, p.x, p.y)
+            # Differenced on the SIM clock, from this message's own header
+            # stamp - not time.monotonic(). It used to use the wall clock,
+            # which divided a sim-frame displacement by a wall-clock interval
+            # and so scaled the whole column by the RTF (~0.25x here): every
+            # recorded speed came out ~4x low, in no consistent unit, while
+            # sitting next to odom_vx which is per simulated second. That made
+            # the column silently incomparable to the very thresholds it was
+            # read against (flip_recovery_node's stuck_min_speed_mps, 0.02) -
+            # see PROGRESS.md, "Two clock-unit errors". CSVs recorded before
+            # this fix are exactly recoverable: re-difference gt_x/gt_y over
+            # sim_t rather than rescaling by RTF.
+            stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+            if self._gt_prev is not None and stamp > self._gt_prev[0]:
+                self._gt_speed = math.dist((p.x, p.y), self._gt_prev[1:]) / (stamp - self._gt_prev[0])
+            if self._gt_prev is None or stamp > self._gt_prev[0]:
+                self._gt_prev = (stamp, p.x, p.y)
             self.gt = (p.x, p.y)
             roll, pitch, yaw = rpy(msg.pose.orientation)
             self._rpy = (roll, pitch, yaw)

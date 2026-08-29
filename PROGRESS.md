@@ -5371,3 +5371,125 @@ Raw evidence: `flip_recovery_node.py`'s extended `stuck_debug` and
 `regolith.universe`, committed together); `scripts/stuck_debug_shadow_reps.sh`
 (new, this repo). No new sim time in this sub-pass - the batch it exists to
 feed is described below.
+
+### Rep 16 (long cluster) with the fuller instrumentation - and two clock-unit errors that invalidate part of the three sections above
+
+The batch's first rep landed in the long cluster (`seed7_fixed_rep16`,
+`FAIL_FALSE_ARRIVAL`, divergence 3.14 m, escalation `[0,0,0,1]`, 4 stuck
+events), which is what the previous section said was needed. Paired against
+rep 15 (short, 1.35 m) it answers the open question - but only after
+correcting two unit errors in this document's own analysis, both of which
+have to come first because the earlier conclusions rest on them. Neither is a
+bug in the rover; both are bugs in how the evidence was read.
+
+**Error 1: the `gt_speed` column in every `--record-signals` CSV is
+RTF-scaled, ~4x low.** `m4_acceptance.py` computed it by dividing a
+sim-frame displacement by a `time.monotonic()` (wall-clock) interval, so the
+column came out at roughly `RTF x true speed` - while sitting in a file whose
+own header comment warns that every other velocity in it is per *simulated*
+second. Checked directly on four reps by re-differencing the same `gt_x`/
+`gt_y` over `sim_t` and comparing to the recorded column:
+
+    rep    run RTF     median(recorded gt_speed / sim-differenced speed)
+    11     0.298x      0.304
+    13     0.298x      0.306
+    15     0.242x      0.247
+    16     0.246x      0.259
+
+The ratio is the RTF, to within 1-5%, in every rep. So every comparison this
+document made between that column and `stuck_min_speed_mps` (0.02 m/s, a
+sim-frame threshold) compared two different units.
+
+**Error 2: the chokepoint's "t=800-1300 s, depending on rep" is wall-clock
+time, not sim time.** No rep in this campaign exceeds 645 s of *simulated*
+time, which should have been the tell. Locating the documented chokepoint
+bounding box by position in all 16 fixed-arm reps gives:
+
+    every rep, first bbox entry:  sim t = 248.1 - 249.4 s   (1.3 s spread, n=16)
+    the same events in wall time:        809 - 1064 s       (RTF 0.242-0.310x)
+
+**In simulated time every rep - short and long - reaches the chokepoint
+within 1.3 seconds of every other.** The previous section's headline that rep
+15 hit it at "t≈249-281 s, a different regime entirely from every rep
+examined above, not just outside their 500 s spread" was comparing rep 15's
+sim time against the earlier reps' wall time. Rep 15 was never an outlier;
+the 500 s "spread" was RTF variation between runs. This *restores and
+sharpens* the original "every run hits the same physical feature at the same
+time" root-cause rather than overturning it.
+
+**What these two errors cost, stated plainly:**
+
+- The "noise-floor coin-flip" reading in the section above is **not
+  supported by the data it cited**. Its evidence was rep 15's `gt_speed`
+  "sitting in a tight noisy band straddling the 0.02 m/s threshold". In sim
+  units that band is ~0.04-0.12 m/s - comfortably *above* the threshold, not
+  straddling it. The node's own view agrees: re-derived at the node's 0.2 s
+  differencing over the fork window, rep 15 has **0 of 99 ticks** below 0.02.
+- The rep 11/12/13 table that refuted the commanded-speed hypothesis
+  ("longest continuous GT<0.02 AND commanded>=0.03 stretch: 7.7 / 5.2 /
+  14.4 s") evaluated its ground-truth half on the scaled column, so those
+  durations are not what they claim. The *conclusion* (commanded speed is not
+  what separates short from long) is untouched - it never depended on the
+  ground-truth half - but that table should not be quoted as evidence that
+  the trigger condition was satisfied in the short reps.
+- The n=10 dwell detection ("every rep shows a near-stationary dwell,
+  `gt_speed < 0.02` sustained 7-28 s") detected its dwells at an effective
+  ~0.08 m/s sim-frame threshold. That all 10 reps dwell *at the same place*
+  survives - it is a position finding, and the bbox table above re-confirms
+  it at n=16. "Near-stationary" does not.
+
+**With that corrected, rep 15 vs rep 16 gives a clean answer - and the fork
+is not at the chokepoint at all.** The two runs are the same run, to within
+0.2 m, for the first 350 s: same three bbox segments through the chokepoint
+(rep 15: 249.1-255.4, 257.8-259.2, 273.2-281.4; rep 16: 248.2-254.5,
+256.3-258.0, 273.1-279.8), and **both** get a recovery there, both triggered
+by the onboard wheel-slip detector rather than the ground-truth oracle. The
+chokepoint does not discriminate. They fork at **t≈371-377 s, around
+(-15.0,-50.5) - a third location**, and there the difference is real, not a
+detector artefact:
+
+    fork window t=365-385, at the node's own 0.2 s differencing
+    rep15 [short]   0 of 99 ticks below 0.02 m/s   median speed 0.083 m/s   no streak, no trigger
+    rep16 [long]   24 of 99 ticks below 0.02 m/s   median speed 0.146 m/s   STUCK RECOVERY #3
+
+Rep 16 genuinely stalls there and rep 15 genuinely does not. Rep 16's node
+log is unambiguous - `streak START` at t=373.80 (`gt_speed=0.0196`), `FIRED
+after 3.00s` - and rep 15's logs nothing at all in that window, with its 5 s
+cooldown long expired. So the ground-truth detector behaved correctly in both.
+What it did do is complete the debounce with **exactly zero margin**: 3.00 s
+against a 3.00 s bar, the minimum possible number of consecutive ticks, on a
+streak that started 2% below the threshold.
+
+**Where the difference comes from is upstream of all of it.** The 0.2 m
+lateral offset that persists from t=50 to t=350 traces to bring-up jitter:
+the first non-zero `/cmd_vel` arrives at sim t=1.400 in rep 16 and t=2.400 in
+rep 15, and that same 1.0 s shows up in the first wedge (streak START t=1.60
+vs t=2.60, both firing after an identical 3.20 s). One second of ROS node
+discovery, before the rover has moved, is enough to decide which cluster a
+rep lands in 6 minutes later - which is the same shape as every other
+bifurcation this document has root-caused, and finally locates the sensitive
+step: not the chokepoint, and not the detector's threshold, but a
+sub-metre path offset seeded at startup and cashed in at a boulder 50 m later.
+
+**What this does not establish:** one long/short pair is not the mechanism
+for all 16 reps - it shows this pair's fork, at one location, and the
+0.2 m-offset chain is a plausible reading of a correlation, not a
+demonstrated cause. The other five long reps have not been checked against
+the (-15.0,-50.5) fork, and the startup-jitter timing has not been
+manipulated deliberately (the obvious test - hold the first `/cmd_vel` for a
+fixed sim time and see whether the split collapses - is not attempted here).
+
+`m4_acceptance.py`'s `gt_speed` now differences on the sim clock from the
+pose message's own header stamp, verified populated with sim time on the live
+graph. This changes a recorded column mid-campaign: reps up to and including
+17 carry the old wall-clock convention, 18 onward the corrected one. Neither
+matters for anything downstream - no verdict ever read the column - and every
+CSV either way is exactly recoverable by re-differencing `gt_x`/`gt_y` over
+`sim_t`, which is what all the numbers above do and what any future analysis
+should do rather than trusting the column.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep16/` (new, first
+long-cluster rep with the slip-path and shadow-streak instrumentation);
+re-analysis of `seed7_fixed_rep{1..16}` on disk, no new sim time for any of
+the corrections above; `m4_acceptance.py`'s `_on_gt` fix. Fixed-arm totals now
+n=16: 9 short (mean 1.28 m), 7 long (mean 3.19 m), gap still empty.
