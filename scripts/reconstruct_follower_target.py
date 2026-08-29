@@ -207,8 +207,12 @@ def main() -> None:
               f"({skipped} skipped as escape-owned):")
         print(f"  median |error| {errors[n // 2]:.4f} rad/s   90th pct {errors[int(n * 0.9)]:.4f}"
               f"   max {errors[-1]:.4f}")
-        print("  (a floor of ~0.02-0.05 is expected: the follower steers on the EKF estimate, "
-              "this reconstructs from ground truth, and the two differ by 0.13-0.20 m here)")
+        if use_ekf:
+            print("  (reconstructed from the same pose the follower used, so a small floor here "
+                  "is\n   sampling and timing skew, not a frame difference)")
+        else:
+            print("  (reconstructed from ground truth while the follower steered on the EKF "
+                  "estimate,\n   so this error is dominated by however far apart those two were)")
 
 
 if __name__ == "__main__":
