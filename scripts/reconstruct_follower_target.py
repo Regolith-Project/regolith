@@ -170,7 +170,12 @@ def main() -> None:
     errors = []
     skipped = 0
     frame = "ekf" if use_ekf else "gt"
-    print(f"\n sim_t  {frame}_x   {frame}_y    yaw     alpha   recon_w  recorded_w  sat  rot-in-place")
+    # deviation and target index separate the two explanations for a large
+    # alpha: a rover pushed off a reasonable path (deviation grows, target
+    # index stalls) versus a path that turns sharply under a rover sitting
+    # right on it (deviation stays small, the target jumps ahead round a bend).
+    print(f"\n sim_t  {frame}_x   {frame}_y    yaw     alpha   recon_w  recorded_w  sat rip"
+          f"  dev_m  tgt#  target_xy")
     nxt = args.from_t
     for r in rows:
         t = float(r["sim_t"])
@@ -197,8 +202,10 @@ def main() -> None:
             nxt = t + args.step
             print(f"{t:7.1f} {pos[0]:7.2f} {pos[1]:7.2f} {math.degrees(yaw):7.1f} "
                   f"{cmd['alpha_deg']:7.1f} {cmd['angular_z']:8.3f} {recorded_w:10.3f}   "
-                  f"{'Y' if cmd['saturated'] else '.'}    {'Y' if cmd['rotate_in_place'] else '.'}"
-                  f"{'   [escape owns /cmd_vel]' if owned_by_recovery else ''}")
+                  f"{'Y' if cmd['saturated'] else '.'}   {'Y' if cmd['rotate_in_place'] else '.'}"
+                  f"  {cmd['deviation_m']:5.2f}  {cmd['target_idx']:3d}"
+                  f"  ({cmd['target_xy'][0]:7.2f},{cmd['target_xy'][1]:7.2f})"
+                  f"{'  [escape owns /cmd_vel]' if owned_by_recovery else ''}")
 
     if args.validate and errors:
         errors.sort()
