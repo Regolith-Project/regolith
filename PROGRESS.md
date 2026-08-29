@@ -5493,3 +5493,105 @@ long-cluster rep with the slip-path and shadow-streak instrumentation);
 re-analysis of `seed7_fixed_rep{1..16}` on disk, no new sim time for any of
 the corrections above; `m4_acceptance.py`'s `_on_gt` fix. Fixed-arm totals now
 n=16: 9 short (mean 1.28 m), 7 long (mean 3.19 m), gap still empty.
+
+### n=17 resolves the fixed-arm split: a hard-turn demand on flat ground, a real stall, and a correct-but-costly recovery
+
+Rep 17 landed short (1.28 m), giving a second instrumented short rep, and
+with it the whole n=17 sample became worth re-reading with the corrected
+units from the section above. It resolves the split, and it retires the
+startup-jitter reading that section ended on.
+
+**First, the correction.** That section proposed that the two runs' 0.2 m
+offset traced to bring-up jitter - rep 16's first `/cmd_vel` at sim t=1.400
+against rep 15's t=2.400 - and called that "the sensitive step". Checked
+across every rep that records `/cmd_vel`, it does not survive:
+
+    first non-zero /cmd_vel   short reps 2.10-3.10 s     long reps 1.40-2.80 s
+    first 0.10 m of motion    short reps 5.66-6.88 s     long reps 5.44-6.66 s
+
+Both ranges overlap; rep 14 (long, 2.80 s) starts later than rep 17 (short,
+2.10 s). Startup jitter is real and it is what makes the runs differ at all,
+but it does not predict the cluster. That was a two-rep coincidence read as a
+mechanism, and it is withdrawn.
+
+**What does separate the clusters, with no exceptions at n=17:** whether the
+rover comes to a dead stop in the window t≈365-385 s.
+
+    all 10 short reps    0 sub-threshold ticks in t=365-385
+    all  7 long reps     4-24 sub-threshold ticks
+
+Zero overlap, every rep in the campaign. Thirteen of the seventeen follow the
+same path to within ~0.1 m and meet it at the same place - the five long ones
+among them (1, 5, 9, 14, 16) all stall at (-15.20,-50.65) between t=374 and
+t=383. Reps 4 and 13 are on a genuinely different route (they are at
+(-10.8,-41.0) when everyone else is at (-14.1,-47.0)) and stall at
+(-10.3,-39.5) instead - still inside the same time window, still long. So the
+event is not tied to one patch of ground, and calling it "a third chokepoint"
+would overstate it.
+
+**The stall is real, not a detector artefact.** Two readings were checked and
+rejected before this one. It is not an in-place pivot mistaken for a wedge:
+over a trailing 3.0 s window the long reps' net ground-truth displacement
+drops to **1-16 mm** at the fork, against **177-228 mm** for every short rep
+at the same place and time. The rover genuinely stops. Nor would counting
+rotation as motion help - the obvious "compare like with like" fix, since
+`commanded_speed` includes `|ang_z| * half_track` while `gt_speed` measures
+translation only. Re-derived with a symmetric measure (`v + |yaw_rate| *
+half_track`), the sub-threshold tick count at the **real** first wedge falls
+from 18-22 to 2-7, i.e. that change would break detection of the wedge every
+rep genuinely has, while only halving the fork count. Recorded as a rejected
+fix, not an untried idea.
+
+**And the ground there is featureless.** Against the seed-7 manifest and
+heightmap: no rock within 4.5 m of the stall point (nearest is 4.51 m away,
+2.55 m of clear gap to its collision surface), local slope 0.6 deg, and 1 cm
+of relief along the whole approach. It sits inside a shallow crater (r=10.9 m,
+depth 1.20 m) but 5 m from its centre, on its flat floor.
+
+**What actually stops the rover is what the follower asks for.** At the fork
+the two clusters are commanded completely differently, from the same place at
+the same heading:
+
+    at the fork, mean |cmd angular_z|    short reps 0.022-0.030 rad/s
+                                         long  reps 0.182-0.230 rad/s
+    heading at t=370 (majority path)     -133 to -144 deg in BOTH clusters
+    EKF divergence at t=370              0.13-0.20 m in BOTH clusters
+
+The long reps are being asked to turn roughly eight times harder, and they
+cannot do it: commanded 0.23 rad/s, achieved 0.047 rad/s, ~22 deg of yaw
+against 0.60 m of travel over 8 s. That is skid-steer scrub on flat regolith -
+the rover fighting its own wheels, not an obstacle. The stuck detector then
+fires **correctly**: by its own definition the rover is stationary under a
+non-trivial command, and it is. The escape maneuver that follows - reverse,
+turn, mark a keep-out zone on clear ground, replan - is what costs the ~1.8 m
+of extra divergence that defines the long cluster.
+
+**The divergence is created here, not inherited.** Every rep in both clusters
+sits at 0.13-0.20 m of EKF divergence at t=370, immediately before the fork,
+and the clusters' final numbers (1.04-1.40 m vs 2.96-3.61 m) are built
+entirely after it. So the split is not the EKF drifting differently and the
+planner reacting; the fork event is the cause and the divergence is its
+consequence.
+
+**The open question is now one step upstream, and it is a different
+question.** Same position, same heading, same pose estimate, same hazard set -
+and the follower demands a gentle correction in ten reps and a hard turn in
+seven. That difference is in the planned path, which this campaign has never
+recorded. Answering it needs the planner's output logged per replan, not more
+reps of the same experiment - the same conclusion this document reached about
+`flip_recovery_node`'s internals two sections ago, now pointing at
+`regolith_planner`.
+
+**What this does not establish:** that the stall is skid-steer scrub is an
+inference from the commanded-vs-achieved yaw rate on flat, rock-free ground -
+it is consistent with everything measured, but no wheel-level torque or
+contact data was collected to confirm it. Whether a gentler recovery (or none
+at all - the rover might work its own way out, as the short reps do) would
+land the long reps at 1.3 m is untested, and would need the same paired
+campaign discipline as every other change here.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep17/` (new); all
+numbers above re-derived from `seed7_fixed_rep{1..17}` already on disk plus
+the seed-7 manifest and heightmap, no new sim time. Fixed-arm totals n=17:
+10 short (mean 1.28 m, 1.04-1.40), 7 long (mean 3.19 m, 2.96-3.61), gap still
+empty.
