@@ -319,12 +319,14 @@ def run_watcher(args) -> int:
                 # timestamps quoted by any node's log.
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
-                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z\n"
+                    "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z,"
+                    "ekf_x,ekf_y,ekf_yaw\n"
                 )
             self.sim_first = None
             self.sim_last = None
             self._gt_speed = 0.0
             self._gt_prev = None
+            self._ekf_yaw = float("nan")
             self._imu = None
             self._odom = None
             self._rpy = (0.0, 0.0, 0.0)
@@ -413,7 +415,7 @@ def run_watcher(args) -> int:
             self._cmd = (msg.linear.x, msg.angular.z)
 
         def _log_signals(self):
-            if self.gt is None or self._odom is None or self._imu is None:
+            if self.gt is None or self._odom is None or self._imu is None or self.ekf is None:
                 return
             roll, pitch, yaw = self._rpy
             cov_xx, cov_yy = self._ekf_cov_xy if self._ekf_cov_xy is not None else (float("nan"),) * 2
@@ -425,7 +427,8 @@ def run_watcher(args) -> int:
                 f"{roll:.4f},{pitch:.4f},{yaw:.4f},"
                 f"{self.gt[0]:.3f},{self.gt[1]:.3f},{self._gt_speed:.4f},"
                 f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g},"
-                f"{self._cmd[0]:.4f},{self._cmd[1]:.4f}\n"
+                f"{self._cmd[0]:.4f},{self._cmd[1]:.4f},"
+                f"{self.ekf[0]:.3f},{self.ekf[1]:.3f},{self._ekf_yaw:.4f}\n"
             )
 
         def _on_ekf(self, msg):
@@ -438,6 +441,12 @@ def run_watcher(args) -> int:
             else:
                 self._last_ekf = (p.x, p.y)
             self.ekf = (p.x, p.y)
+            # The follower steers on THIS pose, not on ground truth, so any
+            # offline reconstruction of what it commanded needs it. Recorded
+            # after a reconstruction from ground truth came out 45 deg wrong in
+            # a rep whose divergence at the time was 3.38 m - see PROGRESS.md
+            # and scripts/reconstruct_follower_target.py.
+            self._ekf_yaw = rpy(msg.pose.pose.orientation)[2]
             # row-major 6x6 pose covariance (x,y,z,roll,pitch,yaw order per
             # nav_msgs/Odometry) - [0] is x-variance, [7] is y-variance (row 1,
             # col 1 in the flattened 6x6). Recorded to test whether a ZUPT

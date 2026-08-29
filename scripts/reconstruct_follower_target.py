@@ -15,10 +15,13 @@ heading error is recomputable exactly. This does that, and - because a
 reconstruction nobody checked is just a second opinion - it can score itself
 against the `/cmd_vel` the run actually recorded.
 
-One caveat this cannot escape: the follower steers on the EKF estimate, while
-the signals CSV records ground-truth pose and yaw. Over the fork window the
-two differ by 0.13-0.20 m (PROGRESS.md), so reconstructed alpha carries that
-error. --validate reports it rather than hiding it.
+The follower steers on the EKF estimate, so that is what this reconstructs
+from - `ekf_x`/`ekf_y`/`ekf_yaw`, recorded since the run that made the point
+unavoidable: reconstructing the same window from ground truth put alpha 45 deg
+out, because the estimate was 3.38 m from the truth at the time. Runs recorded
+before those columns existed fall back to ground truth with a warning, which is
+only meaningful while divergence is small. --validate scores either choice
+against the recorded /cmd_vel rather than asking to be trusted.
 """
 
 from __future__ import annotations
@@ -142,20 +145,32 @@ def main() -> None:
     ap.add_argument("--from-t", type=float, default=365.0, help="sim time window start")
     ap.add_argument("--to-t", type=float, default=385.0)
     ap.add_argument("--step", type=float, default=1.0, help="print every N sim seconds")
+    ap.add_argument("--from-ground-truth", action="store_true",
+                    help="reconstruct from ground truth even when the EKF pose is available "
+                         "(shows what the follower would have done with perfect localization)")
     ap.add_argument("--validate", action="store_true",
                     help="score reconstructed angular_z against the recorded /cmd_vel")
     args = ap.parse_args()
 
     paths = load_paths(args.rep_dir, args.seed)
     rows = load_signals(args.rep_dir, args.seed)
+    use_ekf = bool(rows) and "ekf_x" in rows[0] and not args.from_ground_truth
     print(f"{len(paths)} planned paths, {len(rows)} signal rows")
+    if use_ekf:
+        print("reconstructing from the EKF pose - the one the follower actually steers on")
+    else:
+        print("WARNING: no ekf_x/ekf_y/ekf_yaw columns in this run" if not args.from_ground_truth
+              else "reconstructing from GROUND TRUTH by request")
+        print("         reconstructing from ground truth instead; alpha is only meaningful "
+              "while\n         divergence is small - check the trace before trusting it")
     for p in paths:
         print(f"  path #{p['seq']}: sim_t={p['sim_t']:8.2f}  {p['n_poses']:3d} waypoints"
               f"  published while the rover was at {p['gt_at_publish']}")
 
     errors = []
     skipped = 0
-    print(f"\n sim_t   gt_x    gt_y    yaw     alpha   recon_w  recorded_w  sat  rot-in-place")
+    frame = "ekf" if use_ekf else "gt"
+    print(f"\n sim_t  {frame}_x   {frame}_y    yaw     alpha   recon_w  recorded_w  sat  rot-in-place")
     nxt = args.from_t
     for r in rows:
         t = float(r["sim_t"])
@@ -164,8 +179,12 @@ def main() -> None:
         active = path_in_force(paths, t)
         if active is None:
             continue
-        pos = (float(r["gt_x"]), float(r["gt_y"]))
-        yaw = float(r["yaw"])
+        if use_ekf:
+            pos = (float(r["ekf_x"]), float(r["ekf_y"]))
+            yaw = float(r["ekf_yaw"])
+        else:
+            pos = (float(r["gt_x"]), float(r["gt_y"]))
+            yaw = float(r["yaw"])
         cmd = follower_command([tuple(p) for p in active["poses"]], pos, yaw)
         recorded_w = float(r["cmd_ang_z"]) if "cmd_ang_z" in r else float("nan")
         recorded_v = float(r["cmd_lin_x"]) if "cmd_lin_x" in r else float("nan")
