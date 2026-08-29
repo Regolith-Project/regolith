@@ -118,3 +118,18 @@ def test_path_in_force_picks_the_most_recent_replan():
 if __name__ == "__main__":
     import pytest
     sys.exit(pytest.main([__file__, "-q"]))
+
+
+def test_recovery_owned_samples_are_separable_from_follower_output():
+    """The escape's own limits put it outside anything the follower can publish."""
+    # flip_recovery_node's escape: reverse at -0.2 m/s, turn at 0.5 rad/s.
+    assert R.recovery_owns_cmd(-0.2, 0.0)
+    assert R.recovery_owns_cmd(0.0, 0.5)
+    assert R.recovery_owns_cmd(0.0, -0.5)
+    # Ordinary follower output, including a saturated turn, is not.
+    assert not R.recovery_owns_cmd(0.2, 0.0)
+    assert not R.recovery_owns_cmd(0.0, R.MAX_ANGULAR)
+    assert not R.recovery_owns_cmd(0.0, -R.MAX_ANGULAR)
+    assert not R.recovery_owns_cmd(0.06, 0.29)
+    # A run without /cmd_vel recorded must not be silently treated as escape.
+    assert not R.recovery_owns_cmd(float("nan"), float("nan"))

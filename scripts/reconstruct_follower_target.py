@@ -91,6 +91,23 @@ def follower_command(path: list, position: tuple, yaw: float, goal_xy: tuple = N
     }
 
 
+def recovery_owns_cmd(linear_x: float, angular_z: float) -> bool:
+    """True when /cmd_vel was published by flip_recovery_node, not the follower.
+
+    During an escape maneuver `_control_step` returns immediately and the
+    recovery node drives - so those samples are not the follower's output and
+    scoring a reconstruction against them measures nothing. The signals CSV has
+    no /recovery_active column (recording one would be cleaner; this campaign's
+    schema was already fixed when the need showed up), but the two writers are
+    separable by their own limits: the follower never commands a negative
+    linear velocity and never exceeds max_angular_velocity, while the escape
+    reverses at -0.2 m/s and turns at 0.5 rad/s.
+    """
+    if math.isnan(linear_x) or math.isnan(angular_z):
+        return False
+    return linear_x < -1e-6 or abs(angular_z) > MAX_ANGULAR + 1e-3
+
+
 def load_paths(rep_dir: Path, seed: int) -> list:
     f = rep_dir / f"seed_{seed}_paths.jsonl"
     if not f.exists():
@@ -137,6 +154,7 @@ def main() -> None:
               f"  published while the rover was at {p['gt_at_publish']}")
 
     errors = []
+    skipped = 0
     print(f"\n sim_t   gt_x    gt_y    yaw     alpha   recon_w  recorded_w  sat  rot-in-place")
     nxt = args.from_t
     for r in rows:
@@ -150,18 +168,24 @@ def main() -> None:
         yaw = float(r["yaw"])
         cmd = follower_command([tuple(p) for p in active["poses"]], pos, yaw)
         recorded_w = float(r["cmd_ang_z"]) if "cmd_ang_z" in r else float("nan")
-        if not math.isnan(recorded_w):
+        recorded_v = float(r["cmd_lin_x"]) if "cmd_lin_x" in r else float("nan")
+        owned_by_recovery = recovery_owns_cmd(recorded_v, recorded_w)
+        if not math.isnan(recorded_w) and not owned_by_recovery:
             errors.append(abs(cmd["angular_z"] - recorded_w))
+        else:
+            skipped += 1
         if t >= nxt:
             nxt = t + args.step
             print(f"{t:7.1f} {pos[0]:7.2f} {pos[1]:7.2f} {math.degrees(yaw):7.1f} "
                   f"{cmd['alpha_deg']:7.1f} {cmd['angular_z']:8.3f} {recorded_w:10.3f}   "
-                  f"{'Y' if cmd['saturated'] else '.'}    {'Y' if cmd['rotate_in_place'] else '.'}")
+                  f"{'Y' if cmd['saturated'] else '.'}    {'Y' if cmd['rotate_in_place'] else '.'}"
+                  f"{'   [escape owns /cmd_vel]' if owned_by_recovery else ''}")
 
     if args.validate and errors:
         errors.sort()
         n = len(errors)
-        print(f"\nreconstruction vs recorded /cmd_vel over {n} samples:")
+        print(f"\nreconstruction vs recorded /cmd_vel over {n} samples "
+              f"({skipped} skipped as escape-owned):")
         print(f"  median |error| {errors[n // 2]:.4f} rad/s   90th pct {errors[int(n * 0.9)]:.4f}"
               f"   max {errors[-1]:.4f}")
         print("  (a floor of ~0.02-0.05 is expected: the follower steers on the EKF estimate, "
