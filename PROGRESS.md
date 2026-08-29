@@ -5861,3 +5861,43 @@ the heading error grows only *after* the collapse has started - rep 5's is
 fired: the escape is not what freed it, which is consistent with this
 document's long-standing finding that escapes fire far more often than they
 demonstrably help.
+
+**Correction to the paragraph above, same pass:** it says rep 5 "works itself
+free at t=378 ... after the detector has already fired: the escape is not what
+freed it". That is wrong, and the check that would have caught it is one line
+long. At t=378 rep 5's `/cmd_vel` reads `(-0.200, 0.000)` - the escape's
+reverse leg, which by definition no follower here can command. The same holds
+in reps 4 and 6, and the node's own accounting agrees: all three log `STUCK
+RECOVERY #3 result: ground truth moved 0.49-0.50 m during the maneuver -
+FREED`. The rover did not work itself free; **the escape reversed it off the
+ledge**, which for a rover caught on a 4 cm step is the correct move and
+evidently an effective one.
+
+    rep4    t=377   7mm   cmd=( 0.060,-0.300)  follower, caught
+            t=379 122mm   cmd=(-0.200, 0.000)  escape reversing
+    rep5    t=377   7mm   cmd=( 0.059,-0.300)  follower, caught
+            t=378 129mm   cmd=(-0.200, 0.000)  escape reversing
+    rep6    t=377   8mm   cmd=( 0.059,-0.300)  follower, caught
+            t=378 125mm   cmd=(-0.200, 0.000)  escape reversing
+
+This reverses the implication drawn from it. The escape is not firing for
+nothing at this stall and then charging 1.8 m of divergence for the privilege -
+it is the thing that gets the rover off the step, and the 1.8 m is the price of
+a manoeuvre that works. Any future attempt to suppress the escape here (which
+the paragraph above was building towards) has to answer what frees the rover
+instead; on this evidence, nothing else would have.
+
+The general finding it leaned on - that escapes fire far more often than they
+demonstrably help - is about this document's whole population of escapes and is
+untouched. Applying it to *this* stall without checking who was driving was the
+error.
+
+**Final campaign tally, n=6:** 2 short (reps 2, 3), 4 long (reps 1, 4, 5, 6);
+rep 1 on the alternate route, the other five on the majority path. Path at the
+fork identical across all five majority-path reps. All three reconstructable
+long reps (4, 5, 6) show the same catch - roll pinned at -5.3 deg, translation
+collapsing to 1-8 mm/s, heading error growing only afterwards - and all three
+are freed by the escape's reverse leg, moving 0.49-0.50 m during the manoeuvre.
+
+Raw evidence: `planned_path_campaign/seed7_paths_rep{5,6}/` (new). ~1.3 h of
+wall-clock sim time.
