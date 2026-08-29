@@ -5753,3 +5753,82 @@ worth correlating against is logged in sim time.
 
 Raw evidence: recomputation over `escape_timing_fix_campaign/seed7_fixed_rep{1..19}`,
 no new sim time; `m4_acceptance.py`'s trace header.
+
+### The planned path is identical in both clusters - the hypothesis this campaign was built to test, refuted by it
+
+`--record-paths` and `reconstruct_follower_target.py` were built to answer one
+question: why the follower steers at its 0.30 rad/s angular limit at the fork
+in the long reps and not in the short ones, with the planned path named as
+"the only candidate left". Four seed-7 reps later, with the follower's command
+now reconstructable to a median 0.0008-0.0010 rad/s of the recorded `/cmd_vel`,
+the answer is that the path is not a candidate at all.
+
+**The path in force at the fork is byte-identical in a short rep and a long
+one.** Both rep 3 (short, 1.3 m) and rep 4 (long, 3.2 m) are following the
+55-waypoint path published at their chokepoint replan (sim t=260.6 and 261.8),
+and the two waypoint lists compare equal - not similar, equal - down to the
+millimetre the recorder writes. At the fork both are steering at the same
+waypoint, `(-16.80,-52.73)`, and both then advance to the same next one. The
+planner is not what differs between the clusters, and neither is anything
+downstream of it that a path could explain.
+
+**What differs is that one rover crosses the 4 cm step and the other catches
+on it.** Both roll onto it at t≈372 and both reach the same -5.3 deg of roll:
+
+    sim_t     rep3 (short)                      rep4 (LONG)
+              yaw    req'd   err    roll        yaw    req'd   err    roll   gt/s
+     372    -140.8  -140.1    0.7   -5.2      -139.8  -140.1   -0.2   -2.0   319mm
+     373    -138.1  -140.1   -2.0   -5.3      -140.0  -140.1   -0.1   -5.0    84mm
+     374    -139.0  -140.2   -1.1   -5.3      -135.6  -140.2   -4.6   -5.3    55mm
+     375    -139.8  -140.2   -0.4   -5.0      -132.8  -140.5   -7.8   -5.3    30mm
+     376    -143.9  -140.2    3.6   -0.9      -133.0  -140.9   -8.0   -5.3     1mm
+     377    -145.6  -139.9    5.7    0.1      -133.6  -141.3   -7.7   -5.3     7mm
+     378    -147.0  -139.4    7.6    0.1      -134.2  -141.7   -7.5   -5.3     7mm
+
+Rep 3's roll releases after ~3 s and it drives on. Rep 4's **pins at -5.3 deg
+and stays there**, and its translation collapses from 84 mm/s to 1 mm/s over
+the same three seconds. While caught, its body is rotated ~7 deg *away* from
+the heading it needs (-140.0 to -132.8, in the wrong direction, under a
+command asking for the opposite), which is what drives the heading error past
+the saturation point.
+
+**So the causality is the reverse of what the n=17 section published, for the
+second time in this investigation.** That section read the saturated steering
+as the cause - "the long reps are asked to turn roughly eight times harder,
+and they cannot do it". The measurement says the rover is caught first and the
+steering demand grows because it is caught: at t=373 rep 4's heading error is
+-0.1 deg, smaller than rep 3's, and it only grows once translation has already
+collapsed. An earlier correction found the same arrow reversed for the
+rotate-in-place branch (aftermath of the escape, not cause of the stall). Both
+readings came from comparing cluster averages over a window instead of
+following one rep through it in order.
+
+**It also shrinks what "saturated" means.** With gain 1.5 and a 0.30 rad/s
+limit, saturation begins at alpha = 11.5 deg. The long reps are not being asked
+for a violent manoeuvre - a 15 deg heading error saturates this follower. The
+marker is real and separates the clusters, but it describes a modest
+correction, not an impossible one, and previous sections implying otherwise
+overstated it.
+
+**Where this leaves the split.** Identical path, identical approach, the same
+4 cm step, the same -5.3 deg of roll - and one rover rides over it while the
+other catches. At t=372, one second before their fates separate, they differ by
+1 deg of yaw and 3 deg of roll phase. That is contact dynamics on a 4 cm
+obstacle, which in a rigid-body simulator is where determinism is thinnest.
+The split is not planner geometry, not follower gains, and not the stuck
+detector's threshold: it is whether a 0.5 m rover's wheels happen to climb a
+4 cm ledge on a given approach - amplified, once it fails, by a recovery that
+costs 1.8 m of divergence every time it fires.
+
+**What this does not establish:** one short/long pair with identical paths does
+not prove the paths are identical in every pair - reps 1 and 2 of this campaign
+predate the EKF-pose columns and cannot be reconstructed at the fork, and reps
+5 and 6 are still running. Nor does "contact dynamics" name a mechanism; no
+wheel-contact or torque data was collected, and the claim that the two reps
+differ only in contact phase rests on their paths being equal and their poses
+being within 1 deg, not on anything measured at the wheels.
+
+Raw evidence: `planned_path_campaign/seed7_paths_rep{1..4}/` (new; rep 1 long
+on the alternate route, rep 2 short, rep 3 short, rep 4 long - reps 3 and 4
+carry `ekf_x`/`ekf_y`/`ekf_yaw` and are the reconstructable pair used above).
+~2.9 h of wall-clock sim time.
