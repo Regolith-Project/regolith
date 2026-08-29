@@ -1,0 +1,148 @@
+[INFO] [launch]: All log files can be found below /home/balazs/.ros/log/2026-08-29-22-46-41-065449-DESKTOP-IE5MOME-8381
+[INFO] [launch]: Default logging verbosity is set to INFO
+[hello_moon.launch] Using ROS_DOMAIN_ID=96 (isolated DDS domain for this launch - see PROGRESS.md)
+[INFO] [ruby $(which gz) sim-1]: process started with pid [8425]
+[INFO] [robot_state_publisher-2]: process started with pid [8427]
+[INFO] [parameter_bridge-3]: process started with pid [8430]
+[INFO] [wheel_slip_node.py-4]: process started with pid [8432]
+[INFO] [sensor_covariance_relay.py-5]: process started with pid [8435]
+[INFO] [ekf_node-6]: process started with pid [8437]
+[INFO] [costmap_node-7]: process started with pid [8439]
+[INFO] [planner_node-8]: process started with pid [8441]
+[INFO] [pure_pursuit_node-9]: process started with pid [8443]
+[INFO] [flip_recovery_node.py-10]: process started with pid [8445]
+[INFO] [mission_markers_node.py-11]: process started with pid [8447]
+[parameter_bridge-3] [INFO] [1788040002.634906777] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.636331147] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.638734731] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.639775868] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/odometry (gz.msgs.Odometry) -> /odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.641772550] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/odometry (nav_msgs/msg/Odometry) -> /odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.642708300] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera (gz.msgs.Image) -> /camera (sensor_msgs/msg/Image)] (Lazy 0)
+[robot_state_publisher-2] [INFO] [1788040002.644409440] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1788040002.644606713] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1788040002.644621465] [robot_state_publisher]: got segment chassis
+[robot_state_publisher-2] [INFO] [1788040002.644628780] [robot_state_publisher]: got segment front_left_wheel
+[robot_state_publisher-2] [INFO] [1788040002.644635299] [robot_state_publisher]: got segment front_right_wheel
+[robot_state_publisher-2] [INFO] [1788040002.644641311] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-2] [INFO] [1788040002.644647675] [robot_state_publisher]: got segment rear_left_wheel
+[robot_state_publisher-2] [INFO] [1788040002.644654143] [robot_state_publisher]: got segment rear_right_wheel
+[parameter_bridge-3] [INFO] [1788040002.644714476] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera (sensor_msgs/msg/Image) -> /camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.646153041] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera_info (gz.msgs.CameraInfo) -> /camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.647240751] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera_info (sensor_msgs/msg/CameraInfo) -> /camera_info (gz.msgs.CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.648447594] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/depth_camera (gz.msgs.Image) -> /depth_camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.649564268] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/depth_camera (sensor_msgs/msg/Image) -> /depth_camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.650714202] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu (gz.msgs.IMU) -> /imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.651880480] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/imu (sensor_msgs/msg/Imu) -> /imu (gz.msgs.IMU)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.653093341] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/regolith_moon/model/rover/joint_state (gz.msgs.Model) -> /world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.654269320] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState) -> /world/regolith_moon/model/rover/joint_state (gz.msgs.Model)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788040002.655186825] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/rover/pose (gz.msgs.Pose) -> /model/rover/pose (geometry_msgs/msg/PoseStamped)] (Lazy 0)
+[flip_recovery_node.py-10] [INFO] [1788040003.067601754] [regolith_flip_recovery]: Flip/stuck recovery armed (simulated set_pose backstop for flips, straight-line cmd_vel override for stuck-but-upright)
+[wheel_slip_node.py-4] [INFO] [1788040003.085373437] [regolith_wheel_slip]: Wheel-slip ZUPT armed: /odom -> /odom/gated (onboard signals only - wheel odometry and IMU, never ground truth). legacy_rigid_body_signature=False
+[costmap_node-7] [INFO] [1788040003.145699518] [regolith_costmap]: Published costmap: 256x256 cells at 0.781 m/cell
+[mission_markers_node.py-11] [INFO] [1788040003.168083349] [regolith_mission_markers]: Mission markers active - start at (0.0, 0.0), Gazebo flags on, RViz on /mission_markers
+[planner_node-8] [WARN] [1788040007.213542629] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-8] [INFO] [1788040017.274559978] [regolith_planner]: Planned path: 103 waypoints, start=(128, 128) goal=(52, 73)
+[parameter_bridge-3] [INFO] [1788040017.611742118] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[flip_recovery_node.py-10] [INFO] [1788040018.466489873] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0015 commanded=0.0690 t=2.60)
+[flip_recovery_node.py-10] [INFO] [1788040018.466930656] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0015 commanded=0.0690 dt=0.200 t=2.60)
+[flip_recovery_node.py-10] [INFO] [1788040031.882665603] [regolith_flip_recovery]: [stuck_debug] shadow streak PASSED the 3.00s bar (started t=2.60, t=5.80)
+[flip_recovery_node.py-10] [INFO] [1788040031.883094338] [regolith_flip_recovery]: [stuck_debug] streak FIRED after 3.20s (t=5.80)
+[costmap_node-7] [WARN] [1788040031.893803796] [regolith_costmap]: Hazard #1 marked at (0.59, -0.54): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-9] [INFO] [1788040031.904573516] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[pure_pursuit_node-9] [INFO] [1788040051.461132994] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1788040051.521637093] [regolith_flip_recovery]: STUCK RECOVERY #1 (escalation level 0, triggered by ground truth; 1 ground-truth / 0 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[flip_recovery_node.py-10] [INFO] [1788040051.522081203] [regolith_flip_recovery]: [stuck_debug] shadow streak tally at recovery #1: 0 cuts, longest 3.20s (bar 3.00s)
+[planner_node-8] [WARN] [1788040051.523599984] [regolith_planner]: Current-position cell (128, 127) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (128, 126) instead
+[planner_node-8] [INFO] [1788040051.604552662] [regolith_planner]: Planned path: 103 waypoints, start=(128, 126) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788040053.181014704] [regolith_flip_recovery]: [stuck_debug] shadow streak DROPPED at 8.60s (tick gap of 5.40s, t=11.20)
+[flip_recovery_node.py-10] [INFO] [1788040053.181432800] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0011 commanded=0.0690 t=11.20)
+[flip_recovery_node.py-10] [WARN] [1788040056.404467861] [regolith_flip_recovery]: STUCK RECOVERY #1 result: ground truth moved 0.60 m during the maneuver - FREED (1/1 escapes have freed the rover so far)
+[flip_recovery_node.py-10] [INFO] [1788040065.523779812] [regolith_flip_recovery]: [stuck_debug] shadow streak PASSED the 3.00s bar (started t=11.20, t=14.20)
+[flip_recovery_node.py-10] [INFO] [1788040072.496090977] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0000 commanded=0.0690 dt=0.200 t=15.80)
+[flip_recovery_node.py-10] [INFO] [1788040082.333370935] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 7.20s (gt_speed>=min: gt_speed=0.0206 commanded=0.0690 t=18.40; 1 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788040082.333803235] [regolith_flip_recovery]: [stuck_debug] streak RESET after 2.60s (gt_speed>=min: gt_speed=0.0206 commanded=0.0690 dt=0.200 t=18.40)
+[pure_pursuit_node-9] [WARN] [1788040084.749656401] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-8] [WARN] [1788040084.751379294] [regolith_planner]: Current-position cell (128, 127) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (128, 126) instead
+[planner_node-8] [INFO] [1788040084.846897853] [regolith_planner]: Planned path: 103 waypoints, start=(128, 126) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788040999.889425755] [regolith_flip_recovery]: [stuck_debug] slip ASSERTED (t=251.68)
+[wheel_slip_node.py-4] [WARN] [1788040999.889607581] [regolith_wheel_slip]: WHEEL SLIP #1: over the last 15.0 s the wheels claim 2.52 m and 2.77 rad of turning; the gyro saw 0.40 rad (14% of it) and the attitude spanned 7.83 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[flip_recovery_node.py-10] [INFO] [1788041019.662398035] [regolith_flip_recovery]: [stuck_debug] slip PREEMPTED the ground-truth path after 5.12s asserted (live streak=none shadow streak=none gt_speed=0.0571 commanded=0.1965 t=256.80)
+[pure_pursuit_node-9] [INFO] [1788041019.663402191] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1788041019.670909831] [regolith_costmap]: Hazard #2 marked at (-11.21, -38.57): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-9] [INFO] [1788041019.671163703] [regolith_pure_pursuit]: Costmap changed (a new keep-out zone) - restoring the replan budget: the route being retried is not the one that already failed
+[flip_recovery_node.py-10] [INFO] [1788041034.195889975] [regolith_flip_recovery]: [stuck_debug] slip CLEARED after already consumed by a trigger (trigger bar: 5.00s, t=260.40)
+[wheel_slip_node.py-4] [WARN] [1788041034.196302822] [regolith_wheel_slip]: WHEEL SLIP #1 cleared - over the last 5.0 s the wheels claimed 0.59 rad of turning and the gyro corroborated 25% of it. Phantom distance kept out of the EKF so far: 1.23 m.
+[flip_recovery_node.py-10] [INFO] [1788041034.280446679] [regolith_flip_recovery]: [stuck_debug] slip ASSERTED (t=260.42)
+[wheel_slip_node.py-4] [WARN] [1788041034.280484762] [regolith_wheel_slip]: WHEEL SLIP #2: over the last 15.0 s the wheels claim 2.14 m and 3.58 rad of turning; the gyro saw 0.32 rad (9% of it) and the attitude spanned 6.29 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[pure_pursuit_node-9] [INFO] [1788041039.883041613] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1788041039.943555174] [regolith_flip_recovery]: STUCK RECOVERY #2 (escalation level 0, triggered by wheel slip (onboard); 1 ground-truth / 1 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[flip_recovery_node.py-10] [INFO] [1788041039.943997799] [regolith_flip_recovery]: [stuck_debug] shadow streak tally at recovery #2: 1 cuts, longest 7.20s (bar 3.00s)
+[planner_node-8] [WARN] [1788041039.945781089] [regolith_planner]: Current-position cell (79, 113) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (80, 112) instead
+[planner_node-8] [INFO] [1788041039.969039225] [regolith_planner]: Planned path: 55 waypoints, start=(80, 112) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788041041.605379280] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0034 commanded=0.0690 t=262.20)
+[flip_recovery_node.py-10] [INFO] [1788041041.463823408] [regolith_flip_recovery]: [stuck_debug] slip CLEARED after 2.00s (trigger bar: 5.00s, t=262.42)
+[wheel_slip_node.py-4] [WARN] [1788041041.464353777] [regolith_wheel_slip]: WHEEL SLIP #2 cleared - over the last 5.0 s the wheels claimed 0.64 rad of turning and the gyro corroborated 90% of it. Phantom distance kept out of the EKF so far: 1.23 m.
+[flip_recovery_node.py-10] [INFO] [1788041042.165996836] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 0.40s (gt_speed>=min: gt_speed=0.0228 commanded=0.0690 t=262.60; 2 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [WARN] [1788041043.757986914] [regolith_flip_recovery]: STUCK RECOVERY #2 result: ground truth moved 0.53 m during the maneuver - FREED (2/2 escapes have freed the rover so far)
+[flip_recovery_node.py-10] [INFO] [1788041062.271270403] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0189 commanded=0.1217 t=267.60)
+[flip_recovery_node.py-10] [INFO] [1788041062.271752255] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0189 commanded=0.1217 dt=0.200 t=267.60)
+[flip_recovery_node.py-10] [INFO] [1788041063.084425016] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 0.20s (gt_speed>=min: gt_speed=0.0355 commanded=0.1244 t=267.80; 3 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041063.084835306] [regolith_flip_recovery]: [stuck_debug] streak RESET after 0.20s (gt_speed>=min: gt_speed=0.0355 commanded=0.1244 dt=0.200 t=267.80)
+[flip_recovery_node.py-10] [INFO] [1788041489.729987554] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0190 commanded=0.1157 t=375.20)
+[flip_recovery_node.py-10] [INFO] [1788041489.730499346] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0190 commanded=0.1157 dt=0.200 t=375.20)
+[flip_recovery_node.py-10] [INFO] [1788041501.954398816] [regolith_flip_recovery]: [stuck_debug] shadow streak PASSED the 3.00s bar (started t=375.20, t=378.20)
+[flip_recovery_node.py-10] [INFO] [1788041501.954900878] [regolith_flip_recovery]: [stuck_debug] streak FIRED after 3.00s (t=378.20)
+[pure_pursuit_node-9] [INFO] [1788041501.955866420] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1788041501.963710328] [regolith_costmap]: Hazard #3 marked at (-16.51, -52.64): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-9] [INFO] [1788041521.133725735] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1788041521.194638286] [regolith_flip_recovery]: STUCK RECOVERY #3 (escalation level 0, triggered by ground truth; 2 ground-truth / 1 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[flip_recovery_node.py-10] [INFO] [1788041521.195103328] [regolith_flip_recovery]: [stuck_debug] shadow streak tally at recovery #3: 3 cuts, longest 7.20s (bar 3.00s)
+[planner_node-8] [INFO] [1788041521.208020140] [regolith_planner]: Planned path: 38 waypoints, start=(61, 108) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788041522.869948889] [regolith_flip_recovery]: [stuck_debug] shadow streak DROPPED at 8.40s (tick gap of 5.40s, t=383.60)
+[flip_recovery_node.py-10] [WARN] [1788041526.120623016] [regolith_flip_recovery]: STUCK RECOVERY #3 result: ground truth moved 0.49 m during the maneuver - FREED (3/3 escapes have freed the rover so far)
+[flip_recovery_node.py-10] [INFO] [1788041625.578941461] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0193 commanded=0.1183 t=409.60)
+[flip_recovery_node.py-10] [INFO] [1788041625.579416460] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0193 commanded=0.1183 dt=0.200 t=409.60)
+[flip_recovery_node.py-10] [INFO] [1788041630.436875585] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 1.20s (gt_speed>=min: gt_speed=0.0205 commanded=0.1220 t=410.80; 4 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041630.437303276] [regolith_flip_recovery]: [stuck_debug] streak RESET after 1.20s (gt_speed>=min: gt_speed=0.0205 commanded=0.1220 dt=0.200 t=410.80)
+[flip_recovery_node.py-10] [INFO] [1788041646.488625024] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0199 commanded=0.1178 t=415.00)
+[flip_recovery_node.py-10] [INFO] [1788041646.489233088] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0199 commanded=0.1178 dt=0.200 t=415.00)
+[flip_recovery_node.py-10] [INFO] [1788041658.692348635] [regolith_flip_recovery]: [stuck_debug] shadow streak PASSED the 3.00s bar (started t=415.00, t=418.00)
+[flip_recovery_node.py-10] [INFO] [1788041658.692968995] [regolith_flip_recovery]: [stuck_debug] streak FIRED after 3.00s (t=418.00)
+[pure_pursuit_node-9] [INFO] [1788041658.693902677] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-7] [WARN] [1788041658.702146991] [regolith_costmap]: Hazard #4 marked at (-17.17, -54.87): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[flip_recovery_node.py-10] [INFO] [1788041670.093154167] [regolith_flip_recovery]: [stuck_debug] slip ASSERTED (t=421.10)
+[wheel_slip_node.py-4] [WARN] [1788041670.093369215] [regolith_wheel_slip]: WHEEL SLIP #3: over the last 15.0 s the wheels claim 1.47 m and 2.87 rad of turning; the gyro saw 0.42 rad (14% of it) and the attitude spanned 9.18 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[flip_recovery_node.py-10] [INFO] [1788041678.332325053] [regolith_flip_recovery]: [stuck_debug] slip CLEARED after 2.00s (trigger bar: 5.00s, t=423.10)
+[wheel_slip_node.py-4] [WARN] [1788041678.332668720] [regolith_wheel_slip]: WHEEL SLIP #3 cleared - over the last 5.0 s the wheels claimed 0.03 rad of turning and the gyro corroborated 100% of it. Phantom distance kept out of the EKF so far: 1.63 m.
+[flip_recovery_node.py-10] [INFO] [1788041678.423638076] [regolith_flip_recovery]: [stuck_debug] slip ASSERTED (t=423.12)
+[wheel_slip_node.py-4] [WARN] [1788041678.423863109] [regolith_wheel_slip]: WHEEL SLIP #4: over the last 15.0 s the wheels claim 1.73 m and 2.49 rad of turning; the gyro saw 0.32 rad (13% of it) and the attitude spanned 9.18 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[flip_recovery_node.py-10] [INFO] [1788041686.524721043] [regolith_flip_recovery]: [stuck_debug] slip CLEARED after 2.00s (trigger bar: 5.00s, t=425.12)
+[wheel_slip_node.py-4] [WARN] [1788041686.525070761] [regolith_wheel_slip]: WHEEL SLIP #4 cleared - over the last 5.0 s the wheels claimed 0.28 rad of turning and the gyro corroborated 86% of it. Phantom distance kept out of the EKF so far: 1.84 m.
+[pure_pursuit_node-9] [INFO] [1788041696.143015644] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-10] [WARN] [1788041696.203985209] [regolith_flip_recovery]: STUCK RECOVERY #4 (escalation level 1, triggered by ground truth; 3 ground-truth / 1 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 6.0s, then turned right at 0.50 rad/s for 3.5s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[flip_recovery_node.py-10] [INFO] [1788041696.204494369] [regolith_flip_recovery]: [stuck_debug] shadow streak tally at recovery #4: 4 cuts, longest 7.20s (bar 3.00s)
+[planner_node-8] [WARN] [1788041696.205557728] [regolith_planner]: Current-position cell (59, 107) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (59, 108) instead
+[planner_node-8] [INFO] [1788041696.221719486] [regolith_planner]: Planned path: 39 waypoints, start=(59, 108) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788041697.489373852] [regolith_flip_recovery]: [stuck_debug] shadow streak DROPPED at 12.80s (tick gap of 9.80s, t=427.80)
+[flip_recovery_node.py-10] [INFO] [1788041697.489812791] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0067 commanded=0.0690 t=427.80)
+[flip_recovery_node.py-10] [WARN] [1788041699.664441282] [regolith_flip_recovery]: STUCK RECOVERY #4 result: ground truth moved 1.20 m during the maneuver - FREED (4/4 escapes have freed the rover so far)
+[flip_recovery_node.py-10] [INFO] [1788041708.576094580] [regolith_flip_recovery]: [stuck_debug] shadow streak PASSED the 3.00s bar (started t=427.80, t=430.80)
+[flip_recovery_node.py-10] [INFO] [1788041716.078425055] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0044 commanded=0.0690 dt=0.200 t=432.60)
+[flip_recovery_node.py-10] [INFO] [1788041725.022151955] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 7.00s (gt_speed>=min: gt_speed=0.0216 commanded=0.0690 t=434.80; 5 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041725.022650673] [regolith_flip_recovery]: [stuck_debug] streak RESET after 2.20s (gt_speed>=min: gt_speed=0.0216 commanded=0.0690 dt=0.200 t=434.80)
+[pure_pursuit_node-9] [WARN] [1788041728.638532578] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-8] [WARN] [1788041728.639783791] [regolith_planner]: Current-position cell (59, 107) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (59, 108) instead
+[planner_node-8] [INFO] [1788041728.654836192] [regolith_planner]: Planned path: 39 waypoints, start=(59, 108) goal=(52, 73)
+[flip_recovery_node.py-10] [INFO] [1788041765.895181416] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0077 commanded=0.0690 t=445.20)
+[flip_recovery_node.py-10] [INFO] [1788041765.895634756] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0077 commanded=0.0690 dt=0.200 t=445.20)
+[flip_recovery_node.py-10] [INFO] [1788041767.614967993] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 0.40s (gt_speed>=min: gt_speed=0.0420 commanded=0.1140 t=445.60; 6 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041767.615404234] [regolith_flip_recovery]: [stuck_debug] streak RESET after 0.40s (gt_speed>=min: gt_speed=0.0420 commanded=0.1140 dt=0.200 t=445.60)
+[flip_recovery_node.py-10] [INFO] [1788041886.624405903] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0044 commanded=0.0690 t=475.80)
+[flip_recovery_node.py-10] [INFO] [1788041886.624931282] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0044 commanded=0.0690 dt=0.200 t=475.80)
+[flip_recovery_node.py-10] [INFO] [1788041887.462282339] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 0.20s (gt_speed>=min: gt_speed=0.0345 commanded=0.1123 t=476.00; 7 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041887.462802224] [regolith_flip_recovery]: [stuck_debug] streak RESET after 0.20s (gt_speed>=min: gt_speed=0.0345 commanded=0.1123 dt=0.200 t=476.00)
+[flip_recovery_node.py-10] [INFO] [1788041907.769957124] [regolith_flip_recovery]: [stuck_debug] shadow streak START (gt_speed=0.0193 commanded=0.1335 t=481.00)
+[flip_recovery_node.py-10] [INFO] [1788041907.770394765] [regolith_flip_recovery]: [stuck_debug] streak START (gt_speed=0.0193 commanded=0.1335 dt=0.200 t=481.00)
+[flip_recovery_node.py-10] [INFO] [1788041912.662276094] [regolith_flip_recovery]: [stuck_debug] shadow streak CUT at 1.20s (gt_speed>=min: gt_speed=0.0224 commanded=0.1219 t=482.20; 8 cuts so far, longest 7.20s)
+[flip_recovery_node.py-10] [INFO] [1788041912.662789657] [regolith_flip_recovery]: [stuck_debug] streak RESET after 1.20s (gt_speed>=min: gt_speed=0.0224 commanded=0.1219 dt=0.200 t=482.20)
+[pure_pursuit_node-9] [INFO] [1788042571.389864083] [regolith_pure_pursuit]: Goal reached (within 0.35 m of the commanded goal)

@@ -1,0 +1,105 @@
+=== seed 7, fixed, paths rep 1 - 20:58:48 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=35
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.9 m from the goal after 92.5 m travelled, EKF divergence 3.6 m, 4 stuck events, 0 flips, 7 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.9m      92.5m     3.6m      4      0      7
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.9 m true error
+=== paths rep 1 finished 21:38:33 ===
+=== seed 7, fixed, paths rep 2 - 21:38:38 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=71
+[seed 7] PASS - ground truth 1.5 m from the goal after 88.3 m travelled, EKF divergence 1.1 m, 2 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m      88.3m     1.1m      2      0      2
+=== paths rep 2 finished 22:13:40 ===
+=== seed 7, fixed, paths rep 3 - 22:13:45 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep3
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=83
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 1.7 m from the goal after 88.0 m travelled, EKF divergence 1.3 m, 2 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      1.7m      88.0m     1.3m      2      0      2
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 1.7 m true error
+=== paths rep 3 finished 22:46:34 ===
+=== seed 7, fixed, paths rep 4 - 22:46:39 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep4
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=96
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.5 m from the goal after 93.8 m travelled, EKF divergence 3.2 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.5m      93.8m     3.2m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.5 m true error
+=== paths rep 4 finished 23:29:38 ===
+=== batch done 23:29:43 ===
+--- paths rep 1: done, skipping ---
+--- paths rep 2: done, skipping ---
+--- paths rep 3: done, skipping ---
+--- paths rep 4: done, skipping ---
+=== seed 7, fixed, paths rep 5 - 23:29:57 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep5
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=81
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.4 m from the goal after 93.5 m travelled, EKF divergence 3.1 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.4m      93.5m     3.1m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.4 m true error
+=== paths rep 5 finished 00:09:05 ===
+=== seed 7, fixed, paths rep 6 - 00:09:10 ===
+Results -> /home/balazs/regolith/planned_path_campaign/seed7_paths_rep6
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=15
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.3 m from the goal after 93.6 m travelled, EKF divergence 3.0 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.3m      93.6m     3.0m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.3 m true error
+=== paths rep 6 finished 00:46:30 ===
+=== batch done 00:46:35 ===
