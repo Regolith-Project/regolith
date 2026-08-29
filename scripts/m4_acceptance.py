@@ -291,6 +291,19 @@ def run_watcher(args) -> int:
             # claim (/odom twist) against what the IMU and ground truth say the
             # body actually did. A slip detector may only use the first two -
             # the ground-truth columns are the answer key, not an input.
+            # Every path the planner publishes, one JSON object per line. The
+            # fixed-arm split comes down to the follower steering at its
+            # angular limit at one spot in some reps and not others, from the
+            # same position, heading and pose estimate (PROGRESS.md) - and the
+            # only input left that could differ is the path it is following,
+            # which no campaign here has ever recorded. Written per replan
+            # rather than per tick: the planner only publishes on a goal, so
+            # this is a handful of lines per run, and the follower's target is
+            # reconstructable offline from a path plus the pose trace.
+            self._paths = None
+            self._path_seq = 0
+            if args.paths_jsonl:
+                self._paths = Path(args.paths_jsonl).open("w", buffering=1)
             self._signals = None
             if args.signals_csv:
                 self._signals = Path(args.signals_csv).open("w", buffering=1)
@@ -443,6 +456,29 @@ def run_watcher(args) -> int:
         def _on_path(self, msg):
             if msg.poses:
                 self.path_seen = True
+            if self._paths is not None:
+                # sim_t from the message's own header stamp (the planner runs on
+                # sim time), NOT the wall clock - the same distinction that made
+                # gt_speed unreadable for three sections of PROGRESS.md.
+                stamp = msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9
+                self._paths.write(
+                    json.dumps(
+                        {
+                            "seq": self._path_seq,
+                            "sim_t": round(stamp, 3),
+                            "wall_t": round(time.monotonic() - self.started, 2),
+                            "frame_id": msg.header.frame_id,
+                            "n_poses": len(msg.poses),
+                            "gt_at_publish": [round(v, 3) for v in self.gt] if self.gt else None,
+                            "poses": [
+                                [round(p.pose.position.x, 3), round(p.pose.position.y, 3)]
+                                for p in msg.poses
+                            ],
+                        }
+                    )
+                    + "\n"
+                )
+                self._path_seq += 1
 
         def _on_reached(self, msg):
             if msg.data and self.goal_reached_at is None and self.gt is not None:
@@ -721,6 +757,7 @@ def _run_metadata(args) -> dict:
         "goal_tolerance_m": args.goal_tolerance_m,
         "legacy_rigid_body_signature": args.legacy_rigid_body_signature,
         "stuck_debug": args.stuck_debug,
+        "record_paths": args.record_paths,
         "sim_timeout_s": args.sim_timeout_s,
         "sensor_suite": "wheel odometry + IMU + visual odometry" if args.visual_odometry
                         else "wheel odometry + IMU",
@@ -750,6 +787,7 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
     log_path = out_dir / f"seed_{seed}_launch.log"
     trace_path = out_dir / f"seed_{seed}_trace.csv"
     signals_path = out_dir / f"seed_{seed}_signals.csv"
+    paths_path = out_dir / f"seed_{seed}_paths.jsonl"
     result_path = out_dir / f"seed_{seed}_result.json"
     counters = {"stuck": 0, "flips": 0, "slips": 0}
 
@@ -783,6 +821,7 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
             f"--sim-timeout-s {args.sim_timeout_s} "
             f"--tolerance-m {args.tolerance_m} --graph-timeout-s {args.graph_timeout_s}"
             + (f" --signals-csv {signals_path}" if args.record_signals else "")
+            + (f" --paths-jsonl {paths_path}" if args.record_paths else "")
         )
         # Poll the LAUNCH alongside the watcher, rather than just blocking on the
         # watcher. If the simulator dies mid-run, sim time stops advancing, so
@@ -902,6 +941,13 @@ def main() -> int:
              "for judging a slip detector offline (~5 MB/hour/run)"
     )
     parser.add_argument(
+        "--record-paths", action="store_true",
+        help="also log every path the planner publishes, one JSON object per replan "
+             "(a few KB/run). With --record-signals this makes the follower's own "
+             "heading error reconstructable offline - see PROGRESS.md, the open "
+             "question about why it steers at its angular limit in some reps"
+    )
+    parser.add_argument(
         "--legacy-rigid-body-signature", action="store_true",
         help="A/B LEVER ONLY, both arms otherwise identical: re-enable wheel_slip_node's "
              "retired 'signature 2' (attitude-span + gyro-RMS rigid-body check), which "
@@ -922,6 +968,7 @@ def main() -> int:
     parser.add_argument("--trace-csv", help=argparse.SUPPRESS)
     parser.add_argument("--result-json", help=argparse.SUPPRESS)
     parser.add_argument("--signals-csv", help=argparse.SUPPRESS)
+    parser.add_argument("--paths-jsonl", help=argparse.SUPPRESS)
     args = parser.parse_args()
 
     if args.watch:
