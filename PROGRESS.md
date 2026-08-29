@@ -5832,3 +5832,32 @@ Raw evidence: `planned_path_campaign/seed7_paths_rep{1..4}/` (new; rep 1 long
 on the alternate route, rep 2 short, rep 3 short, rep 4 long - reps 3 and 4
 carry `ekf_x`/`ekf_y`/`ekf_yaw` and are the reconstructable pair used above).
 ~2.9 h of wall-clock sim time.
+
+Rep 5 (long, 3.12 m) confirms both halves on a second pair. **The path in
+force at the fork is byte-identical across every majority-path rep in this
+campaign** - reps 2 (short), 3 (short), 4 (long) and 5 (long) all follow the
+same 55-waypoint path published at their chokepoint replan, comparing equal to
+each other. Only rep 1 differs, and it is the alternate-route rep, already
+replanning at t=367 with 48 waypoints because it had forked long before. Two
+short and two long reps, one path.
+
+And rep 5 reproduces the catch signature rep 4 showed, against rep 3's
+release, on the same three seconds:
+
+    sim_t   rep3 [short]      rep4 [LONG]       rep5 [LONG]
+            roll    gt/s      roll    gt/s      roll    gt/s   heading err
+     373   -5.3    83mm      -5.0    84mm      -5.3    53mm      -4.5 deg
+     374   -5.3    69mm      -5.3    55mm      -5.3    29mm      -7.7 deg
+     375   -5.0    78mm      -5.3    30mm      -5.3    13mm      -9.4 deg
+     376   -0.9    77mm      -5.3     1mm      -5.3     8mm      -9.0 deg
+     377    0.1    68mm      -5.3     7mm      -5.3     7mm      -8.7 deg
+     378    0.1    78mm      -5.3     7mm      -4.8   124mm      -6.8 deg
+
+The short rep's roll releases at t=376 and its speed never drops below
+68 mm/s. Both long reps pin at -5.3 deg and collapse to 1-8 mm/s, and in both
+the heading error grows only *after* the collapse has started - rep 5's is
++0.3 deg at t=372, before it catches. Rep 5 also works itself free at t=378
+(124 mm in a second, roll releasing to -4.8), after the detector has already
+fired: the escape is not what freed it, which is consistent with this
+document's long-standing finding that escapes fire far more often than they
+demonstrably help.
