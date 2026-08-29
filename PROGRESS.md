@@ -5316,3 +5316,58 @@ signals --stuck-debug`); `scripts/stuck_debug_chokepoint_rep.sh` (new); `flip_re
 node.py`'s `stuck_debug` param, `hello_moon.launch.py`'s `stuck_debug` arg, `m4_acceptance.
 py`'s `--stuck-debug` flag (all new, committed separately). ~38 min wall-clock for the one
 rep (RTF ~0.25x, matching every other rep in this campaign).
+
+### The instrumentation's own blind spot, closed: stuck_debug now covers the slip path and keeps a shadow streak
+
+The section above ran one instrumented rep and got an honest but nearly
+content-free answer to the question it was built for: `stuck_debug` logged
+nothing at the chokepoint, because `WHEEL SLIP #2` fired first and
+`_check_stuck` tests `_slip_triggered` **before** it touches `_stuck_since` and
+returns immediately on a hit. So the ground-truth streak's fate was not
+"never close" - it was *unobserved*. That section named this as a blind spot
+and did not fix it; this pass does.
+
+Three gates hide the ground-truth condition from the live `_stuck_since`
+timer, and each of them was active somewhere in the campaign already: slip
+preemption (rep 15's chokepoint), the post-event `stuck_cooldown_s` window,
+and the escape maneuver itself, during which `_tick` returns early and
+`_check_stuck` is not called at all. `stuck_debug` now logs, in addition to
+what it logged before:
+
+- **`/wheel_slip` edges** - ASSERTED, and CLEARED with how long the signal
+  was held against `slip_trigger_s` (5.0 s). The topic is edge-published by
+  `wheel_slip_node`, so a CLEARED line short of the bar is a *slip near-miss*:
+  the competing detector came up and went away without firing. Nothing in this
+  investigation has ever been able to see those.
+- **The preemption moment itself** - when slip does take an event, the live
+  streak age and the shadow streak age at that instant, so the log can say
+  whether the oracle was one tick from firing or nowhere near it.
+- **A shadow streak** - the raw ground-truth condition (`commanded >= 0.03`
+  and `gt_speed < 0.02`) tracked continuously through all three gates:
+  START / CUT (with the cut reason and a running cut tally and longest-streak
+  figure) / PASSED-the-bar, plus a tally line next to every `STUCK RECOVERY`.
+  A tick gap wider than 3x `check_period_s` DROPS a streak rather than
+  spanning it, so an escape maneuver cannot manufacture continuity across the
+  time it swallows.
+
+The shadow drives nothing - it is a measurement of how close the oracle came
+and how often noise on the threshold cut it, which is exactly what the
+noise-floor reading needs and what rep 15 could not produce. Still gated on
+the same `stuck_debug` param, still off by default. 54/54 `regolith_bringup`
+tests green: 6 new ones pin the tally, the noise-on-the-threshold cut pattern
+(a stall interrupted by one over-threshold sample every 0.6 s never reaches
+the 3.0 s bar - the coin-flip mechanism, in miniature), the gap drop and its
+tolerance for ordinary tick jitter, and that the live `_stuck_since` is never
+touched by any of it.
+
+**What this does not do**: it does not change detector behaviour, so it cannot
+by itself move the fixed arm's numbers, and it is not the structural fix the
+previous section floated (majority-of-samples debounce, or smoothing
+`gt_speed`) - that remains unattempted and would need the same paired-campaign
+discipline as every other change here.
+
+Raw evidence: `flip_recovery_node.py`'s extended `stuck_debug` and
+`planetary/regolith_bringup/test/test_flip_recovery_shadow_streak.py` (both in
+`regolith.universe`, committed together); `scripts/stuck_debug_shadow_reps.sh`
+(new, this repo). No new sim time in this sub-pass - the batch it exists to
+feed is described below.
