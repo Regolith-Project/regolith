@@ -5595,3 +5595,30 @@ numbers above re-derived from `seed7_fixed_rep{1..17}` already on disk plus
 the seed-7 manifest and heightmap, no new sim time. Fixed-arm totals n=17:
 10 short (mean 1.28 m, 1.04-1.40), 7 long (mean 3.19 m, 2.96-3.61), gap still
 empty.
+
+### Batch closed at n=19: two more long reps, both predicted correctly, and the unit fix validated on live data
+
+Reps 18 and 19 finished the batch, both long (3.09 m, 3.12 m). They were
+predictions, not fits - the discriminator was fixed at n=17 and both reps'
+data arrived afterwards - and both landed exactly where it said: 24 and 22
+stall ticks at (-15.20,-50.68) and (-15.20,-50.62), t=375-383, with mean
+`|cmd angular_z|` 0.234 and 0.226 rad/s. Rep 17 was the matching negative
+prediction (short, 0 stall ticks). Final fixed-arm sample:
+
+    n=19    10 short   mean 1.28 m [1.04-1.40]
+             9 long    mean 3.17 m [2.96-3.61]
+    cluster gap 1.40 -> 2.96 m, still empty
+    stall in t=365-385 vs cluster membership: 0 disagreements out of 19
+
+Seven of the nine long reps stall within 6 cm of the same point
+(-15.20,-50.65); reps 4 and 13 stall at (-10.3,-39.5) on their different
+route. Every short rep passes the window without a single sub-threshold tick.
+
+The `gt_speed` unit fix is confirmed on live data too: rep 18 is the first run
+recorded with it, and its recorded column against the same positions
+re-differenced over `sim_t` gives a ratio of **0.996**, where every rep before
+it gives the run's RTF (0.24-0.31). The column now means what its name says.
+
+Raw evidence: `escape_timing_fix_campaign/seed7_fixed_rep{18,19}/` (new; rep
+18 onward carry the corrected `gt_speed`). ~2.6 h of wall-clock sim time for
+the two.
