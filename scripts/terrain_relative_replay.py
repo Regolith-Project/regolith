@@ -37,6 +37,11 @@ STRIDE   = float(os.environ.get("S", 0.2))
 MAX_STEP = float(os.environ.get("MAXSTEP", 0.10))
 SEARCH, STEP = 6.0, 0.25
 MIN_MARGIN, CONS, MIN_N = 2.0, 1.5, 30
+# Minimum travel between APPLIED corrections. Publishing is not rationed; only
+# correcting is, and by evidence rather than by time. Without this the track
+# walks at MAX_STEP every tick for as long as the rover stands still, because a
+# window that cannot change is being counted again every second.
+CORR_INTERVAL = float(os.environ.get("CORRINT", 1.0))
 
 def replay(path, dem):
     gx, gy, W, res = dem
@@ -52,7 +57,7 @@ def replay(path, dem):
     tx, ty = ex[0], ey[0]                          # track seeded from the filter once
     buf = []              # (dx, dy, yaw, roll, pitch, travelled)
     pend_x = pend_y = 0.0
-    last_s = -1e9; prev=None; prev_s=None; pub=0; next_t = 0.0
+    last_s = -1e9; prev=None; prev_s=None; pub=0; next_t = 0.0; last_corr = None
     err_track=[]; err_raw=[]
     for i in range(len(d)):
         tx += dxs[i]; ty += dys[i]
@@ -68,6 +73,7 @@ def replay(path, dem):
         # here models a different system as well as taking hours.
         if d["sim_t"][i] < next_t: continue
         next_t = d["sim_t"][i] + 1.0
+        if last_corr is not None and trav[i] - last_corr < CORR_INTERVAL: continue
         if len(buf) < MIN_N: continue
         if buf[-1][5]-buf[0][5] < W_M*0.5: continue
         a = np.array(buf)
@@ -80,7 +86,7 @@ def replay(path, dem):
                 prev=(dx,dy); prev_s=trav[i]; continue
             prev=(dx,dy); prev_s=trav[i]
         dx, dy = trn.clamp_correction(dx, dy, MAX_STEP)
-        tx += dx; ty += dy; pub += 1
+        tx += dx; ty += dy; pub += 1; last_corr = trav[i]
     return err_raw[-1], err_track[-1], max(err_track), pub
 
 SPECS = (("planned_path_campaign/seed7_paths_rep*/seed_7_signals.csv", 7),
