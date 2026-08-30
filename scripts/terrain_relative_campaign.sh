@@ -20,6 +20,7 @@
 # nothing anywhere, so this is the cheapest way to be wrong early.
 set -u
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+
 OUT="${REPO_ROOT}/terrain_relative_campaign"
 SEEDS="${SEEDS:-123}"
 REPS="${REPS:-1 2}"
@@ -27,6 +28,26 @@ REPS="${REPS:-1 2}"
 # equally worth the wall clock: once a baseline for a seed is banked on THIS
 # build, more `on` reps buy more than another `off` one.
 ARMS="${ARMS:-on off}"
+
+# One campaign at a time. Two concurrent runs write the same cell directory and
+# contend for the CPU, which corrupts both the files and the RTF - and it is an
+# easy mistake to make when a launch is backgrounded and its log takes a moment
+# to appear, so the check is here rather than in the operator's memory.
+#
+# An flock, NOT a pgrep. Two attempts at the pgrep form both refused to start
+# because of themselves: `pgrep -f` matches any process whose command line
+# contains the pattern, which includes the shell that invoked this script and
+# even a heredoc that merely mentions it. The bracketed-[m] trick does not save
+# you when the caller's command line quotes the bracketed form too. A lock file
+# has no such failure mode, and mirrors what hello_moon.launch.py already does
+# for ROS_DOMAIN_ID claims.
+mkdir -p "${OUT}"
+exec 9>"${OUT}/.campaign.lock"
+if ! flock -n 9; then
+  echo "REFUSING TO START: another campaign holds ${OUT}/.campaign.lock." >&2
+  echo "Wait for it, or stop it first (pgrep -af m4_acceptance)." >&2
+  exit 1
+fi
 
 for seed in ${SEEDS}; do
   for rep in ${REPS}; do

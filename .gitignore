@@ -11,3 +11,4 @@ PLAN.md
 # Python bytecode from running scripts/ directly
 __pycache__/
 *.pyc
+terrain_relative_campaign/.campaign.lock
