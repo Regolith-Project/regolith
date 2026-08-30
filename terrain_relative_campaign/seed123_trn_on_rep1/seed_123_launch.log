@@ -1,0 +1,71 @@
+[INFO] [launch]: All log files can be found below /home/balazs/.ros/log/2026-08-30-17-54-21-905136-DESKTOP-IE5MOME-18329
+[INFO] [launch]: Default logging verbosity is set to INFO
+[hello_moon.launch] Using ROS_DOMAIN_ID=52 (isolated DDS domain for this launch - see PROGRESS.md)
+[hello_moon.launch] TERRAIN-RELATIVE NAVIGATION ENABLED - the EKF is fused with an absolute position fix matched from IMU attitude against the a-priori DEM. No ground truth is read, so runs with this on ARE milestone results. Replayed through 25 recorded runs it cuts final EKF error from 2.97 m to 0.71 m median, but a replay is not a run - see PROGRESS.md before reading anything into a single result.
+[INFO] [ruby $(which gz) sim-1]: process started with pid [18373]
+[INFO] [robot_state_publisher-2]: process started with pid [18375]
+[INFO] [parameter_bridge-3]: process started with pid [18378]
+[INFO] [wheel_slip_node.py-4]: process started with pid [18380]
+[INFO] [terrain_relative_node.py-5]: process started with pid [18383]
+[INFO] [sensor_covariance_relay.py-6]: process started with pid [18385]
+[INFO] [ekf_node-7]: process started with pid [18387]
+[INFO] [costmap_node-8]: process started with pid [18389]
+[INFO] [planner_node-9]: process started with pid [18391]
+[INFO] [pure_pursuit_node-10]: process started with pid [18393]
+[INFO] [flip_recovery_node.py-11]: process started with pid [18395]
+[INFO] [mission_markers_node.py-12]: process started with pid [18397]
+[parameter_bridge-3] [INFO] [1788108864.951889620] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.954420019] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.957551848] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.960071979] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/odometry (gz.msgs.Odometry) -> /odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.962586380] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/odometry (nav_msgs/msg/Odometry) -> /odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.964202172] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera (gz.msgs.Image) -> /camera (sensor_msgs/msg/Image)] (Lazy 0)
+[robot_state_publisher-2] [INFO] [1788108864.964798220] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1788108864.964989809] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1788108864.965008156] [robot_state_publisher]: got segment chassis
+[robot_state_publisher-2] [INFO] [1788108864.965018189] [robot_state_publisher]: got segment front_left_wheel
+[robot_state_publisher-2] [INFO] [1788108864.965027277] [robot_state_publisher]: got segment front_right_wheel
+[robot_state_publisher-2] [INFO] [1788108864.965036150] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-2] [INFO] [1788108864.965044841] [robot_state_publisher]: got segment rear_left_wheel
+[robot_state_publisher-2] [INFO] [1788108864.965053382] [robot_state_publisher]: got segment rear_right_wheel
+[parameter_bridge-3] [INFO] [1788108864.970649247] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera (sensor_msgs/msg/Image) -> /camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.972207660] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera_info (gz.msgs.CameraInfo) -> /camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.973580897] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera_info (sensor_msgs/msg/CameraInfo) -> /camera_info (gz.msgs.CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.975316249] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/depth_camera (gz.msgs.Image) -> /depth_camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.976222101] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/depth_camera (sensor_msgs/msg/Image) -> /depth_camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.979252116] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu (gz.msgs.IMU) -> /imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.982808819] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/imu (sensor_msgs/msg/Imu) -> /imu (gz.msgs.IMU)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.984452584] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/regolith_moon/model/rover/joint_state (gz.msgs.Model) -> /world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.985954501] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState) -> /world/regolith_moon/model/rover/joint_state (gz.msgs.Model)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788108864.987330055] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/rover/pose (gz.msgs.Pose) -> /model/rover/pose (geometry_msgs/msg/PoseStamped)] (Lazy 0)
+[flip_recovery_node.py-11] [INFO] [1788108865.365505287] [regolith_flip_recovery]: Flip/stuck recovery armed (simulated set_pose backstop for flips, straight-line cmd_vel override for stuck-but-upright)
+[terrain_relative_node.py-5] [INFO] [1788108865.508915959] [regolith_terrain_relative]: Terrain-relative navigation active: 15 m window, fix every 6 m, +-6 m search at 0.25 m, DEM 0.391 m/px from /home/balazs/.cache/regolith/worlds/seed_123/manifest.json. Onboard sensors only - no ground truth is read by this node.
+[wheel_slip_node.py-4] [INFO] [1788108865.537564034] [regolith_wheel_slip]: Wheel-slip ZUPT armed: /odom -> /odom/gated (onboard signals only - wheel odometry and IMU, never ground truth). legacy_rigid_body_signature=False
+[mission_markers_node.py-12] [INFO] [1788108865.623352182] [regolith_mission_markers]: Mission markers active - start at (0.0, 0.0), Gazebo flags on, RViz on /mission_markers
+[costmap_node-8] [INFO] [1788108865.634116986] [regolith_costmap]: Published costmap: 256x256 cells at 0.781 m/cell
+[planner_node-9] [WARN] [1788108869.677464865] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-9] [WARN] [1788108878.649499122] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-9] [INFO] [1788108886.776106943] [regolith_planner]: Planned path: 73 waypoints, start=(127, 128) goal=(86, 60)
+[parameter_bridge-3] [INFO] [1788108887.300740461] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[pure_pursuit_node-10] [WARN] [1788108933.747083202] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-9] [INFO] [1788108933.843386791] [regolith_planner]: Planned path: 73 waypoints, start=(127, 128) goal=(86, 60)
+[terrain_relative_node.py-5] [INFO] [1788109116.416408051] [regolith_terrain_relative]: Terrain fix held: first window, offset (-0.50, -0.23), margin 3.05 - waiting for a second window to confirm
+[terrain_relative_node.py-5] [INFO] [1788109295.678687945] [regolith_terrain_relative]: Terrain fix #1 at 12.3 m travelled: correction (-0.56, -0.65) m, margin 2.77, 61 samples (rejected so far: 0 ambiguous, 0 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1788109577.055457367] [regolith_terrain_relative]: Terrain fix rejected: margin 1.92 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[pure_pursuit_node-10] [WARN] [1788109793.360142090] [regolith_pure_pursuit]: Deviated 4.01 m from path - stopping and replanning
+[planner_node-9] [WARN] [1788109793.363908718] [regolith_planner]: Current-position cell (109, 87) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (109, 90) instead
+[planner_node-9] [INFO] [1788109793.421692539] [regolith_planner]: Planned path: 34 waypoints, start=(109, 90) goal=(86, 60)
+[pure_pursuit_node-10] [WARN] [1788109837.423117916] [regolith_pure_pursuit]: Deviated 4.03 m from path - stopping and replanning
+[planner_node-9] [WARN] [1788109837.427021672] [regolith_planner]: Current-position cell (109, 85) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (109, 82) instead
+[planner_node-9] [INFO] [1788109837.458259764] [regolith_planner]: Planned path: 24 waypoints, start=(109, 82) goal=(86, 60)
+[pure_pursuit_node-10] [INFO] [1788109910.914517047] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[pure_pursuit_node-10] [INFO] [1788109910.942061243] [regolith_pure_pursuit]: Costmap changed (a new keep-out zone) - restoring the replan budget: the route being retried is not the one that already failed
+[costmap_node-8] [WARN] [1788109910.942113348] [regolith_costmap]: Hazard #1 marked at (-37.08, -15.74): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-10] [INFO] [1788109956.264287239] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-11] [WARN] [1788109956.326365011] [regolith_flip_recovery]: STUCK RECOVERY #1 (escalation level 0, triggered by ground truth; 1 ground-truth / 0 onboard triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.11x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-9] [INFO] [1788109956.341818966] [regolith_planner]: Planned path: 23 waypoints, start=(104, 82) goal=(86, 60)
+[flip_recovery_node.py-11] [WARN] [1788109965.377269685] [regolith_flip_recovery]: STUCK RECOVERY #1 result: ground truth moved 0.53 m during the maneuver - FREED (1/1 escapes have freed the rover so far)
+[terrain_relative_node.py-5] [INFO] [1788110041.343298058] [regolith_terrain_relative]: Terrain fix rejected: disagrees with the previous window by 10.97 m (> 1.50); offset now (+4.73, +6.12), was (+0.06, -3.79)
+[pure_pursuit_node-10] [WARN] [1788110081.573282914] [regolith_pure_pursuit]: Deviated 4.01 m from path - stopping and replanning
+[planner_node-9] [WARN] [1788110081.575907432] [regolith_planner]: Current-position cell (95, 80) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (95, 79) instead
+[planner_node-9] [INFO] [1788110081.587680278] [regolith_planner]: Planned path: 20 waypoints, start=(95, 79) goal=(86, 60)

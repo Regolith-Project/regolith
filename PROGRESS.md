@@ -6180,3 +6180,73 @@ blindness. That closes the gate question rather than leaving it as a caveat, and
 it makes the offline validation onboard-honest end to end. It does NOT excuse the
 original mismatch: it was luck that the answer came back the same, and the check
 cost 30 seconds.
+
+### The live run, diagnosed: the fix destabilises the filter, and a wrong attribution corrected
+
+The re-run with the frame bug fixed was stopped at 25 m travelled with 29.6 m of
+divergence. It is a failure, and the cause is this node, not the terrain and not
+the seed.
+
+**First, a correction to my own reading of it, made an hour earlier in this
+session.** I compared the EKF's integrated path length against ground truth,
+found 1.69 (against 0.91 in the matched control), and attributed the run to "an
+undetected wheel-slip episode - the wheels over-claim distance by 69%". That was
+wrong, and it was wrong in the most convenient possible direction: it blamed a
+known pre-existing defect for a failure this node caused. The statistic was real;
+the inference from it was not, because an inflated EKF path is equally consistent
+with the ESTIMATE moving too fast, and I did not check which.
+
+The check that settles it takes one query, comparing the filter's own speed
+against the wheels and against the world:
+
+    sim_t      ekf speed   odom_vx   gt speed
+     20- 60      0.189      0.188     0.188     all three agree - before the fix
+    120-150      0.344      0.177     0.175     filter at 2x the wheels
+    150-175      0.423      0.075     0.077     filter at 5.6x
+    170-180      0.412      0.000     0.032     wheels STOPPED, filter at 0.41 m/s
+
+The wheels track ground truth to three decimal places for the whole run. The
+filter does not. At the end the wheel odometry reports zero velocity and the
+estimate is still travelling at 0.41 m/s. This is not slip; **nothing was
+over-claiming distance except the estimator itself.**
+
+**And it starts at the fix.** Divergence sits flat at 0.17 m for the first
+11.75 m of travel. The node publishes its one and only correction at 12.3 m -
+(-0.56, -0.65), a modest 0.86 m, at margin 2.77. From 12.82 m onward divergence
+grows monotonically and accelerates: 1.28, 2.70, 4.21, 6.17, 8.56, 11.29, 14.27,
+and past the +-6 m search radius, after which the node is structurally unable to
+correct it however good its next match would have been.
+
+So a single isolated absolute position update, of a size the matcher is measured
+to deliver, left this EKF's velocity state corrupted and it never recovered -
+even though wheel-odometry velocity is fused continuously at high rate and was
+reporting the truth throughout.
+
+**Why the oracle never showed this.** `absolute_reference_relay.py` publishes at
+~1 Hz. A steady stream of small absolute updates gives the filter no room to
+carry an injected velocity error: the next update lands a second later and
+corrects it. This node publishes once per 6 m of travel, which on this rover is
+one update every several MINUTES. Whatever the update does to the filter's
+velocity has minutes to integrate before anything absolute contradicts it. The
+oracle validated the concept of an absolute fix; it did not validate a SPARSE
+one, and the difference turns out to matter more than the accuracy of the fix.
+
+That reframes the entire design. The offline replay cannot see this, because it
+models the filter as "add the correction to a running offset" - it has no
+velocity state to corrupt, so a sparse fix and a dense one look identical to it.
+Every number in the sections above is a statement about the MATCHER, which
+remains accurate to 0.77 m median, and none of them is a statement about fusing
+that matcher into this EKF.
+
+**The concrete next step, not attempted here.** Publish at a rate comparable to
+the oracle's rather than once per window: the match costs 20-50 ms, so a 1 Hz
+sliding-window fix republishing the current best offset is affordable. That
+changes the character of the measurement (successive fixes become highly
+correlated, so the covariance has to be widened to stay honest) and it needs the
+same paired campaign to validate. Until that exists, `terrain_relative` stays
+off, and the honest summary is: **the matcher works and the fusion does not.**
+
+Raw evidence: `terrain_relative_campaign/seed123_trn_{on,off}_rep1/`. The control
+arm finished FAIL_FALSE_ARRIVAL at 12.42 m arrival error / 12.11 m divergence,
+which is seed 123's ordinary drift-limited behaviour on this build and the
+baseline any future attempt has to beat.
