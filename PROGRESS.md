@@ -5901,3 +5901,165 @@ are freed by the escape's reverse leg, moving 0.49-0.50 m during the manoeuvre.
 
 Raw evidence: `planned_path_campaign/seed7_paths_rep{5,6}/` (new). ~1.3 h of
 wall-clock sim time.
+
+## Terrain-relative navigation: the oracle, earned
+
+Every failing seed in this document fails for the same reason, and the document
+has said so for weeks: the arrival error is the EKF's own drift plus the
+follower's stopping distance, to within centimetres. `goal_tolerance_m` closed
+the part of that a control parameter could reach (1.0 -> 0.35 m, a clean 0/3 ->
+3/3 on seed 7). The rest is drift, and drift is unbounded because **nothing in
+the sensor suite observes absolute position**: a differential-drive model cannot
+represent the ~10% of this rover's motion that is lateral slide, an IMU cannot
+observe it, and so it accumulates as an uncorrected random walk.
+
+`absolute_reference_relay.py` tested the obvious hypothesis by handing the EKF
+ground truth at ~1 Hz with 0.5 m sigma. It passed 3/3 where the unaided stack
+passes 1/3, and its docstring names what it is standing in for: "a real
+terrain-relative or visual-odometry fix". Visual odometry was then built,
+measured, and turned off - it made localisation worse on all three seeds. The
+terrain-relative half was never attempted.
+
+This section is that half. `terrain_relative_node.py` publishes the same topic
+the oracle does, with no ground truth anywhere in it.
+
+### What it measures, and why this sensor suite already contains the answer
+
+Attitude is an absolute measurement - gravity does not drift. Driving over known
+terrain, the sequence of roll and pitch the IMU reports is a signature of where
+on that terrain the rover is. The a-priori DEM (the terrain heightmap
+`regolith_costmap` already loads; on a real mission, an orbital DEM) predicts
+roll and pitch for any candidate position. Slide the recent trajectory over the
+DEM, score predicted against measured attitude, and the best-scoring offset is an
+absolute position fix. This is TERCOM, the technique that exists precisely for
+navigation with no beacon, no landmark catalogue and no external signal.
+
+Nothing new was added to the rover. The IMU and the wheel odometry were already
+there, and the DEM was already being loaded by another node.
+
+The first question was whether the signal exists at all, and it does. Predicting
+attitude from the DEM at the rover's true pose, across 128k driving samples on
+seed 7:
+
+    roll   correlation +0.87, residual 1.18 deg against a 2.05 deg signal
+    pitch  correlation +0.71, residual 1.52 deg against a 2.15 deg signal
+
+The residual is NOT the rocks - excluding every sample within 5 m of a catalogued
+boulder leaves it unchanged (1.26 deg roll), which was worth checking because
+"drive around the rocks" would have been a cheap improvement if true. It is the
+gap between a point tangent-plane prediction and what a 0.52 x 0.46 m chassis on
+four wheels actually does, plus vehicle dynamics. That ratio - signal barely
+larger than residual - is what sets everything below.
+
+### Validated against 25 recorded runs, with no new simulation time
+
+The matcher was developed and measured entirely against runs already on disk:
+seeds 7, 55 and 123, across `planned_path_campaign` and
+`wheel_slip_generalization_campaign`, 25 runs in total. Ground truth was used
+only to score, never inside the matcher. Runs whose signals CSV predates the
+`ekf_x`/`ekf_y` columns had the EKF pose joined in from their own trace file.
+
+Per-window, open loop, the fix lands at 0.65 m median and 1.56 m p90 error with
+both gates on, and it corrects gross error well: windows where the estimate was
+4-8 m out came back at 1.0 m median, with 0 of 9 made worse. Three variants of
+the cost function were tried and all lost to plain squared error on absolute
+roll and pitch - mean-removed (0.96 m), Huber on the mean-removed residual (0.97
+m), and roll-only (2.58 m). The DC level of attitude is not a nuisance to
+normalise away; it is an absolute measurement of local slope.
+
+Then the same 25 runs were **replayed closed loop** - each accepted fix applied
+to a running correction the way the filter would, so later windows are matched
+from the corrected trajectory and the loop can diverge if the fix is bad:
+
+    final EKF error, median over 25 runs:   2.97 m -> 0.71 m
+    runs improved:                          23 of 25
+    runs finishing outside M4's 1.5 m bar:  18 of 25 -> 8 of 25
+
+    seed   7 (planned_path, n=6):   3.01 m -> 0.92 m
+    seed 123 (drift-limited, n=6): 11.18 m -> 1.64 m
+    seed  55 (n=6):                 2.85 m -> 0.44 m
+    seed   7 (wheel_slip, n=7):     1.72 m -> 0.71 m
+
+Seed 123 is the result that matters most. It is the seed this document has
+called "genuinely drift-limited: 10.3-11.2 m of divergence, which no control
+change can close" - and terrain matching closes it in replay.
+
+### The window length is the parameter, and shorter beats longer
+
+    window   12 m    15 m    20 m    30 m    40 m
+    median   0.53    0.71    0.61    1.80    2.15 m
+
+A window assumes ONE offset explains all of it, and the estimate drifts while
+the window fills - on seed 123 that is metres over 30 m of travel, and no single
+offset can represent it. 12, 15 and 20 m are one plateau; **15 m is the middle of
+it, chosen deliberately over the 12 m argmin**, because the spread across that
+plateau is inside what 25 runs can resolve and picking the best cell of a sweep
+is how a parameter gets fitted to its own validation set.
+
+Accumulating cost surfaces across successive windows, and smoothing the DEM to
+the rover's footprint, were both tried and both made it worse. Same reason in
+both cases: the offset is not constant, so anything that averages over more
+travel smears it.
+
+### A unit test caught an axis swap that had already produced a false conclusion
+
+This is worth recording in full, because the wrong answer was already written
+down and about to be acted on.
+
+The node's matcher is vectorised over candidate offsets - `np.repeat` for one
+axis, `np.tile` for the other - and the two were the wrong way round, so it
+returned `(dy, dx)` as `(dx, dy)`. On isotropic terrain that still produces a
+plausible-looking fix with a plausible-looking confidence margin. It just
+localises the rover to a mirrored position.
+
+Every number computed through the node's own function was wrong, and they told a
+consistent, believable story: closed-loop replay made things **worse** at every
+gain and every window length (2.97 -> 3.12 m at gain 0.1, 3.71 m at gain 1.0),
+the parameter sweeps all came back flat or negative, and the natural conclusion -
+that terrain matching cannot beat this stack's dead reckoning, and belongs beside
+visual odometry as a measured negative - was drafted. Three of the sweeps above
+(stride, DEM smoothing, cost accumulation) were run against the broken matcher
+and had to be redone.
+
+What caught it was `test_recovers_a_known_offset_from_synthetic_terrain`, which
+displaces a synthetic trajectory by a KNOWN, deliberately asymmetric (1.5, -2.0)
+and asserts both components come back. It failed with `dx = -2.04`. The
+prototype used to develop the matcher had the loop order right, which is why the
+open-loop numbers above were never affected and why the discrepancy between the
+two was not obvious.
+
+The general lesson is the one this document keeps relearning from a different
+direction: an asymmetric test case is worth more than a symmetric one, and a
+negative result deserves the same scrutiny as a positive one before it is
+believed. The interim negative was never committed, but it was believed for
+about an hour.
+
+### What this does NOT establish
+
+- **It has not run live yet.** Everything above is replay. The replay applies
+  each accepted fix to a running correction; the real EKF weights it against its
+  own covariance, keeps drifting between fixes, and can reject nothing. A live
+  matched A/B (`scripts/terrain_relative_campaign.sh`, seed 123 first, both arms
+  same build) is running as this is written and its results are not in here.
+- **The map is perfect.** The DEM is the generator's own heightmap read exactly.
+  A real orbital DEM carries registration error and coarser resolution, and
+  degrading it deliberately is the obvious next experiment. It has not been run,
+  and there is no parameter for it yet.
+- **The IMU is noiseless.** This simulator's IMU declares no noise model, so its
+  attitude is effectively exact, and every offline number above was scored
+  against the ground-truth roll/pitch columns because the IMU's own attitude was
+  not recorded. `m4_acceptance.py` now writes `imu_roll`/`imu_pitch` beside the
+  ground-truth columns specifically so that gap can be measured rather than
+  assumed away.
+- **Two gates carry a lot of weight.** A margin threshold rejects ambiguous
+  terrain and a consistency check requires two successive windows to agree
+  within 1.5 m; together they reject roughly half of all attempted fixes. On the
+  recorded runs that gating is what cuts the p90 error from 3.91 m to 1.56 m, but
+  "reject most of them" is a blunt instrument and a better-conditioned matcher
+  would not need it.
+
+Code: `terrain_relative_node.py`, `config/ekf_terrain_relative.yaml` (fuses x and
+y only - terrain matching cannot observe heading), `hello_moon.launch.py`'s
+`terrain_relative:=true`, `m4_acceptance.py --terrain-relative`,
+`test/test_terrain_relative.py` (14 tests; `regolith_bringup` 68/68 green).
+Defaulted OFF pending the live campaign.

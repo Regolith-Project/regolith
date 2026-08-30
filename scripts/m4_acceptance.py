@@ -330,7 +330,7 @@ def run_watcher(args) -> int:
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
                     "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z,"
-                    "ekf_x,ekf_y,ekf_yaw\n"
+                    "ekf_x,ekf_y,ekf_yaw,imu_roll,imu_pitch\n"
                 )
             self.sim_first = None
             self.sim_last = None
@@ -338,6 +338,7 @@ def run_watcher(args) -> int:
             self._gt_prev = None
             self._ekf_yaw = float("nan")
             self._imu = None
+            self._imu_rpy = (float("nan"), float("nan"))
             self._odom = None
             self._rpy = (0.0, 0.0, 0.0)
             # What the follower/recovery layer is actually asking for, as
@@ -420,6 +421,13 @@ def run_watcher(args) -> int:
                 msg.linear_acceleration.x,
                 msg.linear_acceleration.y,
             )
+            # The IMU's OWN attitude, recorded beside the ground-truth roll/pitch
+            # columns rather than instead of them. terrain_relative_node.py
+            # matches on this, but every offline validation of that matcher was
+            # scored against the gt columns because these did not exist yet - so
+            # the gap between the two is the thing to check, and it cannot be
+            # checked without recording both. See PROGRESS.md.
+            self._imu_rpy = rpy(msg.orientation)[:2]
 
         def _on_cmd(self, msg):
             self._cmd = (msg.linear.x, msg.angular.z)
@@ -438,7 +446,8 @@ def run_watcher(args) -> int:
                 f"{self.gt[0]:.3f},{self.gt[1]:.3f},{self._gt_speed:.4f},"
                 f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g},"
                 f"{self._cmd[0]:.4f},{self._cmd[1]:.4f},"
-                f"{self.ekf[0]:.3f},{self.ekf[1]:.3f},{self._ekf_yaw:.4f}\n"
+                f"{self.ekf[0]:.3f},{self.ekf[1]:.3f},{self._ekf_yaw:.4f},"
+                f"{self._imu_rpy[0]:.4f},{self._imu_rpy[1]:.4f}\n"
             )
 
         def _on_ekf(self, msg):
@@ -674,7 +683,8 @@ def run_watcher(args) -> int:
 
 def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
             visual_odometry: bool = False, goal_tolerance_m: float = 1.0,
-            legacy_rigid_body_signature: bool = False, stuck_debug: bool = False):
+            legacy_rigid_body_signature: bool = False, stuck_debug: bool = False,
+            terrain_relative: bool = False):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
@@ -685,7 +695,8 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
         f"visual_odometry:={'true' if visual_odometry else 'false'} "
         f"goal_tolerance_m:={goal_tolerance_m} "
         f"legacy_rigid_body_signature:={'true' if legacy_rigid_body_signature else 'false'} "
-        f"stuck_debug:={'true' if stuck_debug else 'false'}"
+        f"stuck_debug:={'true' if stuck_debug else 'false'} "
+        f"terrain_relative:={'true' if terrain_relative else 'false'}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -780,9 +791,13 @@ def _run_metadata(args) -> dict:
         "stuck_debug": args.stuck_debug,
         "record_paths": args.record_paths,
         "sim_timeout_s": args.sim_timeout_s,
-        "sensor_suite": "wheel odometry + IMU + visual odometry" if args.visual_odometry
-                        else "wheel odometry + IMU",
+        "sensor_suite": ("wheel odometry + IMU"
+                        + (" + visual odometry" if args.visual_odometry else "")
+                        + (" + terrain-relative fix" if args.terrain_relative else "")),
         "localization_oracle": args.localization_oracle,
+        "terrain_relative": args.terrain_relative,
+        # Terrain matching reads the a-priori DEM and the IMU, never ground
+        # truth, so unlike the oracle it does not disqualify the run.
         "milestone_result": not args.localization_oracle,
         "git": {
             "regolith": _git_head(REPO_ROOT),
@@ -816,7 +831,8 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
                            visual_odometry=args.visual_odometry,
                            goal_tolerance_m=args.goal_tolerance_m,
                            legacy_rigid_body_signature=args.legacy_rigid_body_signature,
-                           stuck_debug=args.stuck_debug)
+                           stuck_debug=args.stuck_debug,
+                           terrain_relative=args.terrain_relative)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -931,6 +947,14 @@ def main() -> int:
              "the rover and the milestone. Results are NOT milestone results."
     )
     parser.add_argument(
+        "--terrain-relative", action="store_true",
+        help="fuse an absolute x/y fix matched from IMU attitude against the a-priori terrain "
+             "DEM (terrain_relative_node.py). Onboard sensors only - no ground truth - so "
+             "unlike --localization-oracle these ARE milestone results. Replayed over 25 "
+             "recorded runs it cut final EKF error from 2.97 m to 0.71 m median; live "
+             "validation is what this flag is for."
+    )
+    parser.add_argument(
         "--no-visual-odometry", action="store_true",
         help="run on wheel odometry + IMU alone. This is now the DEFAULT and the flag is a "
              "no-op, kept so the invocations recorded in PROGRESS.md still mean what they "
@@ -1032,10 +1056,14 @@ def main() -> int:
 
     passes = sum(1 for r in results if r["verdict"] == "PASS")
     mode = " [LOCALIZATION ORACLE - EXPERIMENT, NOT A MILESTONE RESULT]" if args.localization_oracle else ""
+    if args.terrain_relative:
+        mode += " [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result]"
     # State the sensor suite on the result itself. The same harness now produces
     # three materially different numbers depending on it, and a table without this
     # line is not interpretable six months from now.
-    suite = "wheel odometry + IMU + visual odometry" if args.visual_odometry else "wheel odometry + IMU"
+    suite = ("wheel odometry + IMU"
+             + (" + visual odometry" if args.visual_odometry else "")
+             + (" + terrain-relative fix" if args.terrain_relative else ""))
     print(f"\n=== M4 acceptance: {passes}/{len(results)} (judged on ground truth){mode} ===")
     print(f"    sensor suite: {suite}")
     print(f"    rover stops within: {args.goal_tolerance_m:.2f} m of the commanded goal "
