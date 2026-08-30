@@ -1,0 +1,7 @@
+
+=== seed 123, terrain_relative=on, rep 8 - 22:26:42 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_on_rep8
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=89

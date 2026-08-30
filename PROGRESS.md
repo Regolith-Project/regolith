@@ -6250,3 +6250,89 @@ Raw evidence: `terrain_relative_campaign/seed123_trn_{on,off}_rep1/`. The contro
 arm finished FAIL_FALSE_ARRIVAL at 12.42 m arrival error / 12.11 m divergence,
 which is seed 123's ordinary drift-limited behaviour on this build and the
 baseline any future attempt has to beat.
+
+## Terrain-relative navigation, live: seed 123 passes M4 for the first time
+
+Seed 123 is the seed this document has called "genuinely drift-limited: 10.3-11.2 m
+of divergence, which no control change can close". On the same build, same goal,
+same day, one arm apart:
+
+    seed 123                    terrain fix ON        control OFF
+    verdict                     PASS                  FAIL_FALSE_ARRIVAL
+    EKF divergence              0.19 m                12.11 m
+    gt error when it arrived    0.15 m                12.44 m
+    gt error where it stopped   0.14 m                12.42 m
+    gt error at the verdict     1.47 m                12.42 m
+    distance driven             87.8 m                114.3 m
+
+The localisation claim is the solid part: **0.19 m of divergence against 12.11 m**,
+and a ground-truth arrival error of 0.15 m against 12.44 m. That is the drift this
+whole investigation has been chasing, corrected by a node reading only the IMU,
+wheel odometry and a terrain map loaded before the run.
+
+**Three things this is not.** It is one run per arm, and this document's own
+history is a list of n=1 results that did not survive replication - the campaign
+is continuing. The PASS is against a 1.5 m bar at 1.47 m, a 3 cm margin, and it
+is thin for a reason worth understanding rather than celebrating: the rover
+arrived 0.15 m from the goal and then **moved 1.34 m during the 8 s settle
+window** the harness waits out before recording a verdict. And nothing here
+touches the other two seeds.
+
+That settle-window slide is now the binding constraint on seed 123's NUMBER,
+though not on its localisation. With drift removed the error budget has moved
+somewhere else entirely - which is what happens when you fix the thing that was
+dominating: whatever is second becomes first. It has not been investigated;
+`max_pitch_deg` is 23.6 on this run, so a slope is the obvious first suspect.
+
+### It took six live runs, and five of them failed on this node, not on the matcher
+
+Worth recording as a sequence, because the matcher's numbers barely moved
+throughout and every failure was in how its answer was handed to the filter.
+
+1. **Missing executable bit.** `install(PROGRAMS)` under a symlink install
+   resolves to the source file, which was not `chmod +x`, so launch_ros could not
+   find the node at all. 30 seconds.
+2. **Sparse updates.** A fix every 6 m of travel is one every several minutes on
+   this rover. One isolated 0.86 m correction left the filter's velocity state
+   corrupted with nothing absolute to contradict it: 0.17 m -> 29.6 m. The oracle
+   publishes at ~1 Hz and never showed this, so "an absolute fix works" had been
+   validated but "a sparse absolute fix works" had not.
+3. **Buffer shifted by the requested correction.** The filter absorbs only part of
+   what it is told, so the window ran ahead of it, the match found it already
+   aligned, and the node published "you are exactly where you think you are" once
+   a second into a filter that was metres wrong. Divergence oscillated 0.5-13 m.
+4. **Buffer not shifted at all.** Now stale, so the same correction was measured
+   and re-applied every tick: 1432 m, most of it accumulated after the rover had
+   stopped moving.
+5. **The carrot on a stick.** Publishing `filter_pose + offset` is not an absolute
+   measurement - it is a target defined relative to the estimate, so it always sat
+   `offset` ahead of wherever the filter had got to. The filter chased it and read
+   the pursuit as velocity: 0.85 m/s of estimated motion against 0.045 m/s at the
+   wheels. Every variation on the buffer had been a variation on where the carrot
+   hung.
+6. **Correcting on a clock instead of on evidence.** With the track finally
+   independent, a stationary rover still had its stale window re-matched every
+   second and another capped correction applied: 0.10 m/s for ~180 s of a stall is
+   the 18 m that run reached.
+
+The fix for 5 and 6 together is the design that works: the node keeps its **own**
+dead-reckoned absolute track, corrects it from terrain matches at most once per
+metre travelled, and publishes that track at 1 Hz. It reads the filter's pose
+exactly once, to seed itself.
+
+**The methodological point, which is the expensive lesson of the night.** The
+offline replay was blind to every one of failures 2-6, because it modelled the
+filter as "add the correction to a running offset" - a model with no velocity
+state to corrupt and no pose to read back. Its numbers were never wrong about the
+MATCHER, and they never said anything about the fusion. `terrain_relative_replay.py`
+now replays the node's actual computation - its own track, corrected and
+published the same way - and it is the only reason the sixth attempt was worth
+running: 2.97 m of dead-reckoning error -> 0.38 m median over 25 recorded runs,
+25/25 improved, runs outside the 1.5 m bar 18 -> 2.
+
+This is the same lesson as the visual-odometry entry above, one level up. There,
+a component was measured against the wrong baseline. Here, a component was
+validated against a model of the system that omitted the part that breaks.
+
+Raw evidence: `terrain_relative_campaign/seed123_trn_{on_rep10,off_rep1}/`, plus
+the four failed configurations kept in the same directory rather than deleted.
