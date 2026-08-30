@@ -1,0 +1,41 @@
+
+=== seed 123, terrain_relative=on, rep 1 - 16:31:39 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_on_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=43
+[seed 123] launch exited (1) - giving the watcher 30 s to finish, then aborting
+[seed 123] ABORT_LAUNCH_DIED
+
+=== M4 acceptance: 0/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123    ABORT_LAUNCH_DIED
+=== finished 16:32:15 ===
+
+=== seed 123, terrain_relative=off, rep 1 - 16:32:25 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_off_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=15
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 12.4 m from the goal after 114.3 m travelled, EKF divergence 12.1 m, 14 stuck events, 0 flips, 27 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     12.4m     114.3m    12.1m     14      0     27
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 12.4 m true error
+=== finished 17:40:56 ===
+
+=== seed 123, terrain_relative=on, rep 2 - 17:41:06 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_on_rep2
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=15
