@@ -23,10 +23,14 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="${REPO_ROOT}/terrain_relative_campaign"
 SEEDS="${SEEDS:-123}"
 REPS="${REPS:-1 2}"
+# Arms to run, and in this order. Overridable because the two are not always
+# equally worth the wall clock: once a baseline for a seed is banked on THIS
+# build, more `on` reps buy more than another `off` one.
+ARMS="${ARMS:-on off}"
 
 for seed in ${SEEDS}; do
   for rep in ${REPS}; do
-    for arm in on off; do
+    for arm in ${ARMS}; do
       run_dir="${OUT}/seed${seed}_trn_${arm}_rep${rep}"
       if [[ -f "${run_dir}/summary.json" ]]; then
         echo "--- seed ${seed} ${arm} rep ${rep}: done, skipping ---"

@@ -6106,3 +6106,54 @@ harness are world-frame points, so a shifted map shifts the estimate against a
 goal that did not move. A mission picking its targets FROM the same orbital map
 would see part of that offset cancel. Treat the 3 m row as a pessimistic bound
 rather than the expected behaviour.
+
+### The first live run, and a second frame bug - this one found by the rover
+
+The first live cell was killed 20 minutes in, because the fix was actively
+making things worse, and the cause was a change made AFTER the offline
+validation and never re-validated.
+
+The symptom, from the run's own logs. At 18.4 m travelled the node published
+its first fix with a correction of **(+1.07, +5.15) m at margin 4.66** - a
+confident answer - when the run's actual divergence at that point was **0.15 m**.
+Divergence went to 4.06 m within seconds, in the +y direction the correction
+pointed. Two successive windows had agreed to within 1.5 m on an offset drifting
+steadily up in y (+2.50, +4.31, +5.15), so the consistency gate passed it: the
+gate compares consecutive windows, and a wrong answer that MOVES steadily is not
+caught by a test for agreement.
+
+The cause. The node originally buffered its window in the estimator's frame,
+which is what the offline replay validated. It was then changed to buffer in the
+wheel-odometry frame - sound reasoning, that /odom is never jumped by fusion
+while the EKF jumps every time a fix lands - and to re-anchor onto the current
+EKF pose with a **translation**. But the two frames differ by a **rotation** as
+well: /odom integrates wheel-derived heading from spawn, the EKF's yaw comes from
+the IMU, and on this run they were **47 degrees apart** (measured live off the
+two topics: odom yaw 2.206 rad, EKF yaw 3.023 rad). The matcher was handed the
+path the rover drove, rotated by 47 degrees, and asked where on the map it fits.
+It answered confidently, because a rotated path is still a perfectly good path
+and nothing in the cost surface knows the difference.
+
+The fix is to go back to buffering in the estimator's frame - the computation
+the replay actually validated - and to solve the jump problem the way the replay
+did: **shift the whole buffer by the published correction** when a fix goes out,
+so the window moves with the filter instead of straddling the step. The EKF
+blends rather than jumping the whole way, so that over- or under-shoots slightly,
+but the residual is a placement error the next fix simply measures again.
+`shift_samples` is now a pure function with its own tests (72 green).
+
+Two bugs in one day, both in the same class - a frame or axis relationship that
+is wrong in a way that still produces plausible output - and they were caught
+very differently. The axis swap was caught by a unit test, in seconds, before it
+cost anything. The frame rotation was caught by a rover driving into a wall of
+its own making, after about 90 minutes of wall clock, because the change that
+introduced it looked like a small improvement to a validated component and so was
+not re-validated against anything. **The rule that would have caught both: if a
+change alters what the matcher is fed, it is not a small change, and the offline
+replay is cheap enough (30 seconds over 25 runs) that there is no excuse for
+skipping it.** The odometry-frame version could not have been replayed at all -
+no recorded run stores the odom pose - which should itself have been the warning.
+
+What survives: the offline numbers, which were all produced by the
+estimator-frame computation now restored. What does not: any claim about live
+behaviour. The re-run is in progress.
