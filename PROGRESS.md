@@ -6157,3 +6157,26 @@ no recorded run stores the odom pose - which should itself have been the warning
 What survives: the offline numbers, which were all produced by the
 estimator-frame computation now restored. What does not: any claim about live
 behaviour. The re-run is in progress.
+
+### The speed gate: validated on ground truth, run on an onboard signal - checked
+
+Spotted while the re-run was driving, and worth checking rather than assuming,
+because it is the same class as the two bugs above: the offline replay gated its
+samples on `gt_speed`, and the node cannot see ground truth. It gates on the
+estimator's forward velocity instead. Those two disagree exactly when it matters
+- during phantom odometry the wheels turn, the body does not, and the estimate
+keeps moving - so the node can buffer a stretch of "path" the rover never drove
+and match that against the DEM.
+
+Re-running the same 25-run replay gated on `odom_vx` instead - the raw wheel
+speed, which is onboard, and which is fooled by wheel spin in exactly the way the
+node is:
+
+    ground-truth gate:  2.97 m -> 0.71 m median, 23/25 improved, 18 -> 8 over the bar
+    onboard gate:       2.97 m -> 0.77 m median, 22/25 improved, 18 -> 8 over the bar
+
+So the result holds on information the rover actually has, including the
+blindness. That closes the gate question rather than leaving it as a caveat, and
+it makes the offline validation onboard-honest end to end. It does NOT excuse the
+original mismatch: it was luck that the answer came back the same, and the check
+cost 30 seconds.
