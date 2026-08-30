@@ -6041,10 +6041,8 @@ about an hour.
   own covariance, keeps drifting between fixes, and can reject nothing. A live
   matched A/B (`scripts/terrain_relative_campaign.sh`, seed 123 first, both arms
   same build) is running as this is written and its results are not in here.
-- **The map is perfect.** The DEM is the generator's own heightmap read exactly.
-  A real orbital DEM carries registration error and coarser resolution, and
-  degrading it deliberately is the obvious next experiment. It has not been run,
-  and there is no parameter for it yet.
+- **The IMU is noiseless** (below), and until the live campaign lands, none of
+  this has run inside the real filter.
 - **The IMU is noiseless.** This simulator's IMU declares no noise model, so its
   attitude is effectively exact, and every offline number above was scored
   against the ground-truth roll/pitch columns because the IMU's own attitude was
@@ -6063,3 +6061,48 @@ y only - terrain matching cannot observe heading), `hello_moon.launch.py`'s
 `terrain_relative:=true`, `m4_acceptance.py --terrain-relative`,
 `test/test_terrain_relative.py` (14 tests; `regolith_bringup` 68/68 green).
 Defaulted OFF pending the live campaign.
+
+### How good does the map have to be? Answered, because it was cheap to answer
+
+The limitation above - "the DEM is the generator's own heightmap read exactly, a
+perfect map, and no mission has one" - is testable without any simulation time:
+degrade the map, replay the same 25 runs, see what breaks.
+`scripts/terrain_relative_dem_quality.py` does that, and the answer separates
+cleanly into "survivable" and "fatal".
+
+    a-priori map                        final EKF error (median, 25 runs)   runs over 1.5 m
+    perfect (as shipped)                     2.97 m -> 0.71 m                  18 -> 8
+    posts coarsened to 1 m                   2.97 m -> 0.85 m                  18 -> 6
+    posts coarsened to 2 m                   2.97 m -> 1.71 m                  18 -> 13
+    posts coarsened to 5 m                   2.97 m -> 1.73 m                  18 -> 16
+    elevation noise 0.1 m rms                2.97 m -> 1.71 m                  18 -> 13
+    elevation noise 0.3 m rms                2.97 m -> 1.86 m                  18 -> 13
+    registration shift 1 m                   2.97 m -> 1.39 m                  18 -> 11
+    registration shift 3 m                   2.97 m -> 4.09 m                  18 -> 25
+
+**Losing map detail degrades the fix gracefully.** At 2-5 m posts, or with
+0.1-0.3 m of elevation noise, it still roughly halves the error - and it degrades
+in the safe direction, because coarser terrain is more ambiguous terrain and the
+margin gate rejects far more windows (153 published fixes on the perfect map,
+27 at 5 m posts). The matcher gets quieter rather than more wrong.
+
+**Misregistration does the opposite, and it is the requirement that matters.**
+A 3 m map offset makes the whole thing worse than dead reckoning - every run ends
+outside the bar, against 18 of 25 with no fix at all - and it does so while
+publishing as many fixes as the perfect map (149 vs 153) at full confidence. Of
+course it does: the map is internally perfect, the matcher correctly reports
+where the rover is on it, and the answer is displaced by exactly the map's own
+error. No confidence measure computed from the cost surface can see this, because
+nothing about the cost surface is wrong.
+
+So the engineering requirement this puts on a mission is specific and not
+obvious from the accuracy numbers alone: **the DEM's resolution barely matters
+and its co-registration to the frame the goals live in matters enormously** -
+roughly, better than 1 m. That is a statement about how the map is tied to the
+mission frame, not about the sensor or the algorithm.
+
+One caveat on the registration arm, since it is the alarming one: goals in this
+harness are world-frame points, so a shifted map shifts the estimate against a
+goal that did not move. A mission picking its targets FROM the same orbital map
+would see part of that offset cancel. Treat the 3 m row as a pessimistic bound
+rather than the expected behaviour.
