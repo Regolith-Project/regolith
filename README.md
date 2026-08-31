@@ -136,7 +136,25 @@ See [`docs/architecture.md`](docs/architecture.md) for how this repo relates to 
 
 Documented in full in [`PROGRESS.md`](PROGRESS.md); the ones that matter most for anyone trying the demo:
 
-- **Localisation drift**: an earlier pass through this demo measured 20-45%
+- **Localisation drift is now correctable onboard, and it is off by default.**
+  `regolith_bringup`'s `terrain_relative_node.py` matches the IMU's attitude
+  against the terrain map the costmap already loads - the technique a lander uses
+  when there is no beacon to navigate by - and publishes an absolute position fix
+  built from onboard sensors only. On seeds 7 and 123 it holds EKF divergence to
+  0.18-0.30 m over ~90 m against 1.04-17.71 m without it, and the rover stops
+  0.08-0.19 m from its goal against 1.36-18.01 m. Enable with
+  `terrain_relative:=true`. It is OFF by default because seed 42 has not been run
+  and because every measurement so far uses a perfect map; degrading the map
+  matters, and a 3 m map registration error makes it worse than dead reckoning.
+  See `PROGRESS.md`.
+- **The rover cannot hold position at a goal.** Once drift is removed this is
+  what is left: the rover arrives, then rolls 1.3-1.5 m into a nearby local
+  minimum before it settles, because a skid-steer commanded to zero velocity has
+  no torque rather than brakes. Every run that reaches its goal on seeds 7 and
+  123 comes to rest at the same point ~1.47 m away, whichever arm it is in, which
+  means the acceptance number currently cannot tell good localisation from
+  mediocre localisation on those goals.
+- **Localisation drift (historical)**: an earlier pass through this demo measured 20-45%
   position drift against a 5% target and attributed it to lunar-gravity
   wheel slip. That figure turned out to be measured before a terrain-
   collision smoothing fix and isn't reproducible on the current code.
@@ -212,7 +230,7 @@ Documented in full in [`PROGRESS.md`](PROGRESS.md); the ones that matter most fo
 | Phase | Focus | Target | Status |
 |---|---|---|---|
 | **WP1** | Autoware fork, architecture, HAL interfaces | Architecture doc + interface packages | Done |
-| **WP2** | GPS-denied localisation (IMU + wheel odom fusion) | <5% drift over 500 m traverse | Partly. 0-4% on isolated test legs and 0.4-0.7% on two of three autonomous 100 m runs, but 5-11% on the third, and the spread between repeats of one seed is larger than the mean (see above) |
+| **WP2** | GPS-denied localisation (IMU + wheel odom fusion) | <5% drift over 500 m traverse | Met on the seeds measured, with terrain-relative navigation on: 0.18-0.30 m of EKF divergence over 88-95 m runs (0.2-0.3% of distance) on seeds 7 and 123, against 1.04-17.71 m with it off. Dead reckoning alone is 0-4% on isolated legs but 5-11% on the worst autonomous seed. Off by default pending seed 42 and a degraded-map test |
 | **WP3** | Terrain-aware navigation + obstacle avoidance | Autonomous 5-waypoint route in simulation | Pipeline works end-to-end and the tour picks its own waypoints from the costmap. Wedge detection and escape fire live and succeed 61/61; arrival accuracy is the open item (see above) |
 | **WP4** | Gazebo planetary simulation environment + benchmarks | Turnkey sim with rocks, slopes, shadows | Done |
 | **WP5** | Documentation + community bootstrap | Clone, build and run in under 1 hour | Done, see the Quick Start above |
