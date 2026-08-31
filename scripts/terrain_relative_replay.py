@@ -36,7 +36,11 @@ W_M      = float(os.environ.get("W", 15.0))
 STRIDE   = float(os.environ.get("S", 0.2))
 MAX_STEP = float(os.environ.get("MAXSTEP", 0.10))
 SEARCH, STEP = 6.0, 0.25
-MIN_MARGIN, CONS, MIN_N = 2.0, 1.5, 30
+# Both gates are env-overridable so they can be swept: they reject roughly half
+# of all attempted fixes and had never been tuned against anything.
+MIN_MARGIN = float(os.environ.get("MARGIN", 2.0))
+CONS = float(os.environ.get("CONS", 1.5))
+MIN_N = 30
 # Minimum travel between APPLIED corrections. Publishing is not rationed; only
 # correcting is, and by evidence rather than by time. Without this the track
 # walks at MAX_STEP every tick for as long as the rover stands still, because a

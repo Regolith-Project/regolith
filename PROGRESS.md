@@ -6563,3 +6563,36 @@ deliberately degraded DEM, since every number here uses a perfect map and a 3 m
 registration error is already known to make the fix worse than dead reckoning;
 and the `min_margin` / `consistency_m` gates, which reject roughly half of all
 attempted fixes and have never been tuned against anything but the offline replay.
+
+### The two gates do not earn their keep any more - measured, not changed
+
+`min_margin` and `consistency_m` reject roughly half of all attempted fixes and
+had never been tuned against anything but the offline replay's earlier form. Swept
+over the same 25 recorded runs:
+
+    min_margin  consistency   track median   runs over the 1.5 m bar
+       2.0          1.5          0.58 m              9      <- shipped
+       1.5          1.5          0.35 m              7
+       3.0          1.5          2.20 m             16
+       2.0          3.0          0.57 m              9
+       1.0          99 (off)     0.35 m              7
+
+**The margin gate at 2.0 is costing accuracy, and the consistency gate is doing
+nothing at all** - loosening it from 1.5 to 3.0 to effectively-infinite changes
+the median by 0.01 m. Turning both off entirely is as good as the best tuned
+setting.
+
+That is not surprising in hindsight and it is worth saying why: both gates were
+added when a single fix was applied in full and unclamped, where one gross
+mismatch could move the estimate metres. `clamp_correction` (0.5 m) and
+`correction_interval_m` (one correction per metre travelled) now bound that
+damage structurally, so the gates are rejecting good fixes to guard against a
+failure mode the design no longer has. They are redundant protection bought at
+the price of half the evidence.
+
+**Caveat, and the reason nothing was changed on the strength of this.** The sweep
+ran at `max_step_m` = 0.1, the script's default, not the shipped 0.5 - the
+comparison between gate settings is fair because the clamp is constant across all
+five rows, but none of these numbers is the shipped configuration, whose median
+is 0.38 m. Re-running the sweep at 0.5 is the obvious next step and it takes
+about twenty minutes. Defaults are untouched until then.
