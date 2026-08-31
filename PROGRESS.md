@@ -6366,3 +6366,45 @@ with it. Inert when the node is not running.
 
 A third control run was dropped in favour of a different seed: at 12.11 and
 17.71 m the control arm is not the uncertain half of this comparison.
+
+### Seed 7 too - and the constraint that replaced drift, identified
+
+Seed 7, same build, terrain fix on: **PASS, 0.27 m divergence, 0.18 m ground-truth
+error at arrival**. Its control arm is still running as this is written, so this
+is a one-armed result so far and the seed-7 comparison is not yet made.
+
+What three passing runs across two seeds do establish is where the remaining
+error now lives, and it is not localisation:
+
+    run                 stopped   slid    verdict   settle
+    seed 123 rep 10     0.14 m    1.34 m   1.467 m   8.0 s
+    seed 123 rep 11     0.18 m    1.30 m   1.469 m   7.7 s
+    seed 7   rep 1      0.18 m    1.41 m   1.474 m   8.7 s
+
+Three runs, two seeds, two different goals, and the verdict lands within 7 mm of
+1.47 m every time. That is not the matcher and it is not the terrain: **the rover
+stops within 0.18 m of its goal and then rolls another 1.3-1.4 m before it
+settles.**
+
+It is not the follower failing to brake either. `pure_pursuit_node._finish_goal`
+calls `_stop()`, which publishes a zero `Twist`, before it announces arrival. But
+a skid-steer with zero commanded velocity is a vehicle with no torque, not a
+vehicle with brakes, and these arrivals are on sloped ground (`max_pitch_deg`
+23.6 on the seed 123 runs). The rover free-rolls. 1.3 m in ~8 s is about
+0.17 m/s, which is its cruise speed, so it barely decelerates at all.
+
+The harness is doing exactly what it was built to do here: the settle detector
+exists so that a rover which merely PASSES THROUGH its goal cannot be credited
+with arriving, and this rover passes through its goal. The verdict is right and
+the number is honest. What has changed is which subsystem owns it.
+
+So M4's error budget on these seeds now reads: 0.18 m of localisation and
+stopping, plus 1.3 m of roll-out. Before tonight it read 12 m of drift plus
+everything else. **The binding constraint has moved off localisation for the
+second time in this project's history, and this time it has landed on the
+vehicle rather than on the estimator.** Nothing here has been attempted - holding
+position on a slope needs either a braking behaviour in the vehicle interface or
+an approach that arrives slower, and both want their own measurement.
+
+Raw evidence: `terrain_relative_campaign/seed7_trn_on_rep1/` and the two seed 123
+ON runs; `stopped_gt_pos` vs `gt_final` in each `*_result.json`.
