@@ -1,0 +1,22 @@
+
+=== seed 42, terrain_relative=on, rep 1 - 05:25:45 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed42_trn_on_rep1
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=30
+[seed 42] PASS - ground truth 1.5 m from the goal after 91.5 m travelled, EKF divergence 0.5 m, 1 stuck events, 0 flips, 0 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU + terrain-relative fix
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    42                 PASS      1.5m      91.5m     0.5m      1      0      0
+=== finished 06:02:48 ===
+
+=== seed 42, terrain_relative=off, rep 1 - 06:02:58 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed42_trn_off_rep1
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=86
