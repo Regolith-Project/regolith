@@ -6463,3 +6463,60 @@ Seed 42 has not been run at all.
 slowly) - that is now worth more to the M4 number than anything in localisation;
 run seed 42; and re-measure with a deliberately degraded DEM, since every result
 here uses a perfect map.
+
+## Retraction: the "1.3-1.5 m roll-out" does not exist - I misread the harness
+
+The section above ("the constraint that replaced drift") and its follow-up
+concluded that the rover arrives at its goal and then **rolls 1.3-1.5 m into a
+local minimum**, that every run comes to rest at the same physical point ~1.47 m
+away, and that this had become M4's binding constraint. **All of that is wrong.**
+It is retracted here rather than edited away, and the commits that carried it
+stay in the history.
+
+`gt_error_m` and `gt_final` are the **verdict snapshot**: `m4_acceptance.py`
+records them the instant ground truth first crosses the arrival bar, while the
+rover is still driving inbound. So every PASS reads ~1.47 m because that is the
+first sample after crossing 1.50 m - by construction, on every seed, in both
+arms. It is not a position the rover ever settles at, and the run's own code says
+so in a comment I read past: *"A verdict is decided the moment ground truth first
+crosses the bar, which is NOT where the rover ends up: it is usually still
+driving."*
+
+Where the rover actually stops is `stopped_gt_error_m`, which the same harness
+records separately and precisely because this distinction has bitten before. The
+corrected picture:
+
+    run                    divergence   ARRIVED AND STOPPED AT   (verdict snapshot)
+    seed 123 ON  rep 10       0.19 m           0.14 m                  1.47 m
+    seed 123 ON  rep 11       0.18 m           0.18 m                  1.47 m
+    seed 7   ON  rep 1        0.27 m           0.18 m                  1.47 m
+    seed 7   ON  rep 2        0.30 m           0.08 m                  1.47 m
+    seed 42  ON  rep 1        0.49 m           0.68 m                  1.47 m
+    seed 123 OFF rep 1       12.11 m          12.42 m                 12.42 m
+    seed 123 OFF rep 10      17.71 m          18.01 m                 18.01 m
+    seed 7   OFF rep 1        3.11 m           3.42 m                  3.42 m
+    seed 7   OFF rep 2        1.04 m           1.36 m                  1.47 m
+
+**The result is simpler and stronger than the version I retracted.** The rover
+stops **0.08-0.68 m** from its goal with the fix on, against 1.36-18.01 m with it
+off. There is no roll-out, no local minimum, and no new vehicle-side constraint -
+I invented all three to explain an artefact of when the harness takes its
+snapshot.
+
+Two claims built on it also fall. The "same resting point" table was comparing
+verdict snapshots, which all sit on a 1.47 m circle around the goal by
+definition, not resting positions. And the reading that seed 7's older
+tolerance campaign "passed 3/3 at 1.46-1.47 m because of roll-out" is wrong for
+the same reason - those are bar-crossing snapshots too, which is exactly what the
+harness comment describes.
+
+**How this happened, since it is the second wrong causal story I have published
+in two days.** I had `stopped_gt_error_m` and `gt_error_m` side by side in the
+first table I built, saw them differ by 1.3 m, and reached for a physical
+explanation - free-rolling on a slope - that fit the numbers and the rover's
+known lack of braking. It was checkable in one grep of the harness and I did not
+do it until a third seed produced the identical 1.47 m and the coincidence became
+impossible to ignore. **A number that is suspiciously identical across
+independent runs is evidence of a shared mechanism in the MEASUREMENT before it
+is evidence of one in the world**, and the "same to three significant figures"
+signal was there from the second run onward.
