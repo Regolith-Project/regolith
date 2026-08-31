@@ -6520,3 +6520,46 @@ impossible to ignore. **A number that is suspiciously identical across
 independent runs is evidence of a shared mechanism in the MEASUREMENT before it
 is evidence of one in the world**, and the "same to three significant figures"
 signal was there from the second run onward.
+
+## Final: what terrain-relative navigation is worth, per seed
+
+All three acceptance seeds, one build, `goal_tolerance_m` 0.35, verdicts and
+divergence as measured (a second seed-42 ON rep was still running when this was
+written):
+
+    seed        arm   verdicts    EKF divergence      where the rover stopped
+    123         ON    2/2 PASS     0.18 - 0.19 m         0.14 - 0.18 m
+    123         OFF   0/2 PASS    12.11 - 17.71 m       12.42 - 18.01 m
+    7           ON    2/2 PASS     0.27 - 0.30 m         0.09 - 0.18 m
+    7           OFF   1/2 PASS     1.04 -  3.11 m         1.35 -  3.42 m
+    42          ON    1/1 PASS     0.49 m                0.66 m
+    42          OFF   1/1 PASS     0.74 m                1.06 m
+
+**The effect is real everywhere and decisive in one place.** Divergence is lower
+with the fix on in every cell, and the rover stops closer to its goal in every
+cell. But the size of that advantage tracks how badly the seed drifts without it:
+
+- **Seed 123 is the case it was built for.** 12-18 m of divergence becomes
+  0.18-0.19 m, and FAIL/FAIL becomes PASS/PASS. This is the seed this document
+  called drift-limited and unclosable by any control change, and it is closed.
+- **Seed 7 is a partial win.** Its control is bimodal (1.04 m and 3.11 m here,
+  matching the short/long clusters documented earlier), so it passes about half
+  the time unaided. The fix takes it to 2/2 on much tighter numbers, but it is
+  improving a seed that was already borderline rather than rescuing a failure.
+- **Seed 42 is nearly a tie on the verdict.** Its control drifted only 0.74 m on
+  this run and passed. The fix is still better (0.49 m, stopping 0.66 m out
+  against 1.06 m), but nothing here would have failed without it.
+
+So the honest headline is not "5/5 against 1/4" - that ratio is mostly an
+artefact of which seeds happen to drift. It is: **terrain matching bounds EKF
+divergence to 0.18-0.49 m regardless of what the seed would otherwise have done,
+where dead reckoning ranges from 0.74 m to 17.71 m on the same three seeds.**
+Bounding the worst case is the whole value, and the worst case is where the
+milestone was being lost.
+
+**Still open, and none of it attempted:** seed 42's second ON rep (running);
+more control reps on seeds 7 and 42, whose arms are one and two runs deep; a
+deliberately degraded DEM, since every number here uses a perfect map and a 3 m
+registration error is already known to make the fix worse than dead reckoning;
+and the `min_margin` / `consistency_m` gates, which reject roughly half of all
+attempted fixes and have never been tuned against anything but the offline replay.

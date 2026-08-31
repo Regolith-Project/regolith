@@ -1,0 +1,53 @@
+[INFO] [launch]: All log files can be found below /home/balazs/.ros/log/2026-08-31-06-39-54-116897-DESKTOP-IE5MOME-31035
+[INFO] [launch]: Default logging verbosity is set to INFO
+[hello_moon.launch] Using ROS_DOMAIN_ID=83 (isolated DDS domain for this launch - see PROGRESS.md)
+[hello_moon.launch] TERRAIN-RELATIVE NAVIGATION ENABLED - the EKF is fused with an absolute position fix matched from IMU attitude against the a-priori DEM. No ground truth is read, so runs with this on ARE milestone results. Replayed through 25 recorded runs it cuts final EKF error from 2.97 m to 0.71 m median, but a replay is not a run - see PROGRESS.md before reading anything into a single result.
+[INFO] [ruby $(which gz) sim-1]: process started with pid [31079]
+[INFO] [robot_state_publisher-2]: process started with pid [31081]
+[INFO] [parameter_bridge-3]: process started with pid [31084]
+[INFO] [wheel_slip_node.py-4]: process started with pid [31087]
+[INFO] [terrain_relative_node.py-5]: process started with pid [31089]
+[INFO] [sensor_covariance_relay.py-6]: process started with pid [31091]
+[INFO] [ekf_node-7]: process started with pid [31093]
+[INFO] [costmap_node-8]: process started with pid [31095]
+[INFO] [planner_node-9]: process started with pid [31097]
+[INFO] [pure_pursuit_node-10]: process started with pid [31099]
+[INFO] [flip_recovery_node.py-11]: process started with pid [31101]
+[INFO] [mission_markers_node.py-12]: process started with pid [31103]
+[parameter_bridge-3] [INFO] [1788154795.701672779] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.704004832] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.707523882] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.708623388] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/odometry (gz.msgs.Odometry) -> /odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[robot_state_publisher-2] [INFO] [1788154795.710006916] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1788154795.710148736] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1788154795.710158765] [robot_state_publisher]: got segment chassis
+[robot_state_publisher-2] [INFO] [1788154795.710163544] [robot_state_publisher]: got segment front_left_wheel
+[robot_state_publisher-2] [INFO] [1788154795.710168353] [robot_state_publisher]: got segment front_right_wheel
+[robot_state_publisher-2] [INFO] [1788154795.710172551] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-2] [INFO] [1788154795.710176809] [robot_state_publisher]: got segment rear_left_wheel
+[robot_state_publisher-2] [INFO] [1788154795.710181708] [robot_state_publisher]: got segment rear_right_wheel
+[parameter_bridge-3] [INFO] [1788154795.711748488] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/odometry (nav_msgs/msg/Odometry) -> /odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.712823471] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera (gz.msgs.Image) -> /camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.715323539] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera (sensor_msgs/msg/Image) -> /camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.716577814] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera_info (gz.msgs.CameraInfo) -> /camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.718315893] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera_info (sensor_msgs/msg/CameraInfo) -> /camera_info (gz.msgs.CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.719610595] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/depth_camera (gz.msgs.Image) -> /depth_camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.720874427] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/depth_camera (sensor_msgs/msg/Image) -> /depth_camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.722533901] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu (gz.msgs.IMU) -> /imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.724166245] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/imu (sensor_msgs/msg/Imu) -> /imu (gz.msgs.IMU)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.725403966] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/regolith_moon/model/rover/joint_state (gz.msgs.Model) -> /world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.726843705] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState) -> /world/regolith_moon/model/rover/joint_state (gz.msgs.Model)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1788154795.728306424] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/rover/pose (gz.msgs.Pose) -> /model/rover/pose (geometry_msgs/msg/PoseStamped)] (Lazy 0)
+[flip_recovery_node.py-11] [INFO] [1788154796.453659268] [regolith_flip_recovery]: Flip/stuck recovery armed (simulated set_pose backstop for flips, straight-line cmd_vel override for stuck-but-upright)
+[wheel_slip_node.py-4] [INFO] [1788154796.490370185] [regolith_wheel_slip]: Wheel-slip ZUPT armed: /odom -> /odom/gated (onboard signals only - wheel odometry and IMU, never ground truth). legacy_rigid_body_signature=False
+[costmap_node-8] [INFO] [1788154796.565060698] [regolith_costmap]: Published costmap: 256x256 cells at 0.781 m/cell
+[terrain_relative_node.py-5] [INFO] [1788154796.569615422] [regolith_terrain_relative]: Terrain-relative navigation active: 15 m window, fixing at 1.0 Hz, +-6 m search at 0.25 m, DEM 0.391 m/px from /home/balazs/.cache/regolith/worlds/seed_42/manifest.json. Onboard sensors only - no ground truth is read by this node.
+[mission_markers_node.py-12] [INFO] [1788154796.572996381] [regolith_mission_markers]: Mission markers active - start at (0.0, 0.0), Gazebo flags on, RViz on /mission_markers
+[planner_node-9] [WARN] [1788154800.245083016] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-9] [INFO] [1788154810.276183469] [regolith_planner]: Planned path: 109 waypoints, start=(127, 127) goal=(110, 19)
+[parameter_bridge-3] [INFO] [1788154810.482748195] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[pure_pursuit_node-10] [WARN] [1788154849.963744619] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-9] [INFO] [1788154850.008231224] [regolith_planner]: Planned path: 109 waypoints, start=(127, 127) goal=(110, 19)
+[terrain_relative_node.py-5] [INFO] [1788155025.047558821] [regolith_terrain_relative]: Terrain fix held: first window, offset (+0.30, +0.00), margin 5.93 - waiting for an independent window to confirm
+[terrain_relative_node.py-5] [INFO] [1788155029.234897115] [regolith_terrain_relative]: Terrain correction #1 at 7.8 m travelled: (+0.36, -0.04) m, margin 4.83, 39 samples, 2 poses published (rejected so far: 0 ambiguous, 0 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1788155145.791753648] [regolith_terrain_relative]: Terrain correction #6 at 13.5 m travelled: (-0.05, +0.04) m, margin 3.77, 67 samples, 32 poses published (rejected so far: 0 ambiguous, 0 inconsistent)
