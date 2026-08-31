@@ -1,0 +1,59 @@
+[
+  {
+    "verdict": "FAIL_FALSE_ARRIVAL",
+    "goal": [
+      -53.01,
+      -32.34
+    ],
+    "gt_final": [
+      -45.16086200684797,
+      -16.133419170414363
+    ],
+    "ekf_final": [
+      -52.74280227506304,
+      -32.133055189357876
+    ],
+    "gt_error_m": 18.00728267733462,
+    "divergence_m": 17.70520180538634,
+    "gt_travelled_m": 141.65215398330525,
+    "ekf_travelled_m": 132.03956956539616,
+    "sim_time_s": 1383.1200000000001,
+    "verdict_gt_error_m": 18.00728267733462,
+    "stopped_gt_error_m": 18.00728267733462,
+    "stopped_gt_pos": [
+      -45.16086200684797,
+      -16.133419170414363
+    ],
+    "settled_reason": "verdict is terminal",
+    "settle_sim_s": 0.0,
+    "max_roll_deg": 12.944662664348849,
+    "max_pitch_deg": 22.96686366956872,
+    "path_planned": true,
+    "goal_publishes": 2,
+    "goal_reached_published": true,
+    "goal_reached_gt_error_m": 18.01475872951626,
+    "wall_time_s": 6015.79076191198,
+    "seed": 123,
+    "goal_validation": {
+      "goal": [
+        -53.01,
+        -32.34
+      ],
+      "cell": [
+        86,
+        60
+      ],
+      "in_bounds": true,
+      "neighbourhood_clear": true,
+      "connected_to_spawn": true,
+      "straight_line_m": 62.09618104199323
+    },
+    "straight_line_m": 62.09618104199323,
+    "stuck_events": 21,
+    "flip_events": 0,
+    "slip_events": 32,
+    "log": "/home/balazs/regolith/terrain_relative_campaign/seed123_trn_off_rep10/seed_123_launch.log",
+    "trace": "/home/balazs/regolith/terrain_relative_campaign/seed123_trn_off_rep10/seed_123_trace.csv",
+    "started": "2026-08-30 23:56:03"
+  }
+]

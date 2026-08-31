@@ -6336,3 +6336,33 @@ validated against a model of the system that omitted the part that breaks.
 
 Raw evidence: `terrain_relative_campaign/seed123_trn_{on_rep10,off_rep1}/`, plus
 the four failed configurations kept in the same directory rather than deleted.
+
+### Replicated: n=2 per arm, and the split is clean
+
+    seed 123, same build, same goal      verdict   divergence   error at arrival   verdict error
+    terrain fix ON,  rep 10              PASS         0.19 m         0.15 m            1.47 m
+    terrain fix ON,  rep 11              PASS         0.18 m         0.19 m            1.47 m
+    control OFF,     rep 1               FAIL        12.11 m        12.44 m           12.42 m
+    control OFF,     rep 10              FAIL        17.71 m        18.01 m           18.01 m
+
+Non-overlapping on every column, which is the standard this document has asked
+of every other result. The two ON runs agree to a centimetre on divergence and
+to 0.04 m on arrival error; the two control runs bracket 12-18 m.
+
+**Both ON runs return a verdict error of exactly 1.47 m**, from arrival errors
+of 0.15 and 0.19 m. That coincidence is the strongest evidence yet that the
+residual is not measurement scatter but a deterministic post-arrival slide: the
+rover stops within 0.2 m of the goal, then slides to the same resting place
+during the harness's 8 s settle window, on the same terrain both times. It is
+now the binding constraint on seed 123's NUMBER while contributing nothing to
+its localisation, and it has not been investigated.
+
+`m4_acceptance.py` now records `trn_x`/`trn_y` - what `terrain_relative_node`
+actually publishes - beside the filter's own estimate. Every diagnosis during
+that node's bring-up had to infer this by comparing filter speed against wheel
+speed, and "is the node's track wrong, or is the filter wrong" was the first
+question every single time. It is unanswerable without this column and trivial
+with it. Inert when the node is not running.
+
+A third control run was dropped in favour of a different seed: at 12.11 and
+17.71 m the control arm is not the uncertain half of this comparison.

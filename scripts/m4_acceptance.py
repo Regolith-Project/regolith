@@ -233,6 +233,7 @@ def pick_goal(seed: int, min_m: float, max_m: float) -> dict:
 def run_watcher(args) -> int:
     import rclpy
     from geometry_msgs.msg import PoseStamped
+    from geometry_msgs.msg import PoseWithCovarianceStamped
     from geometry_msgs.msg import Twist
     # Aliased: nav_msgs' Path would otherwise shadow pathlib.Path inside this
     # function, which is used for every output file below.
@@ -330,7 +331,7 @@ def run_watcher(args) -> int:
                 self._signals.write(
                     "t_s,sim_t,odom_vx,odom_wz,imu_wz,imu_ax,imu_ay,roll,pitch,yaw,"
                     "gt_x,gt_y,gt_speed,ekf_cov_xx,ekf_cov_yy,ekf_cov_vx,cmd_lin_x,cmd_ang_z,"
-                    "ekf_x,ekf_y,ekf_yaw,imu_roll,imu_pitch\n"
+                    "ekf_x,ekf_y,ekf_yaw,imu_roll,imu_pitch,trn_x,trn_y\n"
                 )
             self.sim_first = None
             self.sim_last = None
@@ -339,6 +340,7 @@ def run_watcher(args) -> int:
             self._ekf_yaw = float("nan")
             self._imu = None
             self._imu_rpy = (float("nan"), float("nan"))
+            self._trn = (float("nan"), float("nan"))
             self._odom = None
             self._rpy = (0.0, 0.0, 0.0)
             # What the follower/recovery layer is actually asking for, as
@@ -353,6 +355,16 @@ def run_watcher(args) -> int:
             self.create_subscription(Odometry, "/odometry/filtered", self._on_ekf, 10)
             self.create_subscription(Odometry, "/odom", self._on_odom, 10)
             self.create_subscription(Imu, "/imu", self._on_imu, 10)
+            # What terrain_relative_node actually PUBLISHES, recorded beside the
+            # filter's own estimate. Every diagnosis during that node's
+            # bring-up had to infer this by comparing filter speed against wheel
+            # speed, which is indirect and cost hours: "is the node's track wrong
+            # or is the filter wrong" is the first question every time and it is
+            # unanswerable without this column. Inert when the node is not
+            # running - the topic simply never arrives and the columns stay NaN.
+            self.create_subscription(
+                PoseWithCovarianceStamped, "/absolute_reference/pose", self._on_trn, 10
+            )
             self.create_subscription(Twist, "/cmd_vel", self._on_cmd, 10)
             self.create_subscription(Bool, "/goal_reached", self._on_reached, 10)
             # The goal is re-sent until a path comes back, not a fixed number of
@@ -429,6 +441,9 @@ def run_watcher(args) -> int:
             # checked without recording both. See PROGRESS.md.
             self._imu_rpy = rpy(msg.orientation)[:2]
 
+        def _on_trn(self, msg):
+            self._trn = (msg.pose.pose.position.x, msg.pose.pose.position.y)
+
         def _on_cmd(self, msg):
             self._cmd = (msg.linear.x, msg.angular.z)
 
@@ -447,7 +462,8 @@ def run_watcher(args) -> int:
                 f"{cov_xx:.6g},{cov_yy:.6g},{cov_vx:.6g},"
                 f"{self._cmd[0]:.4f},{self._cmd[1]:.4f},"
                 f"{self.ekf[0]:.3f},{self.ekf[1]:.3f},{self._ekf_yaw:.4f},"
-                f"{self._imu_rpy[0]:.4f},{self._imu_rpy[1]:.4f}\n"
+                f"{self._imu_rpy[0]:.4f},{self._imu_rpy[1]:.4f},"
+                f"{self._trn[0]:.3f},{self._trn[1]:.3f}\n"
             )
 
         def _on_ekf(self, msg):
