@@ -20,3 +20,36 @@ Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_off_rep10
 === seed 123 ===
 [seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
 [seed 123] launch is on ROS_DOMAIN_ID=96
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 18.0 m from the goal after 141.7 m travelled, EKF divergence 17.7 m, 21 stuck events, 0 flips, 32 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     18.0m     141.7m    17.7m     21      0     32
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 18.0 m true error
+=== finished 01:28:20 ===
+
+=== seed 123, terrain_relative=on, rep 11 - 01:28:27 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_on_rep11
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=84
+[seed 123] PASS - ground truth 1.5 m from the goal after 88.8 m travelled, EKF divergence 0.2 m, 6 stuck events, 0 flips, 15 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU + terrain-relative fix
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123                 PASS      1.5m      88.8m     0.2m      6      0     15
+=== finished 02:17:50 ===
+
+=== seed 123, terrain_relative=off, rep 11 - 02:18:00 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed123_trn_off_rep11
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=27

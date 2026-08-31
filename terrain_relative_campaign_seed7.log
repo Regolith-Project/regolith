@@ -1,0 +1,64 @@
+
+=== seed 7, terrain_relative=on, rep 1 - 02:24:10 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed7_trn_on_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=88
+[seed 7] PASS - ground truth 1.5 m from the goal after 95.8 m travelled, EKF divergence 0.3 m, 4 stuck events, 0 flips, 3 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU + terrain-relative fix
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m      95.8m     0.3m      4      0      3
+=== finished 03:11:28 ===
+
+=== seed 7, terrain_relative=off, rep 1 - 03:11:38 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed7_trn_off_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=40
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.4 m from the goal after 93.5 m travelled, EKF divergence 3.1 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.4m      93.5m     3.1m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.4 m true error
+=== finished 03:55:06 ===
+
+=== seed 7, terrain_relative=on, rep 2 - 03:55:16 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed7_trn_on_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=29
+[seed 7] PASS - ground truth 1.5 m from the goal after 91.7 m travelled, EKF divergence 0.3 m, 3 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU + terrain-relative fix
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m      91.7m     0.3m      3      0      4
+=== finished 04:39:20 ===
+
+=== seed 7, terrain_relative=off, rep 2 - 04:39:30 ===
+Results -> /home/balazs/regolith/terrain_relative_campaign/seed7_trn_off_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=44
+[seed 7] PASS - ground truth 1.5 m from the goal after 87.9 m travelled, EKF divergence 1.0 m, 2 stuck events, 0 flips, 2 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m      87.9m     1.0m      2      0      2
+=== finished 05:15:53 ===
+campaign complete - 05:16:03
