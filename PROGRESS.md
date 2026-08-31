@@ -6408,3 +6408,58 @@ an approach that arrives slower, and both want their own measurement.
 
 Raw evidence: `terrain_relative_campaign/seed7_trn_on_rep1/` and the two seed 123
 ON runs; `stopped_gt_pos` vs `gt_final` in each `*_result.json`.
+
+## The campaign, finished: what terrain-relative navigation does and does not buy
+
+Four cells per seed, two seeds, one build, `goal_tolerance_m` 0.35 throughout.
+
+    run                    verdict  divergence  error at arrival  where it came to rest
+    seed 123 ON  rep 10    PASS        0.19 m        0.15 m        1.47 m from the goal
+    seed 123 ON  rep 11    PASS        0.18 m        0.19 m        1.47 m
+    seed 123 OFF rep 1     FAIL       12.11 m       12.44 m       12.42 m
+    seed 123 OFF rep 10    FAIL       17.71 m       18.01 m       18.01 m
+    seed 7   ON  rep 1     PASS        0.27 m        0.18 m        1.47 m
+    seed 7   ON  rep 2     PASS        0.30 m        0.08 m        1.47 m
+    seed 7   OFF rep 1     FAIL        3.11 m        3.44 m        3.42 m
+    seed 7   OFF rep 2     PASS        1.04 m        1.36 m        1.47 m
+
+**What is unambiguous: localisation.** EKF divergence is 0.18-0.30 m with the fix
+on and 1.04-17.71 m with it off, non-overlapping, across two seeds and both of
+seed 123's arms. Ground-truth error at the moment the rover stops is 0.08-0.19 m
+against 1.36-18.01 m. That is the drift this document has been chasing since M4
+was reopened, corrected by a node reading only the IMU, the wheel encoders, and a
+map loaded before the run - no ground truth anywhere in it.
+
+**What the verdict number does NOT show, and this is the part worth carrying
+forward.** Every run that gets anywhere near its goal comes to rest at the SAME
+physical point, and per seed that point is ~1.47 m from the goal:
+
+    seed 123, both ON runs      rest at (-52.77, -30.89)
+    seed 7, both ON runs        rest at (-41.7, -58.1)
+    seed 7, the control that passed   rests at (-41.9, -57.9)
+
+The rover cannot hold position at these goals. It arrives, rolls, and settles in
+a nearby local minimum. So the ON runs reach the goal to 0.08-0.19 m and then roll
+1.3-1.5 m away from it, while seed 7's passing CONTROL never got closer than
+1.36 m and rolled only 0.12 m - and all of them are scored at 1.47 m. **On these
+goals the acceptance metric cannot tell 0.1 m of localisation from 1.4 m of it.**
+Both arms end up in the same hole.
+
+That also explains a number this document has had on record for weeks without
+explaining it: seed 7's earlier tolerance campaign passed 3/3 at 0.35 m with
+arrival errors of **1.46-1.47 m**. That is the same resting point, on an older
+build. The roll-out has been the floor under seed 7's arrival number all along,
+and it was read at the time as the tolerance result it was mixed in with.
+
+**So the honest headline is about drift, not about the pass rate.** M4's arrival
+error on these seeds is now 0.1-0.2 m of localisation plus a 1.3-1.5 m roll-out
+the vehicle cannot avoid, where before it was 3-18 m of drift plus everything
+else. Seed 123 goes from FAIL at 12-18 m to PASS twice; seed 7 goes from a
+bimodal control that passes about half the time to 2/2, on much better numbers.
+Seed 42 has not been run at all.
+
+**Next, and none of it attempted:** make the rover hold position at a goal
+(a braking behaviour in the vehicle interface, or an approach that arrives
+slowly) - that is now worth more to the M4 number than anything in localisation;
+run seed 42; and re-measure with a deliberately degraded DEM, since every result
+here uses a perfect map.
