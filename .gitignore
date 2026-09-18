@@ -12,3 +12,6 @@ PLAN.md
 __pycache__/
 *.pyc
 terrain_relative_campaign/.campaign.lock
+
+# scratch renders from scripts/render_still.py (iteration artefacts, not deliverables)
+docs/media/dev/
