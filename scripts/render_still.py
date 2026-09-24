@@ -64,7 +64,12 @@ def _look_at_rpy(eye, target):
     return 0.0, pitch, yaw
 
 
-def _rig_sdf(index, pose, width, height, hfov, far=3000.0):
+def _rig_sdf(index, pose, width, height, hfov, far=6000.0):
+    # far=6000 (was 3000): the sky dome/Earth/far-field horizon (sky.py, earth.py,
+    # farfield.py) sit as far out as sky_radius_m (default 4800 m) and
+    # farfield_outer_radius_m's corners (default 3000 * sqrt(2) ~= 4243 m) - both
+    # need to stay inside this camera's far clip or they clip/vanish. See
+    # TerrainConfig for the current defaults if this ever needs to move again.
     x, y, z, roll, pitch, yaw = pose
     return f"""    <model name="render_rig_{index}">
       <static>true</static>
@@ -105,6 +110,18 @@ def _presets(spawn_xy, spawn_z):
         "horizon": ((sx - 3.0, sy - 3.0, spawn_z + 0.35), (sx + 60.0, sy + 55.0, spawn_z + 2.0), 1.3),
         # Close on the wheels/ground contact - the detail shot for the rover build.
         "detail": ((sx - 0.85, sy - 0.75, spawn_z + 0.35), (sx, sy, spawn_z + 0.14), 1.0),
+        # Aimed at TerrainConfig's default earth_azimuth_deg/earth_elevation_deg
+        # (200 deg / 22 deg - see config.py for why that is nowhere near this
+        # module's other presets' own ~13-80 deg forward azimuth: Earth's default
+        # position trades off being in front of the rover against actually being
+        # lit by the fixed sun direction, and this preset exists to verify the
+        # side that placement was optimised for). Narrow hfov - a "how does Earth
+        # itself look" shot, not an establishing shot.
+        "earthlight": (
+            (sx, sy, spawn_z + 1.2),
+            (sx - 174.2, sy - 63.4, spawn_z + 75.0),
+            0.35,
+        ),
     }
 
 
@@ -143,7 +160,12 @@ def build_world(seed, views, width, height, with_rover, cine_light, out_world_di
 
     cfg = TerrainConfig(seed=seed)
     if cine_light:
-        cfg = dataclasses.replace(cfg, sun_elevation_deg=25.0, scene_ambient=(0.12, 0.12, 0.13))
+        # 25 deg / 0.12 (a first pass) blew the surface out to near-white,
+        # nothing like regolith's real ~0.08-0.14 albedo - see hello_moon.launch.py
+        # for the matching change and why. 18/0.07 keeps the surface readable on
+        # video without losing the low-sun long-shadow look or crushing shadows
+        # to flat black.
+        cfg = dataclasses.replace(cfg, sun_elevation_deg=18.0, scene_ambient=(0.07, 0.07, 0.08))
     world_sdf_path = generate_world(cfg, out_world_dir, start_paused=False)
     manifest = json.loads((out_world_dir / "manifest.json").read_text())
     spawn = manifest["spawn_zone"]

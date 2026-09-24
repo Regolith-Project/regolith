@@ -11,8 +11,8 @@ component reuse log.
 | M0: Environment verified | Done |
 | M1: Procedural lunar terrain | Done |
 | M2: Rover spawns and drives (teleop) | Done |
-| M3: Localisation | **Done, on isolated legs.** The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4% on isolated wheel-odom+IMU+EKF legs, within the <5% target. In full autonomous runs it is 0.4-0.7% of distance on the two well-behaved seeds and 5-11% on seed 123, and it varies by an order of magnitude between repeats of the same seed - see "The stopping tolerance, measured" below | **As of 2026-08-31 there is an onboard fix for the autonomous-run drift: `terrain_relative_node.py` (IMU attitude matched against the a-priori DEM) holds EKF divergence to 0.18-0.30 m over 88-95 m runs on seeds 7 and 123, against 1.04-17.71 m with it off, non-overlapping, n=4/3. Off by default pending seed 42 and a degraded-map test - see "The campaign, finished" below** |
-| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. Seed 7's tolerance response is now a finished measurement, n=3 both arms, same build, same goal: **0/3 at the shipped 1.0 m (1.53-1.60 m, every run over the 1.5 m bar) vs. 3/3 at 0.35 m (1.46-1.47 m)**, a clean non-overlapping split with zero orbiting-fallback firings across eleven completed runs - see "The replicate campaign, finished" below. `goal_tolerance_m`'s default is changed to **0.35 m** on that evidence. It does not fix M4 overall: seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal (still one run per arm, not replicated - tolerance is structurally irrelevant to a failure that large); seed 123 is drift-limited at 10.3-11.2 m. **Both seeds fail by margins no stopping tolerance can close**, and their drift distribution is still unmeasured - one run per arm remains one sample. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" and "The replicate campaign, finished" below. **A second, previously-flagged contributor to seed 42's variance is now root-caused and fixed**: `wheel_slip_node`'s "rigid body" false-positive (falsely declaring slip - and ZUPTing real distance out of the EKF - on ordinary dead-straight driving over smooth ground) is retired. A same-build A/B campaign (n=3/arm, seed 42) shows the fix cleanly, non-overlappingly reduces stuck-recovery events, ZUPT-suppressed distance, travelled distance and sim time - but does **not** move seed 42's pass rate or reliably reduce EKF divergence (3/3 vs 2/3 PASS, divergence ranges overlap heavily). Whatever actually drives seed 42's order-of-magnitude divergence spread is still unidentified. See "Root-caused: the benign-ground traction stall was never a stall" and the two sections following it | **UPDATE 2026-08-31: the localisation half is solved where it was failing.** With terrain-relative navigation on, EKF divergence is bounded to 0.18-0.49 m on all three seeds against 0.74-17.71 m off, and the rover stops 0.09-0.66 m from its goal against 1.06-18.01 m. **Seed 123 - drift-limited and previously unclosable - goes FAIL/FAIL at 12-18 m to PASS/PASS at 0.18 m.** Seed 7 was already borderline (its control passes about half the time) and seed 42's control passed on its one run, so the headline pass ratio overstates it: bounding the worst case is the value. An earlier version of this row claimed a post-arrival roll-out had become the constraint - retracted, that was a misreading of `gt_error_m`. Open: more control reps, a degraded-map test, and the gates that reject half the fixes. See "Final: what terrain-relative navigation is worth" |
+| M3: Localisation | **Done, on isolated legs.** The originally-recorded 20-45% drift was pre-fix (see "M3 drift re-investigation" below); current-code drift measures 0-4% on isolated wheel-odom+IMU+EKF legs, within the <5% target. In full autonomous runs it is 0.4-0.7% of distance on the two well-behaved seeds and 5-11% on seed 123, and it varies by an order of magnitude between repeats of the same seed - see "The stopping tolerance, measured" below | **As of 2026-08-31 there is an onboard fix for the autonomous-run drift: `terrain_relative_node.py` (IMU attitude matched against the a-priori DEM) holds EKF divergence to 0.18-0.30 m over 88-95 m runs on seeds 7 and 123, against 1.04-17.71 m with it off, non-overlapping, n=4/3. Off by default pending seed 42 and a degraded-map test - see "The campaign, finished" below**. **UPDATE 2026-09-14: the degraded-map test is done on seed 123 - six cells, three map qualities, two reps each, same build, 6/6 PASS with divergence separating cleanly and monotonically (perfect 0.18-0.29 m, a plausible orbital DEM 0.64-0.91 m, a deliberately noisy one 1.08-1.12 m). Map quality has a real and bounded cost, and the fix survived every quality tested. Two caveats keep it OFF for now: only seed 123 has been tested against a degraded map, and the one defect the evidence says the EKF cannot average away - registration bias - was not in that campaign and is running now on seed 7. See "How good does the map have to be?" and "The prediction that failed"** |
+| M4: Autonomous navigation | **Not reliably met, and the honest unit is a per-run number rather than a score.** The pipeline drives 94-134 m among real boulders, escapes 61/61 wedges, and flips zero times; the arrival error on every failing seed is the EKF's drift plus the follower's stopping distance, to within centimetres. Seed 7's tolerance response is now a finished measurement, n=3 both arms, same build, same goal: **0/3 at the shipped 1.0 m (1.53-1.60 m, every run over the 1.5 m bar) vs. 3/3 at 0.35 m (1.46-1.47 m)**, a clean non-overlapping split with zero orbiting-fallback firings across eleven completed runs - see "The replicate campaign, finished" below. `goal_tolerance_m`'s default is changed to **0.35 m** on that evidence. It does not fix M4 overall: seed 42 has produced a 1.50 m pass **and** 5.69 / 7.76 m failures on the same build and goal (still one run per arm, not replicated - tolerance is structurally irrelevant to a failure that large); seed 123 is drift-limited at 10.3-11.2 m. **Both seeds fail by margins no stopping tolerance can close**, and their drift distribution is still unmeasured - one run per arm remains one sample. An older build with a 0.5 m / 1 Hz absolute position reference passed 3/3 at 1.48 m (an experiment, not a milestone result), so planning, control and recovery are not what limits the number. See "The stopping tolerance, measured" and "The replicate campaign, finished" below. **A second, previously-flagged contributor to seed 42's variance is now root-caused and fixed**: `wheel_slip_node`'s "rigid body" false-positive (falsely declaring slip - and ZUPTing real distance out of the EKF - on ordinary dead-straight driving over smooth ground) is retired. A same-build A/B campaign (n=3/arm, seed 42) shows the fix cleanly, non-overlappingly reduces stuck-recovery events, ZUPT-suppressed distance, travelled distance and sim time - but does **not** move seed 42's pass rate or reliably reduce EKF divergence (3/3 vs 2/3 PASS, divergence ranges overlap heavily). Whatever actually drives seed 42's order-of-magnitude divergence spread is still unidentified. See "Root-caused: the benign-ground traction stall was never a stall" and the two sections following it | **UPDATE 2026-08-31: the localisation half is solved where it was failing.** With terrain-relative navigation on, EKF divergence is bounded to 0.18-0.49 m on all three seeds against 0.74-17.71 m off, and the rover stops 0.09-0.66 m from its goal against 1.06-18.01 m. **Seed 123 - drift-limited and previously unclosable - goes FAIL/FAIL at 12-18 m to PASS/PASS at 0.18 m.** Seed 7 was already borderline (its control passes about half the time) and seed 42's control passed on its one run, so the headline pass ratio overstates it: bounding the worst case is the value. An earlier version of this row claimed a post-arrival roll-out had become the constraint - retracted, that was a misreading of `gt_error_m`. Open: more control reps and the gates that reject half the fixes. **The degraded-map test is now parameterised and answered offline, and it corrected a published wrong conclusion**: the binding requirement on the a-priori DEM is its VERTICAL ERROR, not its registration or its resolution - the matcher reads slope, so sigma of height error correlated over length L arrives as sigma/L of slope error, 0.05 m of it already hurts more than a 3 m map offset, and a coarser DEM is *better* at equal vertical error. On terrain this gentle a real NAC-stereo DTM would probably not support the matcher. A live three-arm campaign is running. See "How good does the map have to be?" and "Final: what terrain-relative navigation is worth" |
 | M5: Demo polish and packaging | Substantially done (see notes) |
 
 ## Decisions
@@ -6062,50 +6062,410 @@ y only - terrain matching cannot observe heading), `hello_moon.launch.py`'s
 `test/test_terrain_relative.py` (14 tests; `regolith_bringup` 68/68 green).
 Defaulted OFF pending the live campaign.
 
-### How good does the map have to be? Answered, because it was cheap to answer
+### How good does the map have to be? Answered, then re-answered - the first answer was wrong
 
 The limitation above - "the DEM is the generator's own heightmap read exactly, a
 perfect map, and no mission has one" - is testable without any simulation time:
 degrade the map, replay the same 25 runs, see what breaks.
-`scripts/terrain_relative_dem_quality.py` does that, and the answer separates
-cleanly into "survivable" and "fatal".
+`scripts/terrain_relative_dem_quality.py` does that.
+
+**An earlier version of this section published the wrong conclusion, and it is
+worth stating why before the corrected table, because the bug was in the
+experiment rather than in the code under test.** The elevation-noise arms drew a
+Gaussian field, smoothed it to make the error spatially correlated - which is
+right, a DEM's height error is correlated, not white - and then applied it
+without renormalising. Smoothing with a kernel several cells wide cuts a drawn
+field's rms by more than an order of magnitude: the arm labelled "0.1 m rms"
+applied about 0.005 m. The tell was in the published table and went unread - that
+arm scored **1.71 m, identical to the coarsening-only arm**, because coarsening
+was doing all of the work and the noise was doing none. It was read as "noise is
+survivable" when it was really "no noise was applied". `degrade_dem` now
+renormalises the smoothed field to the requested rms, and a test pins that at two
+post spacings.
+
+With the amplitude it claims, the ordering of the three defects inverts.
 
     a-priori map                        final EKF error (median, 25 runs)   runs over 1.5 m
-    perfect (as shipped)                     2.97 m -> 0.71 m                  18 -> 8
-    posts coarsened to 1 m                   2.97 m -> 0.85 m                  18 -> 6
+    perfect (as shipped)                     2.97 m -> 0.71 m                  18 ->  8
+    posts coarsened to 1 m                   2.97 m -> 0.85 m                  18 ->  6
     posts coarsened to 2 m                   2.97 m -> 1.71 m                  18 -> 13
     posts coarsened to 5 m                   2.97 m -> 1.73 m                  18 -> 16
-    elevation noise 0.1 m rms                2.97 m -> 1.71 m                  18 -> 13
-    elevation noise 0.3 m rms                2.97 m -> 1.86 m                  18 -> 13
-    registration shift 1 m                   2.97 m -> 1.39 m                  18 -> 11
-    registration shift 3 m                   2.97 m -> 4.09 m                  18 -> 25
+    elevation noise 0.02 m rms               2.97 m -> 1.37 m                  18 -> 12
+    elevation noise 0.05 m rms               2.97 m -> 4.23 m                  18 -> 17
+    elevation noise 0.10 m rms               2.97 m -> 6.16 m                  18 -> 23
+    elevation noise 0.30 m rms               2.97 m -> 7.63 m                  18 -> 23
+    2 m posts + 0.02 m noise                 2.97 m -> 1.79 m                  18 -> 15
+    2 m posts + 0.05 m noise                 2.97 m -> 3.92 m                  18 -> 21
+    2 m posts + 0.10 m noise                 2.97 m -> 5.99 m                  18 -> 24
+    5 m posts + 0.10 m noise                 2.97 m -> 1.83 m                  18 -> 21
+    5 m posts + 0.30 m noise                 2.97 m -> 7.87 m                  18 -> 19
+    registration shift 1 m (both axes)       2.97 m -> 1.39 m                  18 -> 11
+    registration shift 3 m (both axes)       2.97 m -> 4.09 m                  18 -> 25
 
-**Losing map detail degrades the fix gracefully.** At 2-5 m posts, or with
-0.1-0.3 m of elevation noise, it still roughly halves the error - and it degrades
-in the safe direction, because coarser terrain is more ambiguous terrain and the
-margin gate rejects far more windows (153 published fixes on the perfect map,
-27 at 5 m posts). The matcher gets quieter rather than more wrong.
+**Vertical error is the binding requirement, not registration and not
+resolution.** Five centimetres of height error is already worse than a 3 m map
+offset. The old section called registration "the requirement that matters"; it is
+not, it is the second one.
 
-**Misregistration does the opposite, and it is the requirement that matters.**
-A 3 m map offset makes the whole thing worse than dead reckoning - every run ends
-outside the bar, against 18 of 25 with no fix at all - and it does so while
-publishing as many fixes as the perfect map (149 vs 153) at full confidence. Of
-course it does: the map is internally perfect, the matcher correctly reports
-where the rover is on it, and the answer is displaced by exactly the map's own
-error. No confidence measure computed from the cost surface can see this, because
-nothing about the cost surface is wrong.
+**The mechanism is a division, and it explains every row.** The matcher does not
+read heights, it reads SLOPE - `terrain_gradients` differentiates the DEM before
+anything else happens. Height error of sigma correlated over length L therefore
+arrives as slope error of roughly sigma/L. Measured on seed 123's map (0.39 m
+posts, typical terrain slope 3.1 deg), as median induced slope error against the
+site's own relief:
 
-So the engineering requirement this puts on a mission is specific and not
-obvious from the accuracy numbers alone: **the DEM's resolution barely matters
-and its co-registration to the frame the goals live in matters enormously** -
-roughly, better than 1 m. That is a statement about how the map is tied to the
-mission frame, not about the sensor or the algorithm.
+    posts -> 2 m                 0.49 deg    16% of the terrain's own slope
+    posts -> 5 m                 0.85 deg    27%
+    0.02 m noise, native posts   1.95 deg    63%
+    0.10 m noise, native posts   9.76 deg   314%
+    0.10 m noise, 2 m posts      2.61 deg    84%
+    0.10 m noise, 5 m posts      1.42 deg    46%
 
-One caveat on the registration arm, since it is the alarming one: goals in this
-harness are world-frame points, so a shifted map shifts the estimate against a
-goal that did not move. A mission picking its targets FROM the same orbital map
-would see part of that offset cancel. Treat the 3 m row as a pessimistic bound
-rather than the expected behaviour.
+That ratio predicts the closed-loop table: below roughly half the site's own
+slope the fix survives (<= 1.8 m median), above roughly 80% it collapses past 4 m.
+Coarsening is cheap because smoothing a DEM lowers slope error; adding height
+error is expensive because differentiating amplifies it by 1/L.
+
+**So a coarser DEM is BETTER, at equal vertical error.** Compare the last two
+rows of the mechanism table against the replay: 0.1 m of height error costs
+5.99 m on a 2 m-post map and 1.83 m on a 5 m-post one - same error, coarser map,
+three times the accuracy - because the coarser posts lengthen L. This is the
+opposite of the intuition that a terrain matcher wants the sharpest map available,
+and it is the single most useful thing this experiment produced.
+
+**What that means for a real mission, stated plainly and not in our favour.**
+LRO NAC stereo DTMs run 2-5 m posts at 0.3-1 m vertical precision. On this site
+that is sigma/L of order 3-8 deg against 3.1 deg of terrain relief - at or past
+the point where the table says the fix stops helping. **On terrain this gentle, a
+real orbital DTM would probably not support this matcher.** *(This sentence is
+the one the live campaign has since put in doubt - see "The prediction that
+failed" below. The replay appears to overstate the damage from vertical error
+specifically. Left standing as written, because it is what the offline evidence
+said at the time and the live evidence is n=1.)* The requirement is a
+ratio, not an absolute, so a site with real relief buys margin directly; a mare
+plain does not. That is a statement about where terrain-relative navigation is
+applicable, which is more useful than an accuracy number, and it is not one the
+perfect-map result could have produced.
+
+**The mechanism also names the fix, and the fix works.** If slope error is
+sigma/L, the rover can lengthen L itself: smooth the DEM it was given before
+differentiating it. `dem_prefilter_m` does that - the mitigation is applied last,
+to the map as received, which is the only thing a real rover could do to a map it
+did not make. Same 25 runs:
+
+    a-priori map + what the rover does      final EKF error (median)   runs over 1.5 m
+    0.10 m noise, no prefilter                   2.97 -> 6.16 m            23
+    0.10 m noise, prefilter 0.5 m                2.97 -> 5.00 m            20
+    0.10 m noise, prefilter 1.0 m                2.97 -> 2.76 m            21
+    0.10 m noise, prefilter 2.0 m                2.97 -> 1.73 m            16
+    2 m posts + 0.10 m noise, prefilter 2.0 m    2.97 -> 3.50 m            21
+    perfect map, prefilter 1.0 m                 2.97 -> 1.66 m            13
+
+**It is not a free improvement and it is defaulted OFF for the reason the last
+row shows**: the same prefilter that rescues a noisy map costs 0.71 -> 1.66 m on
+a map that was already good. It is a trade against a quantity the rover cannot
+measure and a mission CAN - the DEM's stated vertical accuracy - so the filter
+length belongs in the mission's map metadata, not in a default.
+
+And the honest ceiling: **no prefilter setting recovers perfect-map
+performance.** The best noisy-map result, 1.73 m, is the same number coarsening
+alone gives and it sits at the 1.5 m bar rather than under it. Prefiltering turns
+a catastrophic map into a mediocre one. That is worth having - 6.16 m is worse
+than doing nothing at all - but it is not a rescue, and the applicability
+statement above still stands.
+
+Misregistration remains fatal for its own separate reason, and the earlier
+section had that part right: a 3 m offset makes things worse than dead reckoning
+while publishing as many fixes as the perfect map (149 vs 153) at full
+confidence. Of course it does - the map is internally perfect, the matcher
+correctly reports where the rover is on it, and the answer is displaced by
+exactly the map's own error. **No confidence measure computed from the cost
+surface can see this, because nothing about the cost surface is wrong.** That is
+what separates it from the noise arms, where the gate does at least fire (fixes
+drop from 153 to ~45) and simply does not fire hard enough.
+
+One caveat on the registration arm, unchanged: goals in this harness are
+world-frame points, so a shifted map shifts the estimate against a goal that did
+not move. A mission picking its targets FROM the same orbital map would see part
+of that offset cancel. Treat the 3 m row as a pessimistic bound rather than the
+expected behaviour.
+
+And one caveat on all of it: this is still the replay, not the EKF. The live
+degraded-map campaign that tests these predictions is
+`scripts/terrain_relative_dem_quality_campaign.sh`, three arms on seed 123
+(perfect / degraded / noisy), run through the same `--dem-post-m`,
+`--dem-noise-m` and `--dem-shift-m` parameters the node now takes so that the
+live stack and the replayed model are one implementation rather than two.
+
+The first two cells of that campaign exposed a reporting bug that had been live
+for weeks and is worth recording, because its failure mode is the dangerous kind:
+it produced a plausible number rather than an error. `terrain_relative_report.py`
+reported **"fixes published 0"** for both cells - which reads exactly like a
+matcher that rejected every window, and would have been read as "terrain-relative
+navigation does nothing on this build". Two separate defects, stacked:
+
+1. **A stale regex.** The node's published-fix line was reworded from `Terrain fix
+   #N ...: correction (dx, dy)` to `Terrain correction #N ...: (dx, dy)`. The
+   parser still matched the old form, so it found nothing. Nothing raised. Both
+   wordings exist in campaign logs on disk, so the pattern now accepts either.
+2. **Counting lines instead of counters.** Every one of those log calls is
+   throttled - the correction line to one per `report_every_m` of travel, both
+   rejection lines to `throttle_duration_sec=30.0` - so the log holds a SAMPLE of
+   the matcher's activity, not a record of it. Even with the regex fixed, line
+   counting gave 14 corrections on a run that applied 61, and 28 ambiguous
+   rejections where the node had counted 195. The node carries its true running
+   totals inside the correction line; the parser reads those now, and falls back
+   to line counting only for a run with no correction line at all, where the lines
+   genuinely are the total.
+
+`scripts/test_report_parsers.py` pins both, against verbatim log fixtures. Nothing
+published in this file was derived from the broken counts - the gate sweeps above
+are all offline-replay numbers - but only by luck.
+
+With the parser fixed, the first two cells say what the offline replay predicted
+they would, in the one place the replay's central claim is visible:
+
+    arm        divergence   corrections applied   accept rate   rejected ambiguous
+    perfect      0.286 m        61 of 258             24%              195
+    degraded     0.911 m        21 of 365              6%              343
+
+**A degraded map makes the matcher quieter, not wronger.** Three times the
+attempts rejected, a third as many corrections applied, margins collapsing from a
+76 maximum to 7.6 - and the estimate degrades toward the unaided one rather than
+away from it. That is the "safe direction" claim, and it is now a live
+observation rather than a replay artefact. (n=1 per arm. The `noisy` arm, where
+the prediction is that this protection FAILS, is the one that matters and it is
+still running.)
+
+#### The prediction that failed - the replay overstates vertical-error damage
+
+The `noisy` arm was run to observe a predicted failure. It passed, twice.
+**Campaign finished: six cells, seed 123, two reps per arm, same build, 6/6
+PASS.** EKF divergence, with the replay's prediction for each arm beside it:
+
+    arm        map                          divergence (n=2)   replay said   corrections   accept rate
+    perfect    as generated                 0.184, 0.286 m        0.71 m       61, 65       24%, 22%
+    degraded   2 m posts, 0.02 m, 0.5 m sh  0.640, 0.911 m       1.79 m       21, 11        6%,  2%
+    noisy      2 m posts, 0.10 m vertical   1.082, 1.123 m       5.99 m       74, 52       25%, 52%
+
+**The three arms separate cleanly and do not overlap**, which is more than the
+replicate count strictly buys: 0.18-0.29 m, 0.64-0.91 m, 1.08-1.12 m. Map quality
+has a real, monotone, measurable cost. Every arm still finished well inside the
+1.5 m bar, and the noisy arm's two reps landed 0.04 m apart.
+
+The replay predicted 5.99 m for the noisy arm - worse than doing nothing. Live it
+finished at 1.08 and 1.12 m and PASSED both times, a factor of 5.4 better than
+predicted.
+
+**Half the prediction was exactly right.** Vertical error does not make the gate
+fire: the noisy arm's accept rate is 25%, indistinguishable from the perfect
+map's 24%, while the coarsened arm's is 6%. The margin distribution says the same
+thing - the maximum falls from 76 to 7.3, so every fix is low-confidence, and the
+gate lets them through anyway because `min_margin` is an absolute threshold at
+2.0 and 2.3 clears it. Noise does not announce itself. That was the claim and it
+holds.
+
+**The half that was wrong is what happens next, and the cause is that the replay
+gives each fix authority the EKF does not.** The replay applies every accepted
+fix to a running correction at full weight. The real filter weights it against
+its own covariance - `position_variance` is 4.0, a deliberately weak trust -
+clamps it to `max_step_m` 0.5, and rations it by `correction_interval_m`. Against
+74 wrong-but-roughly-zero-mean fixes that is exactly the right defence: the
+errors average down. The replay cannot see this because it integrates each one as
+if it were certain.
+
+**The sharp form of the refined claim, which is testable and not yet tested:
+the EKF can average away zero-mean map error and cannot average away a bias.**
+Vertical noise is roughly zero-mean in its effect on the matched offset, so the
+filter survives it. A registration shift is not - it displaces every fix the same
+way, no amount of averaging removes it, and the replay's 3 m arm (4.09 m, worse
+than dead reckoning, 149 fixes published at full confidence) should therefore
+survive contact with the live EKF where the noise arm did not. **That makes the
+registration arm the decisive live test, and it is not in this campaign** - an
+earlier draft had it as `shift3` and it was dropped when the arms were re-chosen.
+It is the next thing to run.
+
+**The distribution behind that claim, measured rather than argued.** The
+explanation lives in a distribution, not in a run, so it can be checked without
+one: match the SAME recorded windows against a degraded DEM and against the
+perfect one, and look at the difference. The statistic that matters is
+|mean|/spread - the fraction of the fix error that no amount of averaging can
+remove.
+
+    seed   defect                     mean error        spread   |mean|/spread
+      7    0.10 m vertical noise    (-0.76, -1.58)      6.29 m       0.28
+      7    1 m registration shift   (+0.76, +1.21)      1.66 m       0.86
+      7    3 m registration shift   (+3.02, +2.73)      1.35 m       3.03
+    123    0.10 m vertical noise    (-1.48, -0.12)      4.71 m       0.32
+    123    1 m registration shift   (+0.43, +0.50)      2.65 m       0.25
+    123    3 m registration shift   (+0.45, +0.27)      5.61 m       0.09
+
+**On seed 7 this is exactly the predicted split.** A 3 m shift comes back as
+(+3.02, +2.73) - the map's own displacement, recovered almost exactly, with a
+spread smaller than the bias. Vertical noise comes back as scatter three to four
+times larger than its mean. One is a systematic error the filter cannot touch;
+the other is what covariance weighting exists to suppress.
+
+**Seed 123 does not show it, and chasing why turned up a real limitation.** The
+first explanation written here was that a 3 m shift on both axes is 4.24 m
+diagonal and saturates the +-6 m search range. That was wrong - 4.24 m is
+comfortably inside 6 m - and measuring it instead of asserting it gave the actual
+answer:
+
+    seed   map           median |offset|   at the +-6 m search edge
+     123   perfect            5.89 m              42%
+     123   3 m shift          6.54 m              42%
+       7   perfect            0.69 m               0%
+       7   3 m shift          4.53 m               6%
+
+**Seed 123's windows saturate the search range on a PERFECT map.** They are drawn
+from recorded runs made with the fix OFF, where the EKF had already drifted 10 m
+and more, so the correction the matcher needs exceeds `search_m` before any map
+defect is added - 42% of windows sit at the bound either way, which is why adding
+a 3 m shift barely moves the mean. Seed 7's windows, from runs that stayed near
+the truth, show the bias cleanly at 0-6%.
+
+Three things follow, and the third is the one that was not previously written
+down anywhere:
+
+- The registration arm has to run on **seed 7**, where the bias is cleanly
+  present, and not only on seed 123.
+- **`search_m` = 6.0 bounds the error this matcher can correct at all.** Beyond
+  it the fix cannot represent the answer, and it fails by pinning at the boundary
+  rather than by reporting low confidence - 82% of seed 123's shifted windows
+  still clear the margin gate while being wrong by construction.
+- That bound also explains part of the replay/live gap independently of
+  covariance weighting. The replay's windows come from unaided runs carrying 10 m
+  of drift; a live run with the fix on from the start never lets drift reach the
+  search bound, so it is matching in a regime the replayed windows never sample.
+  **The replay is not merely conservative, it is sampling a harder problem than
+  the live stack solves.**
+
+Note also that these are raw matches with no gate applied - `min_margin` would
+reject a good share of them - so the spreads are upper bounds on what reaches the
+filter. The ordering is what the table is for.
+
+#### The registration arm, live: the prediction that held
+
+The decisive follow-up, run on seed 7 for the search-bound reason above. First
+cell, and it is as clean a confirmation as this project has produced:
+
+    arm       map                  divergence   accept rate   verdict
+    perfect   as generated         0.18-0.29 m*     24%       PASS      (*seed 123)
+    noisy     0.10 m vertical      1.08-1.12 m      25%       PASS      (seed 123)
+    shift3    3 m registration     4.291 m          90%       FAIL_FALSE_ARRIVAL
+
+**The divergence IS the map's displacement.** A 3 m shift on both axes is 4.243 m
+diagonal; the run finished 4.291 m out - within 5 cm, 1.1%. The rover did not
+wander off, it went exactly where its map said the goal was, and reported arrival
+while standing 4.1 m away. FAIL_FALSE_ARRIVAL is the correct verdict and it is
+the honest name for what a biased a-priori map does to a vehicle that trusts it.
+
+**The gate did not merely fail to help - it inverted.** Ninety percent of attempts
+were accepted, against 24% on a perfect map and 2-6% on a coarsened one, with five
+ambiguous rejections in an entire run. This is the sharpest statement of the whole
+map-quality result:
+
+    a coarsened map   makes the matcher QUIETER   (accept 24% -> 2-6%)  and it survives
+    a noisy map       leaves the matcher as loud  (accept 24% -> 25%)   and it survives
+    a displaced map   makes the matcher LOUDER    (accept 24% -> 90%)   and it fails
+
+Confidence computed from the cost surface measures how well the trajectory
+matches the map. It cannot measure whether the map is where it claims to be, and
+on a displaced map it correctly reports an excellent match - so the one defect
+that is fatal is also the one the matcher is most certain about. **No gate tuned
+on margin or consistency can fix this.** It has to be ruled out upstream, by
+tying the DEM to the frame the goals live in.
+
+This also settles the zero-mean/bias question the `noisy` arm raised. The EKF's
+covariance weighting averages down scatter and cannot touch a systematic offset,
+and the live numbers now show both halves: 0.10 m of vertical error (|mean|/spread
+0.28) costs 0.9 m of divergence, and a 3 m displacement (|mean|/spread 3.03)
+costs the full 4.24 m.
+
+**The seed-7 baseline and the 1 m arm, same build, same goal.** With those in,
+the arm ordering is monotone in the one variable that changed:
+
+    arm       map displacement   accept rate   divergence (median/final)   verdict
+    perfect        0 m               17%            0.37 m                 PASS
+    shift1         1.41 m            34%            1.21 / 1.89 m          PASS, by 7 cm
+    shift3         4.24 m            90%            4.29 m                 FAIL_FALSE_ARRIVAL
+
+**Matcher confidence is an increasing function of registration error: 17% ->
+34% -> 90%.** Not flat, not noisy - monotone. Every extra metre of map
+displacement makes the matcher more willing to act, because a displaced map is
+still an internally consistent map and the cost surface it produces is a good
+one. This is the property that makes misregistration qualitatively different
+from the other two defects rather than merely worse.
+
+**The "better than 1 m co-registration" requirement derived offline is real and
+has no margin.** The 1 m arm passed, but it finished 1.43 m from the goal against
+a 1.5 m bar - seven centimetres of room - with median divergence 1.21 m against
+the 1.41 m the map was displaced by. A 1 m map offset consumes essentially the
+entire arrival budget on this seed. The offline replay put the 1 m arm at 1.39 m
+median where the live run sits at 1.21 m, so for this defect - unlike the
+zero-mean ones - the replay was accurate rather than conservative, which is what
+the bias argument predicts.
+
+A prediction registered before this cell ran said 1.2-1.5 m. The median landed at
+1.21 m and the run's headline divergence at 1.816 m: right about the mechanism,
+optimistic about the magnitude.
+
+**There is one gate, not two - measured across all ten live cells.** Pooling
+both campaigns, every map quality, every seed:
+
+    map condition              margin rejections   consistency rejections   accept
+    coarsened     (seed 123)        343, 456              1, 0              6%, 2%
+    perfect       (seed 123)        195, 231              2, 1             24%, 22%
+    noisy         (seed 123)        224,  43              3, 5             25%, 52%
+    perfect       (seed 7)          222                   0                17%
+    1 m shift     (seed 7)          107                   3                34%
+    3 m shift     (seed 7)            5,   0              3, 1             90%, 99%
+
+`consistency_m` rejects between **zero and five** fixes in every run ever
+recorded here, under every map quality, while `min_margin` ranges from 0 to 456.
+The two-gate design is a one-gate design in practice.
+
+And on the one defect where a second opinion is the only thing that could help,
+the second opinion is blind BY CONSTRUCTION. `consistency_m` asks whether two
+successive windows agree. A constant map displacement makes them agree perfectly -
+that is what "constant" means - so the check passes at exactly the moment it is
+needed. Three and one rejections across the two shift3 runs, against 70 and 71
+fixes applied.
+
+This does not contradict "the gates DO earn their keep" above: that was a
+tail-bounding result on a PERFECT map, where `min_margin` is doing the work and
+does it well. What the live data adds is that (a) `consistency_m` contributes
+almost nothing under any condition, and (b) `min_margin` is ANTI-correlated with
+the defect that actually kills a run - it rejects 222 fixes on a good map and 0
+on a map displaced by 4.24 m. Gating harder would make this worse, not better.
+Misregistration has to be excluded upstream; there is no threshold on this cost
+surface that finds it.
+
+n=1-2 per arm; the remaining reps are running.
+
+Standing limits: n=2 per arm and ONE seed. Seed 123 is the seed where the fix
+does the most work, so it is the right place to start and the wrong place to
+stop - seeds 7 and 42 are untested against a degraded map. The applicability
+paragraph above is written on offline evidence that this campaign undercuts, and
+is flagged in place rather than rewritten.
+
+What can be said now is narrower than that paragraph and firmer than it:
+**the offline replay is a conservative model for zero-mean map defects - by a
+factor of 5 on the worst arm - and its absolute numbers must not be quoted as
+predictions of live behaviour.** Its ORDERING held perfectly (perfect < degraded
+< noisy, live and replayed alike); its MAGNITUDES did not.
+
+Two disclosures on that campaign, since they are the kind of thing that is
+invisible later. Its first cell started before `dem_prefilter_m` existed and the
+remaining cells ran with that code present; it defaults to 0.0 and
+`degrade_dem` is the identity there, so the arms are unaffected, but the tree
+was not byte-identical across all six cells. And the campaign's arms were chosen
+AFTER the corrected offline table, not before it: an earlier draft of the script
+called 2 m posts + 0.15 m noise + 0.5 m shift "realistic", which the corrected
+model says is a catastrophic map rather than a plausible one. That draft was
+never run.
+
 
 ### The first live run, and a second frame bug - this one found by the rover
 
@@ -6462,7 +6822,9 @@ Seed 42 has not been run at all.
 (a braking behaviour in the vehicle interface, or an approach that arrives
 slowly) - that is now worth more to the M4 number than anything in localisation;
 run seed 42; and re-measure with a deliberately degraded DEM, since every result
-here uses a perfect map.
+here uses a perfect map. (The degraded-DEM item is now done offline and running
+live - see "How good does the map have to be?" - and its answer was that
+DEM vertical error, not registration, is the binding requirement.)
 
 ## Retraction: the "1.3-1.5 m roll-out" does not exist - I misread the harness
 
@@ -6559,9 +6921,10 @@ milestone was being lost.
 
 **Still open, and none of it attempted:** seed 42's second ON rep (running);
 more control reps on seeds 7 and 42, whose arms are one and two runs deep; a
-deliberately degraded DEM, since every number here uses a perfect map and a 3 m
-registration error is already known to make the fix worse than dead reckoning;
-and the `min_margin` / `consistency_m` gates, which reject roughly half of all
+deliberately degraded DEM - **now parameterised (`--dem-post-m`, `--dem-noise-m`,
+`--dem-shift-m`), re-measured offline and running live**; the offline answer
+corrected an earlier wrong one, and the binding requirement turns out to be the
+DEM's vertical error rather than its registration or its resolution; and the `min_margin` / `consistency_m` gates, which reject roughly half of all
 attempted fixes and have never been tuned against anything but the offline replay.
 
 ### The two gates do not earn their keep any more - measured, not changed
@@ -6619,3 +6982,544 @@ bounded. The two parameters interact and cannot be tuned apart.
 
 Nothing was changed on the strength of the first sweep, which is the only reason
 this costs a paragraph instead of a regression. The gates stay at 2.0 and 1.5.
+
+## Media re-export: a camera that exists only to film, and one staged wedge
+
+Four assets were asked for by the person cutting the project video, and the
+brief for the first one was the useful part: the existing onboard clip has
+*nothing of the rover in frame*, so there is no foreground, no parallax, and it
+reads as a still photograph rather than as a moving vehicle. That is a framing
+problem, not an exposure problem, and it could not be fixed by pointing the
+existing camera somewhere else.
+
+**The navigation cameras were not touched.** Their pose and intrinsics are
+load-bearing - the costmap, the VO and every M3/M4 number depend on them - so a
+`cine_camera` xacro arg adds a *separate* 1280x720 sensor in one of two
+positions (`onboard`: a mast over the deck, chassis and front wheels in the
+bottom of frame; `chase`: a boom behind and above, whole rover in shot), each
+with its own `CameraVideoRecorder` service. `both` runs the two at once.
+`cine_light` raises the sun 12 -> 25 degrees and the ambient 0.06 -> 0.12, which
+is render-only: the terrain, rocks and costmap are all generated before the
+light is written. Delivered: `docs/media/m5_onboard_drive.mp4` (47.6 s),
+`m4_rviz_autonomous_run.mp4` (1920x1080, 13.9 s),
+`m4_immobilisation_and_escape.mp4` (20 s) and
+`m4_costmap_and_planned_path_2048.png`. `docs/media/README.md` records the
+provenance and caveats of each.
+
+Four things came out of this that are worth keeping.
+
+**RViz *can* be screen-recorded here, and x11grab still cannot.** M5 concluded
+that WSLg defeats desktop capture, which is true of the root window; but
+`import -window <id>` reads an individual window fine, and a loop of those piped
+to ffmpeg makes a video. It grabs at 4.7-6.2 fps, which sounds fatal and is not:
+re-timing the result to sim-time speed compresses ~200 s of wall clock into ~14 s
+of clip, which turns 920 sparse frames into ~65 fps of source material,
+resampled down to 30. The choppiness and the pacing correction cancel out.
+
+**The video recorder writes the mp4 moov atom on STOP.** A gz server segfault
+mid-recording therefore leaves a multi-megabyte file with no header and nothing
+recoverable in it - one Ogre2/Sensors crash cost a complete 68 MB take. All
+recording is now segmented (~150 s), so a crash costs one segment.
+
+**`demo.sh`'s leftover-process check has a hole.** It matches
+`gz[ ]sim.*regolith_moon`, but the server's command line carries the world
+*path*, `.../worlds/seed_42/world.sdf` - the world *name* never appears in it.
+So the pattern matches nothing, exactly like the `ruby .*gz sim` pattern it
+replaced. A survivor was observed doing real damage during this work: it shares
+the gz partition with the next launch, and killing it made `/clock` jump
+*backwards* (188 s -> 115 s) in the new run, which parked every sim-time timer
+in the graph - `flip_recovery_node` stopped ticking for ten minutes and detected
+nothing at all while the rover sat visibly wedged. Match on `worlds/.*world\.sdf`
+instead. Not fixed here; flagged.
+
+**Filming an immobilisation turned out to be harder than the 61/61 figure
+suggests, and the reason is instructive.** Roughly 40 minutes of autonomous tour
+driving on seed 7, plus a full 23 m two-goal run on seed 42, produced *no wedge
+at all*. So the rover was aimed at a known 1.6 m boulder instead. The first
+three attempts all ended `STILL WEDGED` (0.01, 0.01, 0.03 m of ground-truth
+motion across escalation levels 0-2) and none of that was the recovery's fault:
+driving in at a full 0.3 m/s made the rover climb the boulder base, and the
+harness's own forward commands were interleaving with the escape's reverse
+commands at the DiffDrive plugin - the rover was being pushed back into the rock
+it was reversing out of. `pure_pursuit_node` does not do this; it logs "Recovery
+node has taken over /cmd_vel - pausing path following" and stops publishing. Once
+the harness approached at 0.12 m/s and released `/cmd_vel` on seeing a reverse
+command appear on the topic, the very next event freed the rover:
+
+    STUCK RECOVERY #2 (escalation level 1, triggered by wheel slip (onboard))
+      reversed 0.20 m/s for 6.0 s, then turned right at 0.50 rad/s for 3.5 s
+    STUCK RECOVERY #2 result: ground truth moved 1.17 m - FREED
+
+The clip is honest about being a staged wedge - the heading was staged, the
+immobilisation and the escape are the system's own - and `docs/media/README.md`
+says so in those words. Two loose ends are recorded there rather than papered
+over: the escape's on-film duration does not reconcile with the sim-time the
+maneuver claims (so that clip ships at unmodified 1x rather than re-timed on an
+assumption), and a rover-mounted camera makes an escape read as the *world*
+moving, which a world-fixed camera at the now-known wedge site would fix.
+
+One incidental confirmation for anyone quoting the escape counts: the pivot
+false positive is easy to hit. The first "immobilisation" recorded in this
+session was `commanded=0.0690, gt_speed=0.0004` - exactly `0.3 rad/s * 0.23 m`,
+a rover turning in place to face its first goal, with the 3 s debounce firing an
+escape at something that was never stuck. Known and analysed above (a symmetric
+measure was measured and rejected because it would break detection of the real
+wedges), but it means a count of fired escapes is not a count of
+immobilisations. The delivered clip was selected by requiring the opposite
+signature: `commanded=0.3000` against `gt_speed=0.0014`.
+
+### Correction: the rover was never wedged where the section above says it was
+
+The clip that section describes was reviewed and the immediate reaction was that
+the rover looked "immobilised on a shadow" - it sits on open, flat, lit ground
+with nothing touching it. That reading was fair, and chasing it down showed the
+paragraph above is wrong on the mechanism.
+
+**It is not against the boulder's face, and it never climbed anything.** Three
+checks, all against artefacts already on disk:
+
+- **The terrain is flat there.** All 1764 terrain collision boxes were parsed out
+  of the generated world and the collision surface reconstructed along the
+  rover's path: it tracks the visual mesh to within +/-10 mm over 4.5 m, with
+  per-step changes of 2 mm. No slab lip, no invisible step.
+- **The wheels are nowhere near the rock.** At wheel height the boulder's
+  collision ellipsoid is 0.24 m away.
+- **The contact is at the top front-left corner of the chassis.** Testing the
+  rover's whole front face against the ellipsoid in 3-D - including the rock's
+  roll and pitch, which the first pass ignored - the only intersecting point is
+  `ahead 0.29 m, lateral -0.23 m, z 0.265 m`: the deck corner. The boulder has
+  `pitch_rad 0.246`, so it **leans out over the ground**, and the rover drove
+  under the overhang until its top corner jammed against the rock's underside
+  while all four wheels stayed on clear ground.
+
+That is what the onboard signals were saying all along and it was misread as a
+figure of speech: *"the wheels claim 1.84 m and 0.55 rad of turning; the gyro saw
+0.08 rad (14% of it)"* is wheels spinning freely on open ground while the body is
+held somewhere else entirely.
+
+So "driving in at a full 0.3 m/s made the rover climb the boulder base" above is
+retracted - nothing climbed, and the approach speed is not what made the early
+escapes fail. What the speed changed was how far under the overhang the rover
+got. Sensitivity: at the pose where it sat stalled longest the intersection is
+unambiguous (ellipsoid value 0.76), at the pose where the escape finally fired it
+is marginal (0.98-1.02, i.e. within the error of an assumed 26 deg heading and a
+0.39 m/px elevation decode). The direction of the finding holds across the whole
+plausible heading range; the penetration depth does not.
+
+**And the camera is why none of this was visible.** Projecting the boulder into
+the `chase` preset's frame: at `pitch 0.5, hfov 1.05, boom 1.6 m back`, the rock's
+top sat **7.6 degrees above the top edge**. Only its dark underside was in shot,
+immediately against its own cast shadow - hence a rover stopped dead by nothing.
+The preset is now `boom 2.6 m back, 1.1 m up, pitch 0.24, hfov 1.3`, which puts
+the rock's top ~11% down the frame and the rover ~70% down, and the clip was
+re-shot. A framing that hides the one object the shot is about is a defect in the
+shot, not a caveat to write underneath it.
+
+#### The re-shoot was still wrong, and the cause was lighting, not framing
+
+The correction above fixed the `chase` framing and the clip was re-shot with the whole
+boulder in frame. The reviewer looked at it and said the same thing: *"it's still
+getting stuck on the shadow of the boulder."* They were right, and the framing fix -
+while necessary - was not the cause.
+
+The world writes its own light vector, so this is checkable rather than arguable:
+
+    <direction>-0.5198 -0.7424 -0.4226</direction>
+      -> sunlight ARRIVES from bearing 55 deg, elevation 25 deg
+    the rover approached the rock at (16.68, 7.51) from bearing 205 deg
+      -> 150 deg apart, cos = -0.87
+
+**Every take so far had the camera pointed at the boulder's fully shadowed side.** An
+unlit rock renders as a flat black silhouette, and it sits immediately against its own
+cast shadow, so the two merge into one dark mass with no boundary. That is what was on
+screen both times; "stuck on a shadow" was a fair description of it.
+
+Fixed by choosing the target for the light instead of for convenience: the 2.24 m
+boulder at `(-18.90, -9.99)` is reachable in a straight line from spawn, its
+camera-facing side sits 27 deg off the sun (`cos +0.89`), and the straight path clears
+every other rock by 3.4 m. Sun behind the camera, boulder lit and obviously solid, cast
+shadow falling away from the lens. Both escapes in that run freed the rover (0.59 m at
+escalation level 0, then 1.19 m at level 1).
+
+Two things worth keeping out of this:
+
+- **The geometry work was right and still did not produce a usable shot.** Projecting
+  the rock's mesh into the recorded frame put all 240 vertices exactly on the drawn
+  boulder and the rover's deck corner exactly among its base vertices - the model was
+  validated, the contact was real, and the clip was still unreadable. Being able to
+  prove what the physics is doing is not the same as being able to see it.
+- **Check the sun before choosing what to drive at.** The lit face is the one pointing
+  back along the rover's approach; `world.sdf`'s `<direction>` gives it in one line.
+  Three sim runs, roughly an hour and a half, would have been one.
+
+## Sim-to-real, step 1: the recovery node no longer needs an oracle - and the first run says the escape verdict does not survive
+
+`flip_recovery_node` decided everything from `/ground_truth/pose`: flip attitude,
+the "not moving" test, the reset pose, and whether an escape had worked. The node
+was honest about it in its docstring - "a simulation oracle" - but it was the
+shipped default, so **61/61 was measured with a detector no real rover has**.
+
+New `onboard_only` parameter (launch: `onboard_only_recovery:=true`, acceptance
+harness: `--onboard-only-recovery`), default **false** so nothing banked moves
+until a paired campaign says what changes. With it set:
+
+- attitude comes from the **IMU**, position from the rover's own **EKF**, through
+  a single `_detection_pose()` gate that is the only thing the detectors may read;
+- the escape's freed/still-wedged verdict is judged on the **EKF**, with ground
+  truth printed beside it, explicitly labelled scoring-only;
+- a flip **halts the mission** instead of teleporting. A wheeled rover cannot
+  self-right; `set_pose` was inventing a capability the vehicle does not have and
+  turning a mission-ending event into a pause in the log.
+
+Ground truth is still subscribed. It may reach the log; it may not reach a
+decision. That distinction is the whole point.
+
+### First live run: detection transfers, the verdict does not
+
+Drove the rover into seed 42's boulder at `(16.68, 7.51)` with `onboard_only:=true`.
+
+**Detection worked without the oracle.** The EKF-based test caught the wedge and
+fired on its own: `STUCK RECOVERY #1 (escalation level 0, triggered by onboard
+estimate)`. That was the part most at risk and it survived.
+
+**The outcome check did not:**
+
+    STUCK RECOVERY #1 result: onboard estimate moved 0.00 m - STILL WEDGED
+      [scoring only: ground truth moved 0.56 m - THE ROVER'S VERDICT IS WRONG]
+
+The escape **worked**. The rover reversed 0.56 m out of the wedge and believed it
+had not moved at all.
+
+The mechanism is `wheel_slip_node` doing its job. It had asserted slip and was
+feeding the EKF zero-velocity updates - *"Feeding the EKF a zero-velocity update
+instead of the wheels' claim"* - which is correct while the rover is wedged and
+its wheels are spinning. But the ZUPT is still latched through the escape
+maneuver, so the genuine 0.56 m of reversing is zeroed out of the estimate too.
+**The protection that keeps phantom distance out of the EKF also blinds the rover
+to the one motion it most needs to observe.**
+
+On hardware the consequence is not cosmetic: the rover concludes every escape
+failed, escalates (level 1 reverses twice as far and turns longer), and can drive
+itself back into trouble from a position it had already escaped. With the oracle
+this was invisible, because ground truth always saw the 0.56 m.
+
+Not fixed here, and the fix is not obvious - candidates, none tested:
+
+- release the ZUPT for the duration of an escape maneuver (the wheels are being
+  commanded deliberately; the slip signature during a commanded reverse is not
+  the one the gate was built for);
+- judge "freed" on IMU-integrated acceleration over the maneuver rather than EKF
+  displacement;
+- judge it on visual odometry, which is exactly the independent motion estimate
+  this case needs and is already in the tree, off by default.
+
+What this step has already bought: the escape numbers now have a stated
+dependency. Anyone quoting 61/61 has to say whether it was measured with the
+oracle, and the first evidence says the honest number will be lower - not because
+the escapes fail, but because the rover cannot tell that they succeeded.
+
+Next: a paired campaign, both arms, same seeds, to put a number on it.
+
+## The paired campaign: what 61/61 is worth without the oracle
+
+Six cells, one build, same seeds and goals, arms interleaved: seeds 42 / 7 / 123 x
+{`oracle` (shipped), `onboard` (`--onboard-only-recovery`)}, one rep each,
+5 h 21 m wall. `scripts/onboard_recovery_campaign.sh`, scored by
+`scripts/onboard_recovery_report.py`.
+
+    cell                       fired  believed  actually  wrong   verdict
+    seed42_oracle_rep1             4         4         4      0   FAIL_FALSE_ARRIVAL
+    seed42_onboard_rep1           14         6        14      8   FAIL_FALSE_ARRIVAL
+    seed7_oracle_rep1              8         8         8      0   FAIL_FALSE_ARRIVAL
+    seed7_onboard_rep1             8         4         8      4   FAIL_FALSE_ARRIVAL
+    seed123_oracle_rep1           20        20        20      0   FAIL_FALSE_ARRIVAL
+    seed123_onboard_rep1          24         8        24     16   FAIL_FALSE_ARRIVAL
+
+**The escape maneuver is not the problem. The rover's knowledge of it is.**
+
+- **Every escape worked.** All 46 onboard-arm escapes moved the rover at least
+  0.49 m by ground truth (medians 1.14-1.99 m per seed). 46/46.
+- **The rover only recognised 18 of them (39%).** It concluded STILL WEDGED after
+  28 escapes that had in fact freed it - **wrong about 61% of its own successes**.
+- It is not a marginal miss against the 0.3 m bar. Median escape motion as
+  *measured by the rover* was **0.01 m on seed 123 and 0.03 m on seed 42**, against
+  1.99 m and 1.22 m actually travelled. The estimate is not noisy, it is blind.
+- Seed 7 is the exception and worth a look later: there the rover measured a median
+  0.60 m and got 4 of 8 right. Less slip on that ground is the obvious hypothesis
+  and it is untested.
+
+Mechanism, as recorded in the previous section: `wheel_slip_node` asserts slip
+while the rover is wedged and feeds the EKF zero-velocity updates - correct at the
+time - and the ZUPT is still latched through the escape maneuver, so the genuine
+reversing motion is zeroed out of the estimate as well.
+
+**So 61/61 does not survive contact with a real sensor suite - but not in the way
+the number's critics would assume.** The escapes themselves transfer perfectly.
+What does not transfer is the rover's ability to *tell* that they worked, which is
+the input a real mission actually acts on. Detection transfers too: all 46 events
+fired from the onboard estimate, unaided.
+
+### What this campaign does NOT support
+
+Stated plainly, because with one rep per cell the temptation is to read the rest
+of the table:
+
+- **The `fired` counts (46 vs 32) are not a result.** Seed 7 fired 8 in both arms,
+  seed 123 20 vs 24, seed 42 4 vs 14. This repo has already recorded seed 42
+  producing a 1.50 m pass and 5.69 / 7.76 m failures on the same build and goal;
+  the run-to-run spread swamps a one-rep arm difference.
+- **The arrival errors are not a result either** (seed 42 1.69 -> 7.68 m, seed 123
+  10.96 -> 18.34 m, seed 7 3.45 -> 2.88 m). Same reason, and every cell in both
+  arms returned FAIL_FALSE_ARRIVAL, which is the known drift-limited failure mode
+  and not something recovery touches.
+- **The escalation ladders are not evidence for the onboard arm's cost.** Seed 123
+  climbed to level 9 in *both* arms; escalation is driven by re-sticking inside
+  the relapse window, not by the freed verdict.
+- **The oracle arm's "actually freed" column is circular** - that arm reads its
+  verdict from ground truth, so 32/32 is true by construction, not an independent
+  confirmation. The report prints that caveat rather than letting the column be
+  quoted.
+
+The one number this campaign does establish is the within-run one - 18/46 - because
+it compares the rover's own verdict against ground truth **inside the same runs**,
+where run-to-run variance cannot reach it.
+
+### Next
+
+Replicates for anything cross-arm. And the fix is now well-posed: release the ZUPT
+for the duration of a commanded escape, or judge "freed" on a source the slip gate
+does not suppress (IMU integration, or the visual odometry already in the tree and
+off by default). None of the three is tested; the campaign says which question they
+have to answer.
+## Visual realism pass: what the sim LOOKS like, with physics frozen
+
+The sim's appearance was overhauled so that footage from it can carry a case study:
+the rover was a grey box on four black cylinders, the ground was a visible quilt of
+5 m facets, and the 200 m world ended in a hard edge against a flat purple sky. All
+three are fixed. The work was deliberately constrained to be **visual only** - every
+M3/M4 number already in this log was measured against the current physics world, and
+re-measuring all of it was not on the table.
+
+### Physics is frozen, and that was verified independently rather than asserted
+
+For seeds 42 and 7, the world generated by the current tree was compared against the
+world generated by the terrain generator at the inner repo's HEAD, on exactly the
+artefacts physics and planning consume:
+
+| artefact | result |
+|---|---|
+| terrain collision boxes | 1764 / 1764 byte-identical, both seeds |
+| rock collision ellipsoids | 190 / 190 identical, both seeds |
+| `heightmap.png` (costmap's elevation source) | byte-identical |
+| manifest fields read by costmap/planner | identical (190 rocks, 160 craters, spawn zone, z encoding) |
+
+The rover side is covered by `test_physics_untouched_in_sdf.py`, which diffs the
+xacro-to-SDF output with `<visual>` stripped against a baseline captured from the
+**pristine pre-task git HEAD** - independent ground truth, not derived from the
+changed file. Both checks were proven able to go red: perturbing one collision box,
+and separately changing `chassis_mass` 6.0 -> 6.5, each turned the relevant check red,
+and restoring turned it green again.
+
+One methodological note worth recording, because it is the same failure this log has
+already recorded three times. The first version of the collision-box comparison
+reported "0 boxes / 0 boxes -> IDENTICAL" - a vacuous pass, because the regex assumed
+`terrain_box_<n>` when the real naming is `terrain_box_<row>_<col>`, so it compared two
+empty lists. A green check that has never been seen to go red is not evidence.
+
+### Terrain surface
+
+The drawn surface is now a bounded refinement of the frozen collision surface: a
+bicubic reconstruction of the same coarse cell-height grid (which kills the
+piecewise-planar creases) plus a recovered high-frequency residual, both clamped.
+
+- **Deviation from the shipped drawn surface: 0.0280 m worst case on all three seeds**
+  (the clamp), mean 1.09-1.28 cm. Budget was 3 cm against a 0.09 m wheel radius.
+- **Rock seating, measured against the shipped assets** (terrain.obj + the new visual
+  rock meshes + manifest, i.e. what gz actually draws): worst gap -0.0465 m (seed 42),
+  -0.0617 m (seed 7), -0.0006 m (seed 123). All negative, i.e. embedded. **0 of 190
+  rocks floating on any seed.**
+- Surface texture is now a per-seed world-scale bake (4096x4096 over 200 m) replacing
+  the old 512 px / 20 m repeating tile. **This is a real texel-density loss, stated as
+  such: 4.9 cm/texel against the old tile's 3.9 cm/texel.** 8192x8192 (2.4 cm/texel)
+  was tried and **OOM-killed on this 13 GB box, twice** - not shipped.
+- Terrain mesh: 524,288 triangles (was 32,768), terrain.obj 50.5 MB (was 2.8 MB).
+- World generation time: ~56 s mean (51.3 / 48.3 / 67.8 s on seeds 42/7/123) against
+  ~1.1 s before - roughly 50x, dominated by the texture bake and the OBJ export. This
+  is world-build cost, not per-frame cost.
+
+Two intermediate approaches are recorded in the code comments because they are the
+reason the shipped numbers are what they are: a macro/fine budget split whose fine term
+saturated the clip almost everywhere and left the quilt barely moved, and a
+uniform-shrink rock fit that made floating *worse* (up to 176/190 rocks) because the
+frozen ellipsoid is deliberately smaller than the original mesh at its diagonals.
+
+### Real-time factor: an earlier regression claim is RETRACTED
+
+An initial n=2/n=3 measurement suggested the visual pass cost roughly 33% of
+real-time factor. That does not survive a fair sample. Re-measured headless
+(`-r -s`, no GUI, no camera sensors), 6 interleaved reps per arm, first discarded as
+warm-up, `/dev/shm/fastrtps_*` cleared before each launch:
+
+- before: median 0.306, mean 0.331, stdev 0.073, range 0.259-0.445
+- after: median 0.332, mean 0.341, stdev 0.049, range 0.269-0.418
+
+**No confirmed difference** - the after-median is marginally higher, the distributions
+overlap almost entirely, and the within-arm spread exceeds the gap between medians.
+This is consistent with the mechanism: collision geometry is identical, and headless
+RTF is dominated by physics. The honest statement is "no confirmed difference", not
+"no difference".
+
+That number says nothing about filming. **With a 720p camera attached the measured
+render-side RTF is 0.057-0.093** across four measurements - a different quantity, and
+the one that sets how long a take costs in wall-clock.
+
+### Rover
+
+Procedurally generated body: chamfered hull, solar deck with structural ribs and a
+bolt-flange edge, sensor mast with a stereo camera head, HGA dish, whip antenna,
+radiators, cable runs, equipment box, and wheels with grousers, hub and rim. All of it
+is extra `<visual>` elements on the existing links - no new links, no new joints, no
+mass. Whole vehicle ~4,340 triangles; 13/13 package tests pass, including mesh
+determinism and the physics-SDF check above.
+
+**The find worth keeping: `urdf2sdf` silently emits `<diffuse>0 0 0 1</diffuse>` for
+every visual after the FIRST on a multi-visual link when the material is referenced by
+name only** - regardless of which material is named. An inline `<color>` on the
+reference works around it. Because that tint multiplies the PBR albedo map, the deck,
+mast, dish, whip antenna, equipment box, both radiators and both cable runs all
+rendered pure black, while the hull (first visual) and the wheels (sole visual on their
+own links) were always correct.
+
+This cost real time, and the reason it did is instructive: the symptom was read as
+"a flat horizontal deck under a grazing sun is simply dim", which is physically
+plausible and wrong. What broke the deadlock was proving that the intervention which
+*should* have worked under that theory - near-white albedo plus aggressive relief -
+produced a **pixel-identical** render. An explanation that survives only because the
+experiment refuting it was never run is not a diagnosis.
+
+Also recorded: urdf2sdf scales URDF material colours by 1.25 and clamps at 1.0
+(0.55 -> 0.6875, 0.12 -> 0.15, 0.08 -> 0.1, 0.85 -> 1.0), so any channel above 0.8
+saturates.
+
+### Sky, Earth and the far-field horizon
+
+A procedural starfield on a 4800 m inverted sphere, Earth as a lit sphere at ~2 deg
+with its phase driven by the scene's own sun, and a visual-only far-field mesh
+extending the ground to ~3 km. None of it carries collision and none of it reaches
+manifest.json (asserted by `test_farfield_and_sky_visual_only.py`, 14 tests).
+
+Two gz/Ogre2 behaviours found by minimal-world bisection, neither discoverable any
+other way:
+
+1. **A custom OBJ `<mesh>` visual with no vertex normals (`vn`) silently loses its
+   SDF-specified material** and falls back to a fixed default - measured as identical
+   mean RGB to five decimal places across every failing variant. This is what made the
+   sky render as blank white.
+2. **`<pbr><metal><albedo_map>` combined with `<lighting>false</lighting>` on mesh
+   geometry also silently falls back to that same default**, independent of which
+   texture is referenced - proven by substituting a texture already known to work.
+   Worked around by keeping lighting on and moving the star texture to
+   `<emissive_map>` with ambient/diffuse zeroed.
+
+Earth's absence was not a texture bug: at the default azimuth its camera-facing
+hemisphere was geometrically unlit at every elevation, given the frozen sun azimuth.
+Moved to 200 deg, verified illuminated, and a forward-looking preset genuinely cannot
+show a correctly-lit Earth at the same time - a real constraint of the fixed sun, now
+documented in config.
+
+**Open, documented, not fixed: a seam between the near terrain and the far-field,
+visible only from elevated cameras.** Measured by an empirical height sweep (seed 7,
+fixed look direction): no visible gap below ~15 m above local terrain; a few-pixel
+sliver at ~15 m; a clear ~100 px band in a 1080 px frame by 32 m. The transition is
+gradual and azimuth-independence was not proven across seeds. The practical rule is to
+keep a camera below ~15 m when the horizon is in frame, and to render a still at the
+actual camera position before committing a long take above that.
+
+An analytical model of this threshold was built and then **discarded** because it
+predicted the gap should shrink with height, contradicting the renders. The numbers
+above are empirical.
+
+### A pixel test that was measuring the wrong thing
+
+`test_rendered_terrain_seats_rocks.py` began failing once the far-field existed. It was
+root-caused rather than patched: with the far-field present the detector returned
+**824 hits with rocks normal and 824 hits - identical to the column and pixel - with
+rocks lifted 0.5 m**. Its output was entirely the far-field's silhouette and not at all
+rock height. The far-field's real relief produces the same "sky, object, sky, ground"
+column pattern the scanner uses, and it has no notion of "distant terrain" versus "a
+boulder".
+
+Fixed by building that test's own world with `farfield_enabled=False`, which removes
+the confound at source and leaves both assertions exactly as strict. Note the
+consequence honestly: that pixel test now exercises a configuration that is not quite
+the shipped one. That is acceptable because the far-field is a separate visual model
+that cannot affect rock seating, and the geometry-based seating tests grade the shipped
+assets directly.
+
+### The cinematic camera rig, and the footage
+
+The two existing cine cameras are bolted rigidly to the chassis, so the horizon
+pitches with every bump and the framing never changes - bodycam, not cinematography.
+A `cine_rig:=chase|orbit|crane|track` launch argument (opt-in, off by default) now adds
+a free-flying camera-only model with no joint to the rover, moved every tick by
+`camera_rig_node.py` through gz-sim's `/world/<world>/set_pose` - the same mechanism
+`flip_recovery_node.py` already uses in production to right a flipped rover. Rover
+tracking and the camera's own pursuit are each passed through a critically-damped
+second-order filter, using the closed form rather than a naive lerp because it is exact
+for the large, irregular `dt` this node sees while sim time crawls.
+
+That mechanism was verified three ways before anything was built on it, because a
+silent no-op was the obvious risk: pose readback through a bridged `PosePublisher`
+(15/15 exact), **the rendered image actually changing** (three colour-coded boxes, the
+camera teleported and re-aimed at each, frames inspected), and confirmed working for
+both static and non-static rig models.
+
+**Frame count, not container fps.** The first working take looked fine by duration and
+frame count - 26 frames in a 1.04 s clip - but `mpdecimate` showed only 15 of those 26
+were distinct renders (57.7%, ~14.4 fps of real motion). The sensor was producing new
+frames 15 times per simulated second while the pipeline emitted more container frames
+than that. Invisible to a duration check, very visible as stutter full-screen. Fixed by
+raising both the rig sensor's `update_rate` and the node's tick rate to 30 - **they must
+match, not merely be close, or alternate frames repeat a stale pose** - which took the
+same check to 24/26 distinct (92.3%). The check now runs automatically on every clip
+and warns above 10% duplicates.
+
+**Render-side real-time factor is 0.057-0.093 with a 720p camera attached** - a
+different quantity from the headless physics-only number above, and the one that sizes
+a take. At ~0.07, a 550 s wall-clock capture yields ~40 simulated seconds, which is why
+captures are segmented: the recorder writes the mp4 moov atom only on STOP, so a long
+single take is all-or-nothing.
+
+Shipped, both seed 42, both **genuinely autonomous** - the goal is validated against the
+live costmap and the real A* (the same reachability check the tour waypoints use) and
+then `planner_node` and `pure_pursuit_node` do the planning and driving; only the choice
+of where to send it was made for the camera:
+
+| clip | length | distinct frames | note |
+|---|---|---|---|
+| `hero_chase.mp4` | 29.08 s | 652/727 (89.7%, 22.4 fps) | 3 of 4 segments - segment 4's recorder start call timed out; the bad segment was dropped rather than corrupting the take |
+| `hero_orbit.mp4` | 35.36 s | 873/884 (98.8%, 24.7 fps) | reshot tighter (radius 9 m -> 4 m, hfov 1.3 -> 0.7 rad) after the first take put the rover at ~3% of frame width |
+
+An earlier chase take driven by direct `/cmd_vel` was **demoted to labelled B-roll**
+rather than shipped as hero footage. It was cut because this project's claim is
+autonomous navigation, and a hand-driven chassis does not demonstrate that whatever it
+looks like. The lighting requirement it existed to serve - putting the sun behind the
+camera - was met instead by choosing the goal bearing, which costs nothing and keeps
+the run real. Every clip's provenance now states plainly how the rover was driven.
+
+### Open, and deliberately not fixed
+
+- **The far-field seam** above ~15 m camera height (see above). Documented as a framing
+  rule rather than ground down.
+- **Crane and track shots** are implemented and their geometry verified with stills, but
+  never exercised in a live capture. Not claimed as done.
+- **`hello_moon.launch.py` sets no `GZ_PARTITION`.** It allocates a private
+  `ROS_DOMAIN_ID` per launch, but that isolates only the ROS graph - gz-sim and
+  gz-transport traffic live on gz's own partition, so two concurrent launches still
+  share one partition under the same world name. This was demonstrated accidentally:
+  a `stats` read came back showing `sim_time` in the thousands of seconds, from a
+  five-hour-old orphaned server. It is worked around in `record_cine.py` and in
+  `render_still.py`, but **not fixed in the launch file** - which matters for concurrent
+  campaign cells, not just for filming.
+- **Texel density on the ground is a regression** (4.9 vs 3.9 cm/texel) that a larger
+  bake would fix if this box had the memory for it.
