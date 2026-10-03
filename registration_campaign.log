@@ -71,3 +71,21 @@ Results -> /home/balazs/regolith/registration_campaign/seed7_perfect_rep2
 === seed 7 ===
 [seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
 [seed 7] launch is on ROS_DOMAIN_ID=49
+
+# --- restart of the interrupted perfect rep 2 cell, 2026-10-03 13:09:56 ---
+
+=== seed 7, map=perfect (--dem-post-m 0 --dem-noise-m 0 --dem-shift-m 0), rep 2 - 13:09:56 ===
+Results -> /home/balazs/regolith/registration_campaign/seed7_perfect_rep2
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=47
+[seed 7] PASS - ground truth 1.5 m from the goal after 86.8 m travelled, EKF divergence 0.3 m, 1 stuck events, 0 flips, 0 wheel-slip events
+
+=== M4 acceptance: 1/1 (judged on ground truth) [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result] ===
+    sensor suite: wheel odometry + IMU + terrain-relative fix
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7                 PASS      1.5m      86.8m     0.3m      1      0      0
+=== finished 13:54:28 ===
+campaign complete - 13:54:38
