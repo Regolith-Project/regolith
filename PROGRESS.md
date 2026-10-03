@@ -6388,7 +6388,7 @@ the arm ordering is monotone in the one variable that changed:
 
     arm       map displacement   accept rate   divergence (median/final)   verdict
     perfect        0 m             17%, 28%         0.37, 0.32 m           PASS x2
-    shift1         1.41 m            34%            1.21 / 1.89 m          PASS, by 7 cm
+    shift1         1.41 m            34%            1.21 / 1.89 m          PASS, by 7 cm  [WRONG - see correction below]
     shift3         4.24 m            90%            4.29 m                 FAIL_FALSE_ARRIVAL
 
 **Matcher confidence is an increasing function of registration error: 17% ->
@@ -6402,6 +6402,10 @@ Qualified by the second perfect-map rep, run later (2026-10-03, see below): it
 accepted **28%**, not 17%. The ordering survives, but perfect against 1 m is now
 17-28% against 34% at n=1-2 - not a resolved gap. The step that is unambiguous
 is the one to 3 m (90%, 99%).
+
+*[Corrected below: the "1.43 m" and "seven centimetres" in this paragraph are wrong.
+The rover stopped 1.56 m from the goal, outside the bar. The conclusion stands,
+and more strongly - see "Correction: the 1 m arm stopped outside the bar".]*
 
 **The "better than 1 m co-registration" requirement derived offline is real and
 has no margin.** The 1 m arm passed, but it finished 1.43 m from the goal against
@@ -6474,6 +6478,38 @@ AFTER the corrected offline table, not before it: an earlier draft of the script
 called 2 m posts + 0.15 m noise + 0.5 m shift "realistic", which the corrected
 model says is a catastrophic map rather than a plausible one. That draft was
 never run.
+
+### Correction: the 1 m arm stopped outside the bar
+
+The paragraph above says the 1 m arm "finished 1.43 m from the goal against a
+1.5 m bar - seven centimetres of room", and the table scores it "PASS, by 7 cm".
+**Both are wrong**, and it is the same misreading already retracted once in this
+document: the verdict snapshot read as a resting place. The paragraph is
+flagged in place rather than rewritten.
+
+From the cell's own `seed_7_result.json` and 10 Hz signals:
+
+    verdict_gt_error_m        1.48 m   snapshot, first sample inside 1.50 m (sim 528.0 s)
+    goal_reached_gt_error_m   1.55 m   where the rover declared arrival
+    stopped_gt_error_m        1.56 m   where it came to rest
+    closest approach          0.06 m   sim 536.7 s - it drove over the goal
+
+The 1.43 m figure matches nothing in the run's files; its source is not known.
+
+What actually happened is the bias mechanism, visibly. The rover crossed the bar
+(which is all PASS records), drove to within 6 cm of the true goal, did not stop
+there because its estimate - displaced with the map, 1.87 m out by then - put
+the goal further on, and came to rest 1.56 m beyond it, where its map said the
+goal was. The harness's PASS is correct by its own definition (ground truth
+crossed the bar); judged on where the rover stopped, the 1 m arm **misses by
+6 cm**.
+
+So the conclusion strengthens rather than weakens: the "better than 1 m"
+co-registration requirement does not merely have no margin on this seed, a 1 m
+offset (1.41 m on the diagonal) already exceeds the arrival budget. The
+divergence figures in the table (1.21 m median, 1.89 m final) and the
+replay-vs-live comparison are unaffected - they never came from the snapshot.
+Still n=1.
 
 
 ### The first live run, and a second frame bug - this one found by the rover
