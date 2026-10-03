@@ -22,15 +22,43 @@ import re
 
 import numpy as np
 
+# Matches BOTH wordings the node has used. The line was reworded from "Terrain fix
+# #N ... : correction (dx, dy)" to "Terrain correction #N ... : (dx, dy)", and this
+# pattern was not updated - so from that rewording until 2026-09-14 this script
+# silently reported "fixes published 0" for every run, including runs that had
+# published fourteen. Nothing failed; a count simply came back empty, which reads
+# exactly like a matcher that rejected everything. Both forms are kept because
+# both appear in campaign logs already on disk. test_report_parsers.py pins them.
 FIX_RE = re.compile(
-    r"Terrain fix #(\d+) at ([\d.]+) m travelled: correction \(([-+][\d.]+), ([-+][\d.]+)\) m, "
-    r"margin ([\d.]+)"
+    r"Terrain (?:fix|correction) #(\d+) at ([\d.]+) m travelled: (?:correction )?"
+    r"\(([-+][\d.]+), ([-+][\d.]+)\) m, margin ([\d.]+)"
 )
 REJECT_MARGIN_RE = re.compile(r"Terrain fix rejected: margin")
 REJECT_CONSISTENCY_RE = re.compile(r"Terrain fix rejected: disagrees")
+# The authoritative running totals, carried inside the correction line itself.
+TOTALS_RE = re.compile(
+    r"Terrain correction #(\d+) at [\d.]+ m travelled: .*?(\d+) poses published "
+    r"\(rejected so far: (\d+) ambiguous, (\d+) inconsistent\)"
+)
 
 
 def node_activity(run_dir: Path) -> dict:
+    """What the matcher actually did, from the node's own accounting.
+
+    COUNT THE COUNTERS, NOT THE LINES. Every one of these log calls is throttled -
+    the correction line to one per `report_every_m` of travel, both rejection lines
+    to one per 30 s - so the number of lines in the log is a sample of the activity
+    and not a measure of it. An earlier version of this function counted lines, and
+    on a real run that reported 14 corrections where the node had applied 61 and 28
+    ambiguous rejections where it had counted 226. The node carries the true
+    running totals inside the correction line; those are what this reads, and line
+    counting survives only as a fallback for a log with no correction line at all
+    (a run where nothing was ever published, where the line count IS the total).
+
+    `sampled_fixes` is the per-line detail - offsets and margins - and is a
+    throttled SAMPLE by construction. Its offsets are also post-clamp, so they say
+    what the filter was asked to do, not what the matcher measured.
+    """
     logs = list(run_dir.glob("*_launch.log"))
     if not logs:
         return {}
@@ -40,10 +68,21 @@ def node_activity(run_dir: Path) -> dict:
          "margin": float(m[4])}
         for m in FIX_RE.findall(text)
     ]
+    totals = TOTALS_RE.findall(text)
+    if totals:
+        n, poses, ambiguous, inconsistent = (int(v) for v in totals[-1])
+    else:
+        n, poses = len(fixes), 0
+        ambiguous = len(REJECT_MARGIN_RE.findall(text))
+        inconsistent = len(REJECT_CONSISTENCY_RE.findall(text))
     return {
-        "fixes": fixes,
-        "rejected_ambiguous": len(REJECT_MARGIN_RE.findall(text)),
-        "rejected_inconsistent": len(REJECT_CONSISTENCY_RE.findall(text)),
+        "fixes": fixes,                  # kept for callers that want the sample
+        "sampled_fixes": fixes,
+        "corrections_applied": n,
+        "poses_published": poses,
+        "rejected_ambiguous": ambiguous,
+        "rejected_inconsistent": inconsistent,
+        "counts_are_sampled": not totals,
     }
 
 
@@ -85,15 +124,17 @@ def main() -> None:
               f"diverg {r.get('divergence_m', float('nan')):6.2f}  "
               f"travelled {r.get('gt_travelled_m', float('nan')):6.1f}")
         if activity:
-            fixes = activity["fixes"]
-            print(f"{'':34s}     fixes published {len(fixes)}, rejected "
+            fixes = activity["sampled_fixes"]
+            print(f"{'':34s}     corrections applied {activity['corrections_applied']}, "
+                  f"{activity['poses_published']} poses published, rejected "
                   f"{activity['rejected_ambiguous']} ambiguous / "
                   f"{activity['rejected_inconsistent']} inconsistent")
             if fixes:
                 mags = [np.hypot(f["dx"], f["dy"]) for f in fixes]
-                print(f"{'':34s}     correction magnitude: median {np.median(mags):.2f} m, "
-                      f"max {max(mags):.2f} m, margins "
-                      f"{min(f['margin'] for f in fixes):.1f}-{max(f['margin'] for f in fixes):.1f}")
+                print(f"{'':34s}     (throttled sample of {len(fixes)}, post-clamp) "
+                      f"correction median {np.median(mags):.2f} m, max {max(mags):.2f} m, "
+                      f"margins {min(f['margin'] for f in fixes):.1f}-"
+                      f"{max(f['margin'] for f in fixes):.1f}")
         print(f"{'':34s}     IMU vs ground-truth attitude: {imu_vs_truth(run_dir)}")
 
     for arm in ("ON ", "OFF"):
