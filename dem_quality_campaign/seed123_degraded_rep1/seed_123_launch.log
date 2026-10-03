@@ -1,0 +1,142 @@
+[INFO] [launch]: All log files can be found below /home/balazs/.ros/log/2026-09-14-11-22-46-641301-DESKTOP-IE5MOME-1911
+[INFO] [launch]: Default logging verbosity is set to INFO
+[hello_moon.launch] Using ROS_DOMAIN_ID=74 (isolated DDS domain for this launch - see PROGRESS.md)
+[hello_moon.launch] TERRAIN-RELATIVE NAVIGATION ENABLED - the EKF is fused with an absolute position fix matched from IMU attitude against the a-priori DEM. No ground truth is read, so runs with this on ARE milestone results. Replayed through 25 recorded runs it cuts final EKF error from 2.97 m to 0.71 m median, but a replay is not a run - see PROGRESS.md before reading anything into a single result.
+[hello_moon.launch] A-PRIORI DEM DEGRADED: posts 2.0 m, noise 0.02 m, registration shift 0.5 m (seed 1). This run's localisation numbers are NOT perfect-map numbers.
+[INFO] [ruby $(which gz) sim-1]: process started with pid [1955]
+[INFO] [robot_state_publisher-2]: process started with pid [1957]
+[INFO] [parameter_bridge-3]: process started with pid [1960]
+[INFO] [wheel_slip_node.py-4]: process started with pid [1962]
+[INFO] [terrain_relative_node.py-5]: process started with pid [1965]
+[INFO] [sensor_covariance_relay.py-6]: process started with pid [1967]
+[INFO] [ekf_node-7]: process started with pid [1969]
+[INFO] [costmap_node-8]: process started with pid [1971]
+[INFO] [planner_node-9]: process started with pid [1973]
+[INFO] [pure_pursuit_node-10]: process started with pid [1975]
+[INFO] [flip_recovery_node.py-11]: process started with pid [1977]
+[INFO] [mission_markers_node.py-12]: process started with pid [1979]
+[parameter_bridge-3] [INFO] [1789377768.206034295] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/clock (gz.msgs.Clock) -> /clock (rosgraph_msgs/msg/Clock)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.208043328] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/cmd_vel (gz.msgs.Twist) -> /cmd_vel (geometry_msgs/msg/Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.211008570] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/cmd_vel (geometry_msgs/msg/Twist) -> /cmd_vel (gz.msgs.Twist)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.212312988] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/odometry (gz.msgs.Odometry) -> /odometry (nav_msgs/msg/Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.214454112] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/odometry (nav_msgs/msg/Odometry) -> /odometry (gz.msgs.Odometry)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.215763413] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera (gz.msgs.Image) -> /camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.218816579] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera (sensor_msgs/msg/Image) -> /camera (gz.msgs.Image)] (Lazy 0)
+[robot_state_publisher-2] [INFO] [1789377768.219261263] [robot_state_publisher]: got segment base_link
+[robot_state_publisher-2] [INFO] [1789377768.219427846] [robot_state_publisher]: got segment camera_link
+[robot_state_publisher-2] [INFO] [1789377768.219442380] [robot_state_publisher]: got segment chassis
+[robot_state_publisher-2] [INFO] [1789377768.219449949] [robot_state_publisher]: got segment front_left_wheel
+[robot_state_publisher-2] [INFO] [1789377768.219457477] [robot_state_publisher]: got segment front_right_wheel
+[robot_state_publisher-2] [INFO] [1789377768.219464452] [robot_state_publisher]: got segment imu_link
+[robot_state_publisher-2] [INFO] [1789377768.219471314] [robot_state_publisher]: got segment rear_left_wheel
+[robot_state_publisher-2] [INFO] [1789377768.219477967] [robot_state_publisher]: got segment rear_right_wheel
+[parameter_bridge-3] [INFO] [1789377768.219875579] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/camera_info (gz.msgs.CameraInfo) -> /camera_info (sensor_msgs/msg/CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.220746497] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/camera_info (sensor_msgs/msg/CameraInfo) -> /camera_info (gz.msgs.CameraInfo)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.221765215] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/depth_camera (gz.msgs.Image) -> /depth_camera (sensor_msgs/msg/Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.222875866] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/depth_camera (sensor_msgs/msg/Image) -> /depth_camera (gz.msgs.Image)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.223872085] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/imu (gz.msgs.IMU) -> /imu (sensor_msgs/msg/Imu)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.225458601] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/imu (sensor_msgs/msg/Imu) -> /imu (gz.msgs.IMU)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.226892497] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/world/regolith_moon/model/rover/joint_state (gz.msgs.Model) -> /world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.228813698] [ros_gz_bridge]: Creating ROS->GZ Bridge: [/world/regolith_moon/model/rover/joint_state (sensor_msgs/msg/JointState) -> /world/regolith_moon/model/rover/joint_state (gz.msgs.Model)] (Lazy 0)
+[parameter_bridge-3] [INFO] [1789377768.229790615] [ros_gz_bridge]: Creating GZ->ROS Bridge: [/model/rover/pose (gz.msgs.Pose) -> /model/rover/pose (geometry_msgs/msg/PoseStamped)] (Lazy 0)
+[wheel_slip_node.py-4] [INFO] [1789377768.656848738] [regolith_wheel_slip]: Wheel-slip ZUPT armed: /odom -> /odom/gated (onboard signals only - wheel odometry and IMU, never ground truth). legacy_rigid_body_signature=False
+[flip_recovery_node.py-11] [INFO] [1789377768.715895445] [regolith_flip_recovery]: Flip/stuck recovery armed (simulated set_pose backstop for flips, straight-line cmd_vel override for stuck-but-upright). Detection uses GROUND TRUTH - a simulation oracle; see onboard_only for the hardware-runnable path.
+[terrain_relative_node.py-5] [WARN] [1789377768.743852102] [regolith_terrain_relative]: A-PRIORI DEM DELIBERATELY DEGRADED: posts 2.00 m (native 0.39 m), elevation noise 0.02 m sigma -> 0.020 m realised rms (seed 1), registration shift 0.50 m on both axes.
+[terrain_relative_node.py-5] [INFO] [1789377768.785097672] [regolith_terrain_relative]: Terrain-relative navigation active: 15 m window, fixing at 1.0 Hz, +-6 m search at 0.25 m, DEM 0.391 m/px from /home/balazs/.cache/regolith/worlds/seed_123/manifest.json. Onboard sensors only - no ground truth is read by this node.
+[costmap_node-8] [INFO] [1789377768.786774508] [regolith_costmap]: Published costmap: 256x256 cells at 0.781 m/cell
+[mission_markers_node.py-12] [INFO] [1789377768.796103228] [regolith_mission_markers]: Mission markers active - start at (0.0, 0.0), Gazebo flags on, RViz on /mission_markers
+[planner_node-9] [WARN] [1789377772.800068279] [regolith_planner]: No costmap or current pose yet - ignoring goal
+[planner_node-9] [INFO] [1789377782.838602276] [regolith_planner]: Planned path: 73 waypoints, start=(127, 128) goal=(86, 60)
+[parameter_bridge-3] [INFO] [1789377783.135526787] [ros_gz_bridge]: Passing message from ROS geometry_msgs/msg/Twist to Gazebo gz.msgs.Twist (showing msg only once per type)
+[pure_pursuit_node-10] [WARN] [1789377814.731008987] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-9] [INFO] [1789377814.802074187] [regolith_planner]: Planned path: 73 waypoints, start=(127, 128) goal=(86, 60)
+[pure_pursuit_node-10] [INFO] [1789377816.942186486] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-8] [WARN] [1789377816.949378371] [regolith_costmap]: Hazard #1 marked at (-0.31, -0.74): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-10] [INFO] [1789377816.949547354] [regolith_pure_pursuit]: Costmap changed (a new keep-out zone) - restoring the replan budget: the route being retried is not the one that already failed
+[pure_pursuit_node-10] [INFO] [1789377837.991845485] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-11] [WARN] [1789377838.051663120] [regolith_flip_recovery]: STUCK RECOVERY #1 (escalation level 0, triggered by ground truth; 1 ground-truth / 0 onboard-estimate / 0 wheel-slip triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.23x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-9] [WARN] [1789377838.053319731] [regolith_planner]: Current-position cell (128, 128) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (128, 129) instead
+[planner_node-9] [INFO] [1789377838.153487551] [regolith_planner]: Planned path: 74 waypoints, start=(128, 129) goal=(86, 60)
+[flip_recovery_node.py-11] [WARN] [1789377843.334475482] [regolith_flip_recovery]: STUCK RECOVERY #1 result: ground truth moved 0.61 m during the maneuver - FREED (1/1 escapes have freed the rover so far)
+[pure_pursuit_node-10] [WARN] [1789377870.968192419] [regolith_pure_pursuit]: Stalled for 8s - stopping and replanning
+[planner_node-9] [WARN] [1789377870.969561881] [regolith_planner]: Current-position cell (128, 128) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (128, 129) instead
+[planner_node-9] [INFO] [1789377871.038794083] [regolith_planner]: Planned path: 74 waypoints, start=(128, 129) goal=(86, 60)
+[terrain_relative_node.py-5] [INFO] [1789378086.454867648] [regolith_terrain_relative]: Terrain fix held: first window, offset (+2.81, -1.81), margin 8.12 - waiting for an independent window to confirm
+[terrain_relative_node.py-5] [INFO] [1789378091.509621253] [regolith_terrain_relative]: Terrain correction #1 at 7.9 m travelled: (+0.43, -0.26) m, margin 7.58, 39 samples, 2 poses published (rejected so far: 0 ambiguous, 0 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1789378242.810916263] [regolith_terrain_relative]: Terrain correction #6 at 13.4 m travelled: (+0.50, +0.07) m, margin 2.53, 66 samples, 32 poses published (rejected so far: 0 ambiguous, 0 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1789378301.879988640] [regolith_terrain_relative]: Terrain fix rejected: disagrees with the previous window by 1.97 m (> 1.50); offset now (+3.35, +0.09), was (+2.81, -1.81)
+[terrain_relative_node.py-5] [INFO] [1789378373.872791439] [regolith_terrain_relative]: Terrain correction #11 at 19.1 m travelled: (-0.38, +0.33) m, margin 2.65, 74 samples, 63 poses published (rejected so far: 0 ambiguous, 1 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1789378466.372331291] [regolith_terrain_relative]: Terrain fix rejected: margin 1.50 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378497.796190393] [regolith_terrain_relative]: Terrain fix rejected: margin 1.42 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378527.919823125] [regolith_terrain_relative]: Terrain fix rejected: margin 1.36 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378560.320819556] [regolith_terrain_relative]: Terrain fix rejected: margin 1.42 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378590.405553322] [regolith_terrain_relative]: Terrain fix rejected: margin 1.58 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378622.069302210] [regolith_terrain_relative]: Terrain fix rejected: margin 1.30 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378652.590598021] [regolith_terrain_relative]: Terrain fix rejected: margin 1.44 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[wheel_slip_node.py-4] [WARN] [1789378661.371283746] [regolith_wheel_slip]: WHEEL SLIP #1: over the last 15.0 s the wheels claim 2.09 m and 3.56 rad of turning; the gyro saw 0.52 rad (14% of it) and the attitude spanned 18.31 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[pure_pursuit_node-10] [INFO] [1789378682.417681067] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-8] [WARN] [1789378682.424811296] [regolith_costmap]: Hazard #2 marked at (-25.89, -5.54): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[pure_pursuit_node-10] [INFO] [1789378682.425294125] [regolith_pure_pursuit]: Costmap changed (a new keep-out zone) - restoring the replan budget: the route being retried is not the one that already failed
+[terrain_relative_node.py-5] [INFO] [1789378684.136924747] [regolith_terrain_relative]: Terrain fix rejected: margin 1.52 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[wheel_slip_node.py-4] [WARN] [1789378696.560788787] [regolith_wheel_slip]: WHEEL SLIP #1 cleared - over the last 5.0 s the wheels claimed 0.59 rad of turning and the gyro corroborated 25% of it. Phantom distance kept out of the EKF so far: 1.13 m.
+[wheel_slip_node.py-4] [WARN] [1789378696.632559941] [regolith_wheel_slip]: WHEEL SLIP #2: over the last 15.0 s the wheels claim 1.87 m and 3.59 rad of turning; the gyro saw 0.19 rad (5% of it) and the attitude spanned 13.39 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[pure_pursuit_node-10] [INFO] [1789378701.181578629] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-11] [WARN] [1789378701.242558305] [regolith_flip_recovery]: STUCK RECOVERY #2 (escalation level 0, triggered by wheel slip (onboard); 1 ground-truth / 0 onboard-estimate / 1 wheel-slip triggers so far). Escape maneuver: reversed 0.20 m/s for 3.0s, then turned left at 0.50 rad/s for 2.0s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-9] [WARN] [1789378701.243869830] [regolith_planner]: Current-position cell (121, 95) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (121, 96) instead
+[planner_node-9] [INFO] [1789378701.271792909] [regolith_planner]: Planned path: 43 waypoints, start=(121, 96) goal=(86, 60)
+[wheel_slip_node.py-4] [WARN] [1789378704.439064793] [regolith_wheel_slip]: WHEEL SLIP #2 cleared - over the last 5.0 s the wheels claimed 0.78 rad of turning and the gyro corroborated 74% of it. Phantom distance kept out of the EKF so far: 1.13 m.
+[flip_recovery_node.py-11] [WARN] [1789378705.791996970] [regolith_flip_recovery]: STUCK RECOVERY #2 result: ground truth moved 0.60 m during the maneuver - FREED (2/2 escapes have freed the rover so far)
+[terrain_relative_node.py-5] [INFO] [1789378714.511545406] [regolith_terrain_relative]: Terrain fix rejected: margin 1.52 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378745.871632502] [regolith_terrain_relative]: Terrain fix rejected: margin 1.50 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378778.112954262] [regolith_terrain_relative]: Terrain fix rejected: margin 1.48 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378812.413602328] [regolith_terrain_relative]: Terrain fix rejected: margin 1.45 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378844.803969878] [regolith_terrain_relative]: Terrain fix rejected: margin 1.49 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378878.415494044] [regolith_terrain_relative]: Terrain fix rejected: margin 1.50 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378909.390131069] [regolith_terrain_relative]: Terrain fix rejected: margin 1.52 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378941.761390073] [regolith_terrain_relative]: Terrain fix rejected: margin 1.59 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789378972.536204841] [regolith_terrain_relative]: Terrain fix rejected: margin 1.48 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379006.949017402] [regolith_terrain_relative]: Terrain fix rejected: margin 1.44 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[wheel_slip_node.py-4] [WARN] [1789379031.971807880] [regolith_wheel_slip]: WHEEL SLIP #3: over the last 15.0 s the wheels claim 2.54 m and 2.64 rad of turning; the gyro saw 0.38 rad (14% of it) and the attitude spanned 17.07 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[terrain_relative_node.py-5] [INFO] [1789379040.739765422] [regolith_terrain_relative]: Terrain fix rejected: margin 1.42 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[pure_pursuit_node-10] [INFO] [1789379051.334407790] [regolith_pure_pursuit]: Recovery node has taken over /cmd_vel - pausing path following
+[costmap_node-8] [WARN] [1789379051.341075271] [regolith_costmap]: Hazard #3 marked at (-33.37, -10.47): 13 cells lethal (1.2 m + 0.3 m rover radius). The rover got wedged here; the planner will route around it from now on.
+[wheel_slip_node.py-4] [WARN] [1789379067.968224798] [regolith_wheel_slip]: WHEEL SLIP #3 cleared - over the last 5.0 s the wheels claimed 0.16 rad of turning and the gyro corroborated 8% of it. Phantom distance kept out of the EKF so far: 2.79 m.
+[wheel_slip_node.py-4] [WARN] [1789379068.041992432] [regolith_wheel_slip]: WHEEL SLIP #4: over the last 15.0 s the wheels claim 2.50 m and 2.90 rad of turning; the gyro saw 0.10 rad (4% of it) and the attitude spanned 3.72 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[terrain_relative_node.py-5] [INFO] [1789379073.905397156] [regolith_terrain_relative]: Terrain fix rejected: margin 1.48 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[wheel_slip_node.py-4] [WARN] [1789379075.603189497] [regolith_wheel_slip]: WHEEL SLIP #4 cleared - over the last 5.0 s the wheels claimed 0.14 rad of turning and the gyro corroborated 73% of it. Phantom distance kept out of the EKF so far: 3.09 m.
+[wheel_slip_node.py-4] [WARN] [1789379075.678872725] [regolith_wheel_slip]: WHEEL SLIP #5: over the last 15.0 s the wheels claim 2.47 m and 2.62 rad of turning; the gyro saw 0.19 rad (7% of it) and the attitude spanned 6.14 deg. Feeding the EKF a zero-velocity update instead of the wheels' claim.
+[wheel_slip_node.py-4] [WARN] [1789379083.332723961] [regolith_wheel_slip]: WHEEL SLIP #5 cleared - over the last 5.0 s the wheels claimed 0.74 rad of turning and the gyro corroborated 74% of it. Phantom distance kept out of the EKF so far: 3.09 m.
+[pure_pursuit_node-10] [INFO] [1789379085.498581930] [regolith_pure_pursuit]: Recovery finished - resuming path following
+[flip_recovery_node.py-11] [WARN] [1789379085.559329591] [regolith_flip_recovery]: STUCK RECOVERY #3 (escalation level 1, triggered by wheel slip (onboard); 1 ground-truth / 0 onboard-estimate / 2 wheel-slip triggers so far). Escape maneuver: reversed 0.20 m/s for 6.0s, then turned right at 0.50 rad/s for 3.5s (sim time, exact - driven by the sim clock directly, not an RTF-estimated wall-clock sleep; RTF over this window measured 0.25x real time, logged for comparison only). A real rover's FDIR could do the same - this is not a simulated teleport.
+[planner_node-9] [WARN] [1789379085.561558752] [regolith_planner]: Current-position cell (114, 86) is lethal (drift, or a keep-out zone this rover marked itself) - planning from the nearest free cell (113, 87) instead
+[planner_node-9] [INFO] [1789379085.581590969] [regolith_planner]: Planned path: 36 waypoints, start=(113, 87) goal=(86, 60)
+[flip_recovery_node.py-11] [WARN] [1789379090.122953893] [regolith_flip_recovery]: STUCK RECOVERY #3 result: ground truth moved 1.02 m during the maneuver - FREED (3/3 escapes have freed the rover so far)
+[terrain_relative_node.py-5] [INFO] [1789379104.566905984] [regolith_terrain_relative]: Terrain fix rejected: margin 1.61 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379135.032685101] [regolith_terrain_relative]: Terrain fix rejected: margin 1.61 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379166.096768603] [regolith_terrain_relative]: Terrain fix rejected: margin 1.59 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379199.307303457] [regolith_terrain_relative]: Terrain fix rejected: margin 1.57 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379233.023233157] [regolith_terrain_relative]: Terrain fix rejected: margin 1.54 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379263.991651716] [regolith_terrain_relative]: Terrain fix rejected: margin 1.52 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379282.717624488] [regolith_terrain_relative]: Terrain correction #15 at 47.5 m travelled: (-0.12, +0.48) m, margin 2.01, 75 samples, 285 poses published (rejected so far: 198 ambiguous, 1 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1789379304.466428931] [regolith_terrain_relative]: Terrain fix rejected: margin 1.68 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379336.323354787] [regolith_terrain_relative]: Terrain fix rejected: margin 1.59 < 2.00 - this stretch of terrain does not determine position (74 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379368.359394993] [regolith_terrain_relative]: Terrain fix rejected: margin 1.61 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379402.337633566] [regolith_terrain_relative]: Terrain fix rejected: margin 1.63 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379435.680432671] [regolith_terrain_relative]: Terrain fix rejected: margin 1.62 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379465.697806925] [regolith_terrain_relative]: Terrain fix rejected: margin 1.76 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379498.797966779] [regolith_terrain_relative]: Terrain fix rejected: margin 1.77 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379530.481747200] [regolith_terrain_relative]: Terrain fix rejected: margin 1.64 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379560.501799766] [regolith_terrain_relative]: Terrain fix rejected: margin 1.65 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379591.363957152] [regolith_terrain_relative]: Terrain fix rejected: margin 1.66 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379623.123153084] [regolith_terrain_relative]: Terrain fix rejected: margin 1.68 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379653.656512915] [regolith_terrain_relative]: Terrain fix rejected: margin 1.74 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379683.699916937] [regolith_terrain_relative]: Terrain fix rejected: margin 1.68 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379714.245228577] [regolith_terrain_relative]: Terrain fix rejected: margin 1.65 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379744.545236604] [regolith_terrain_relative]: Terrain fix rejected: margin 1.59 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379776.130930164] [regolith_terrain_relative]: Terrain fix rejected: margin 1.81 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379808.794960724] [regolith_terrain_relative]: Terrain fix rejected: margin 1.84 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379841.854768008] [regolith_terrain_relative]: Terrain fix rejected: margin 1.83 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379874.606500773] [regolith_terrain_relative]: Terrain fix rejected: margin 1.81 < 2.00 - this stretch of terrain does not determine position (75 samples over 15 m)
+[terrain_relative_node.py-5] [INFO] [1789379902.734495576] [regolith_terrain_relative]: Terrain correction #16 at 68.5 m travelled: (-0.14, +0.48) m, margin 2.02, 75 samples, 436 poses published (rejected so far: 343 ambiguous, 1 inconsistent)
+[terrain_relative_node.py-5] [INFO] [1789380023.153638088] [regolith_terrain_relative]: Terrain correction #21 at 74.1 m travelled: (-0.06, +0.04) m, margin 3.00, 74 samples, 466 poses published (rejected so far: 343 ambiguous, 1 inconsistent)
+[pure_pursuit_node-10] [INFO] [1789380085.384522324] [regolith_pure_pursuit]: Goal reached (within 0.35 m of the commanded goal)

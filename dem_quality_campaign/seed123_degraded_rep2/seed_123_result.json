@@ -1,0 +1,35 @@
+{
+  "verdict": "PASS",
+  "goal": [
+    -53.01,
+    -32.34
+  ],
+  "gt_final": [
+    -52.43249351563766,
+    -30.992086653557752
+  ],
+  "ekf_final": [
+    -52.44322710741412,
+    -30.35217597492698
+  ],
+  "gt_error_m": 1.466418810912386,
+  "divergence_m": 0.6400006926700318,
+  "gt_travelled_m": 79.74631644331919,
+  "ekf_travelled_m": 92.0272247759741,
+  "sim_time_s": 601.84,
+  "verdict_gt_error_m": 1.466418810912386,
+  "stopped_gt_error_m": 0.40605697392900536,
+  "stopped_gt_pos": [
+    -53.350610484642175,
+    -32.56105828151916
+  ],
+  "settled_reason": "rover declared arrival",
+  "settle_sim_s": 11.759999999999991,
+  "max_roll_deg": 12.99664282483437,
+  "max_pitch_deg": 27.915971856932423,
+  "path_planned": true,
+  "goal_publishes": 2,
+  "goal_reached_published": true,
+  "goal_reached_gt_error_m": 0.39214189651766995,
+  "wall_time_s": 2632.3929969220007
+}
