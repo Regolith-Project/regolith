@@ -6442,7 +6442,9 @@ on a map displaced by 4.24 m. Gating harder would make this worse, not better.
 Misregistration has to be excluded upstream; there is no threshold on this cost
 surface that finds it.
 
-n=1-2 per arm; the remaining reps are running.
+n=1-2 per arm. The remaining reps did not run: the campaign was stopped during
+perfect rep 2, which wrote no result. Four cells are on disk and committed
+(perfect x1, shift1 x1, shift3 x2); the numbers above are those four.
 
 Standing limits: n=2 per arm and ONE seed. Seed 123 is the seed where the fix
 does the most work, so it is the right place to start and the wrong place to

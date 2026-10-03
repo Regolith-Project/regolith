@@ -11,7 +11,7 @@ PLAN.md
 # Python bytecode from running scripts/ directly
 __pycache__/
 *.pyc
-terrain_relative_campaign/.campaign.lock
+.campaign.lock
 
 # scratch renders from scripts/render_still.py (iteration artefacts, not deliverables)
 docs/media/dev/
