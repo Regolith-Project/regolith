@@ -6387,7 +6387,7 @@ costs the full 4.24 m.
 the arm ordering is monotone in the one variable that changed:
 
     arm       map displacement   accept rate   divergence (median/final)   verdict
-    perfect        0 m               17%            0.37 m                 PASS
+    perfect        0 m             17%, 28%         0.37, 0.32 m           PASS x2
     shift1         1.41 m            34%            1.21 / 1.89 m          PASS, by 7 cm
     shift3         4.24 m            90%            4.29 m                 FAIL_FALSE_ARRIVAL
 
@@ -6397,6 +6397,11 @@ displacement makes the matcher more willing to act, because a displaced map is
 still an internally consistent map and the cost surface it produces is a good
 one. This is the property that makes misregistration qualitatively different
 from the other two defects rather than merely worse.
+
+Qualified by the second perfect-map rep, run later (2026-10-03, see below): it
+accepted **28%**, not 17%. The ordering survives, but perfect against 1 m is now
+17-28% against 34% at n=1-2 - not a resolved gap. The step that is unambiguous
+is the one to 3 m (90%, 99%).
 
 **The "better than 1 m co-registration" requirement derived offline is real and
 has no margin.** The 1 m arm passed, but it finished 1.43 m from the goal against
@@ -6411,14 +6416,14 @@ A prediction registered before this cell ran said 1.2-1.5 m. The median landed a
 1.21 m and the run's headline divergence at 1.816 m: right about the mechanism,
 optimistic about the magnitude.
 
-**There is one gate, not two - measured across all ten live cells.** Pooling
+**There is one gate, not two - measured across all eleven live cells.** Pooling
 both campaigns, every map quality, every seed:
 
     map condition              margin rejections   consistency rejections   accept
     coarsened     (seed 123)        343, 456              1, 0              6%, 2%
     perfect       (seed 123)        195, 231              2, 1             24%, 22%
     noisy         (seed 123)        224,  43              3, 5             25%, 52%
-    perfect       (seed 7)          222                   0                17%
+    perfect       (seed 7)          222, 131              0, 1             17%, 28%
     1 m shift     (seed 7)          107                   3                34%
     3 m shift     (seed 7)            5,   0              3, 1             90%, 99%
 
@@ -6442,9 +6447,11 @@ on a map displaced by 4.24 m. Gating harder would make this worse, not better.
 Misregistration has to be excluded upstream; there is no threshold on this cost
 surface that finds it.
 
-n=1-2 per arm. The remaining reps did not run: the campaign was stopped during
-perfect rep 2, which wrote no result. Four cells are on disk and committed
-(perfect x1, shift1 x1, shift3 x2); the numbers above are those four.
+n=1-2 per arm. The campaign was stopped during perfect rep 2 on 2026-09-14; that
+cell was rerun from scratch on 2026-10-03, on the pushed build, with nothing
+else changed: PASS, divergence 0.32 m (rep 1: 0.37 m), stopped 0.15 m from the
+goal (rep 1: 0.06 m), 51 corrections applied at a 28% accept rate. shift1 is
+still n=1.
 
 Standing limits: n=2 per arm and ONE seed. Seed 123 is the seed where the fix
 does the most work, so it is the right place to start and the wrong place to
