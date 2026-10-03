@@ -1,0 +1,109 @@
+
+=== seed 42, recovery=oracle, rep 1 - 13:40:47 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed42_oracle_rep1
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=73
+[seed 42] FAIL_FALSE_ARRIVAL - ground truth 1.7 m from the goal after 93.5 m travelled, EKF divergence 1.4 m, 2 stuck events, 0 flips, 3 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    42   FAIL_FALSE_ARRIVAL      1.7m      93.5m     1.4m      2      0      3
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 42: claimed arrival at 1.7 m true error
+=== finished 14:21:34 ===
+
+=== seed 42, recovery=onboard, rep 1 - 14:21:44 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed42_onboard_rep1
+
+=== seed 42 ===
+[seed 42] goal (-84.52, -13.39), 85.6 m straight line, valid=True (clear=True, connected=True)
+[seed 42] launch is on ROS_DOMAIN_ID=11
+[seed 42] FAIL_FALSE_ARRIVAL - ground truth 7.7 m from the goal after 103.7 m travelled, EKF divergence 7.4 m, 7 stuck events, 0 flips, 15 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+    42   FAIL_FALSE_ARRIVAL      7.7m     103.7m     7.4m      7      0     15
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 42: claimed arrival at 7.7 m true error
+=== finished 15:15:54 ===
+
+=== seed 7, recovery=oracle, rep 1 - 15:16:04 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed7_oracle_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=34
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 3.5 m from the goal after 93.4 m travelled, EKF divergence 3.1 m, 4 stuck events, 0 flips, 4 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      3.5m      93.4m     3.1m      4      0      4
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 3.5 m true error
+=== finished 16:05:29 ===
+
+=== seed 7, recovery=onboard, rep 1 - 16:05:36 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed7_onboard_rep1
+
+=== seed 7 ===
+[seed 7] goal (-42.57, -59.25), 73.0 m straight line, valid=True (clear=True, connected=True)
+[seed 7] launch is on ROS_DOMAIN_ID=3
+[seed 7] FAIL_FALSE_ARRIVAL - ground truth 2.9 m from the goal after 92.3 m travelled, EKF divergence 2.6 m, 4 stuck events, 0 flips, 5 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+     7   FAIL_FALSE_ARRIVAL      2.9m      92.3m     2.6m      4      0      5
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 7: claimed arrival at 2.9 m true error
+=== finished 16:55:52 ===
+
+=== seed 123, recovery=oracle, rep 1 - 16:56:02 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed123_oracle_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=75
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 11.0 m from the goal after 103.0 m travelled, EKF divergence 10.6 m, 10 stuck events, 0 flips, 23 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     11.0m     103.0m    10.6m     10      0     23
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 11.0 m true error
+=== finished 18:00:01 ===
+
+=== seed 123, recovery=onboard, rep 1 - 18:00:09 ===
+Results -> /home/balazs/regolith/onboard_recovery_campaign/seed123_onboard_rep1
+
+=== seed 123 ===
+[seed 123] goal (-53.01, -32.34), 62.1 m straight line, valid=True (clear=True, connected=True)
+[seed 123] launch is on ROS_DOMAIN_ID=9
+[seed 123] FAIL_FALSE_ARRIVAL - ground truth 18.3 m from the goal after 94.4 m travelled, EKF divergence 18.0 m, 12 stuck events, 0 flips, 33 wheel-slip events
+
+=== M4 acceptance: 0/1 (judged on ground truth) ===
+    sensor suite: wheel odometry + IMU
+    rover stops within: 0.35 m of the commanded goal (bar is 1.50 m)
+  seed              verdict  gt error  travelled   diverg  stuck  flips  slips
+   123   FAIL_FALSE_ARRIVAL     18.3m      94.4m    18.0m     12      0     33
+
+1 run(s) published /goal_reached while ground truth disagreed - the reason this harness does not trust that topic:
+  seed 123: claimed arrival at 18.3 m true error
+=== finished 19:01:43 ===
+campaign complete - 19:01:51
