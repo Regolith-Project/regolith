@@ -1,0 +1,28 @@
+{
+  "started": "2026-09-14 16:53:42",
+  "seeds": [
+    7
+  ],
+  "arrival_bar_m": 1.5,
+  "goal_tolerance_m": 0.35,
+  "legacy_rigid_body_signature": false,
+  "stuck_debug": false,
+  "record_paths": false,
+  "sim_timeout_s": 1800.0,
+  "sensor_suite": "wheel odometry + IMU + terrain-relative fix",
+  "localization_oracle": false,
+  "terrain_relative": true,
+  "dem_quality": {
+    "post_m": 0.0,
+    "noise_m": 0.0,
+    "shift_m": 3.0,
+    "noise_seed": 1,
+    "prefilter_m": 0.0,
+    "perfect": false
+  },
+  "milestone_result": true,
+  "git": {
+    "regolith": "ce826e4-dirty",
+    "regolith.universe": "50a673867-dirty"
+  }
+}
