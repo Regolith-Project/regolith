@@ -100,7 +100,7 @@ SPECS = (("planned_path_campaign/seed7_paths_rep*/seed_7_signals.csv", 7),
 out=[]
 for pattern, seed in SPECS:
     dem = trn.terrain_gradients(json.load(open(
-        Path.home() / ".cache/regolith/worlds" / f"seed_{seed}" / "manifest.json")))
+        Path.home() / ".cache/regolith/worlds" / f"seed_{seed}" / "manifest.json")))[:4]
     rows=[replay(f, dem) for f in sorted(glob.glob(pattern))]
     a=np.array(rows)
     print(f"  seed {seed:3d} ({len(rows):2d} runs): raw med {np.median(a[:,0]):6.2f} -> track med "

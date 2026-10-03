@@ -700,7 +700,9 @@ def run_watcher(args) -> int:
 def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
             visual_odometry: bool = False, goal_tolerance_m: float = 1.0,
             legacy_rigid_body_signature: bool = False, stuck_debug: bool = False,
-            terrain_relative: bool = False):
+            terrain_relative: bool = False, onboard_only_recovery: bool = False,
+            dem_post_m: float = 0.0, dem_noise_m: float = 0.0, dem_shift_m: float = 0.0,
+            dem_noise_seed: int = 0, dem_prefilter_m: float = 0.0):
     """Starts hello_moon headless in its own process group; returns (proc, get_domain)."""
     command = (
         "source /opt/ros/humble/setup.bash && "
@@ -712,7 +714,11 @@ def _launch(seed: int, log_path: Path, counters: dict, oracle: bool = False,
         f"goal_tolerance_m:={goal_tolerance_m} "
         f"legacy_rigid_body_signature:={'true' if legacy_rigid_body_signature else 'false'} "
         f"stuck_debug:={'true' if stuck_debug else 'false'} "
-        f"terrain_relative:={'true' if terrain_relative else 'false'}"
+        f"terrain_relative:={'true' if terrain_relative else 'false'} "
+        f"onboard_only_recovery:={'true' if onboard_only_recovery else 'false'} "
+        f"dem_post_m:={dem_post_m} dem_noise_m:={dem_noise_m} "
+        f"dem_shift_m:={dem_shift_m} dem_noise_seed:={dem_noise_seed} "
+        f"dem_prefilter_m:={dem_prefilter_m}"
     )
     proc = subprocess.Popen(
         ["bash", "-c", command],
@@ -812,6 +818,16 @@ def _run_metadata(args) -> dict:
                         + (" + terrain-relative fix" if args.terrain_relative else "")),
         "localization_oracle": args.localization_oracle,
         "terrain_relative": args.terrain_relative,
+        # Recorded on every run, not only degraded ones, so a summary.json always
+        # states what map the fix matched against. All zero is the perfect map.
+        "dem_quality": {
+            "post_m": args.dem_post_m,
+            "noise_m": args.dem_noise_m,
+            "shift_m": args.dem_shift_m,
+            "noise_seed": args.dem_noise_seed,
+            "prefilter_m": args.dem_prefilter_m,
+            "perfect": not (args.dem_post_m or args.dem_noise_m or args.dem_shift_m),
+        },
         # Terrain matching reads the a-priori DEM and the IMU, never ground
         # truth, so unlike the oracle it does not disqualify the run.
         "milestone_result": not args.localization_oracle,
@@ -848,7 +864,11 @@ def run_seed(seed: int, goal_xy, args, out_dir: Path) -> dict:
                            goal_tolerance_m=args.goal_tolerance_m,
                            legacy_rigid_body_signature=args.legacy_rigid_body_signature,
                            stuck_debug=args.stuck_debug,
-                           terrain_relative=args.terrain_relative)
+                           terrain_relative=args.terrain_relative,
+                           onboard_only_recovery=args.onboard_only_recovery,
+                           dem_post_m=args.dem_post_m, dem_noise_m=args.dem_noise_m,
+                           dem_shift_m=args.dem_shift_m, dem_noise_seed=args.dem_noise_seed,
+                           dem_prefilter_m=args.dem_prefilter_m)
     try:
         deadline = time.monotonic() + 120.0
         while domain["id"] is None and time.monotonic() < deadline:
@@ -971,6 +991,31 @@ def main() -> int:
              "validation is what this flag is for."
     )
     parser.add_argument(
+        "--dem-post-m", type=float, default=0.0,
+        help="degrade the a-priori DEM to this post spacing before terrain matching "
+             "(default 0 = the generator's own heightmap, a perfect map). Offline replay "
+             "says detail loss is survivable and misregistration is not; --dem-shift-m is "
+             "the one to worry about."
+    )
+    parser.add_argument(
+        "--dem-noise-m", type=float, default=0.0,
+        help="add spatially-correlated elevation error to the a-priori DEM, sigma in metres."
+    )
+    parser.add_argument(
+        "--dem-shift-m", type=float, default=0.0,
+        help="displace the a-priori DEM by this distance on both axes (registration error)."
+    )
+    parser.add_argument(
+        "--dem-prefilter-m", type=float, default=0.0,
+        help="smooth the a-priori DEM by this length before matching. The mitigation for "
+             "DEM vertical error, not a defect: it recovered 0.1 m of height error from "
+             "6.16 m to 1.73 m in replay, at a cost of 0.71 -> 1.66 m on a good map."
+    )
+    parser.add_argument(
+        "--dem-noise-seed", type=int, default=0,
+        help="RNG seed for --dem-noise-m, so a degraded map is reproducible."
+    )
+    parser.add_argument(
         "--no-visual-odometry", action="store_true",
         help="run on wheel odometry + IMU alone. This is now the DEFAULT and the flag is a "
              "no-op, kept so the invocations recorded in PROGRESS.md still mean what they "
@@ -1024,6 +1069,11 @@ def main() -> int:
              "commanded_speed that caused it. For investigating the fixed-arm chokepoint "
              "split (PROGRESS.md) - noisy, not for campaign use."
     )
+    parser.add_argument(
+        "--onboard-only-recovery", action="store_true",
+        help="SIM-TO-REAL: flip/stuck recovery reads IMU + EKF instead of ground truth, "
+             "and does not teleport on a flip. The shipped escape numbers were all "
+             "measured WITHOUT this, i.e. with a detector no real rover has")
     parser.add_argument("--watch", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--goal", help=argparse.SUPPRESS)
     parser.add_argument("--trace-csv", help=argparse.SUPPRESS)
@@ -1074,6 +1124,9 @@ def main() -> int:
     mode = " [LOCALIZATION ORACLE - EXPERIMENT, NOT A MILESTONE RESULT]" if args.localization_oracle else ""
     if args.terrain_relative:
         mode += " [TERRAIN-RELATIVE FIX ON - onboard sensors, a milestone result]"
+    if args.terrain_relative and (args.dem_post_m or args.dem_noise_m or args.dem_shift_m):
+        mode += (f" [DEGRADED A-PRIORI DEM: {args.dem_post_m} m posts, "
+                 f"{args.dem_noise_m} m noise, {args.dem_shift_m} m registration shift]")
     # State the sensor suite on the result itself. The same harness now produces
     # three materially different numbers depending on it, and a table without this
     # line is not interpretable six months from now.

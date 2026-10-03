@@ -31,8 +31,6 @@ import json
 from pathlib import Path
 
 import numpy as np
-from regolith_costmap.costmap_node import load_heightmap
-from scipy import ndimage
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 _NODE = (REPO_ROOT / "src/regolith.universe/planetary/regolith_bringup/scripts"
@@ -62,21 +60,21 @@ def load_signals(path):
 WINDOW_M, UPDATE_M, STRIDE_M, SEARCH_M, STEP_M = 15.0, 6.0, 0.2, 6.0, 0.25
 MIN_MARGIN, CONSISTENCY_M, MIN_SAMPLES = 2.0, 1.5, 30
 
-def degraded_dem(seed, post_m=None, noise_m=0.0, shift_m=0.0, rng_seed=0):
+def degraded_dem(seed, post_m=None, noise_m=0.0, shift_m=0.0, rng_seed=0,
+                 prefilter_m=0.0):
+    """The degradation itself now lives in the node (`trn.degrade_dem`).
+
+    It was duplicated here while this script was the only consumer. It no longer
+    is: `terrain_relative_node.py` takes the same three defects as ROS parameters
+    so the live stack can be run on a degraded map, and the whole value of that
+    live run is that it tests the prediction THIS script makes. Two copies of the
+    model would let the prediction and the test drift apart without either
+    changing visibly, so there is one copy and this calls it.
+    """
     m = json.load(open(Path.home() / ".cache/regolith/worlds" / f"seed_{seed}" / "manifest.json"))
-    dem = load_heightmap(m)
-    W = float(m["world_size_m"]); res = W/(dem.shape[0]-1)
-    if post_m:            # coarser posts, then back to the same grid: information lost
-        factor = post_m/res
-        small = ndimage.zoom(dem, 1.0/factor, order=1)
-        dem = ndimage.zoom(small, np.array(dem.shape)/np.array(small.shape), order=1)
-    if noise_m:
-        rng = np.random.default_rng(rng_seed)
-        dem = dem + ndimage.gaussian_filter(
-            rng.normal(0, noise_m, dem.shape), sigma=max(post_m or res, res)/res)
-    if shift_m:           # registration error: the map is right, but not where it says
-        dem = ndimage.shift(dem, (shift_m/res, shift_m/res), order=1, mode="nearest")
-    gy, gx = np.gradient(dem, res)
+    gx, gy, W, res, _ = trn.terrain_gradients(
+        m, post_m=post_m or 0.0, noise_m=noise_m, shift_m=shift_m, noise_seed=rng_seed,
+        prefilter_m=prefilter_m)
     return gx, gy, W, res
 
 def replay(path, dem):
@@ -127,9 +125,38 @@ def run_case(label, **kw):
 
 print("=== a-priori DEM quality vs closed-loop replay (25 runs, seeds 7/55/123) ===")
 run_case("perfect map (as shipped)")
+
+# DETAIL LOSS alone. Survivable, and in the safe direction.
 for post in (1.0, 2.0, 5.0):
     run_case(f"posts coarsened to {post:.0f} m", post_m=post)
-for noise in (0.1, 0.3):
-    run_case(f"elevation noise {noise:.1f} m rms", noise_m=noise, post_m=2.0)
+
+# VERTICAL ERROR alone, at the native post spacing. This is the arm whose earlier
+# version was mislabelled: the drawn field was smoothed and never renormalised, so
+# "0.1 m rms" applied about 0.005 m and scored identically to coarsening-only. With
+# the amplitude it claims, vertical error is the WORST of the three defects.
+for noise in (0.02, 0.05, 0.10, 0.30):
+    run_case(f"elevation noise {noise:.2f} m rms", noise_m=noise)
+
+# VERTICAL ERROR at a realistic correlation length. A DTM's height error is
+# correlated over the DTM's OWN posts, not over the finer grid it is resampled
+# onto, and that length is what converts metres of height error into degrees of
+# slope error. Coarser posts therefore PROTECT against the same vertical error -
+# the one genuinely counter-intuitive result here.
+for post, noise in ((2.0, 0.02), (2.0, 0.05), (2.0, 0.10),
+                    (5.0, 0.10), (5.0, 0.30)):
+    run_case(f"{post:.0f} m posts + {noise:.2f} m noise", post_m=post, noise_m=noise)
+
+# THE MITIGATION. Same corrupted maps, but the rover smooths what it was given
+# before differentiating it. Nothing about the map improves; only what the matcher
+# does with it. If sigma/L is really the quantity that matters, lengthening L here
+# should buy back most of what the noise arms lost.
+for pre in (0.5, 1.0, 2.0):
+    run_case(f"0.10 m noise, prefilter {pre:.1f} m", noise_m=0.10, prefilter_m=pre)
+for pre in (1.0, 2.0):
+    run_case(f"2 m posts + 0.10 m noise, prefilter {pre:.1f} m",
+             post_m=2.0, noise_m=0.10, prefilter_m=pre)
+run_case("perfect map, prefilter 1.0 m", prefilter_m=1.0)
+
+# REGISTRATION. A pure bias, invisible to any confidence measure.
 for shift in (1.0, 3.0):
     run_case(f"registration shift {shift:.0f} m (both axes)", shift_m=shift)
